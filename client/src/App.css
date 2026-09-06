@@ -34,6 +34,42 @@ body {
   }
 }
 
+/* Final responsive fixes for product cards, checkout and product detail. */
+.product-actions { display: flex; align-items: center; gap: 8px; }
+.detail-button { border: 1px solid #b9d8f3; border-radius: 4px; padding: 7px 9px; background: #f5faff; color: var(--blue); cursor: pointer; font-size: 11px; white-space: nowrap; }
+.detail-button:hover { background: var(--blue); color: #fff; }
+.product-image:focus-visible, .product-name:focus-visible, .detail-button:focus-visible, .add-button:focus-visible { outline: 3px solid #8fc9ff; outline-offset: 2px; }
+.checkout-page { width: 100vw; max-width: 100%; }
+.checkout-main, .checkout-summary, .payment-option, .bank-info { min-width: 0; }
+.payment-option { width: 100%; }
+.payment-option > span { min-width: 0; flex: 1; }
+.payment-option small { line-height: 1.45; white-space: normal; }
+.detail-page { width: 100%; }
+
+@media (max-width: 700px) {
+  .storefront { overflow-x: hidden; }
+  .header-main, .quick-nav { max-width: 100%; }
+  .hero-banner, .service-row, .promo-showcase { max-width: calc(100% - 24px); }
+  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .product-footer { align-items: flex-end; gap: 8px; }
+  .product-actions { gap: 5px; }
+  .detail-button { padding: 7px 6px; font-size: 10px; }
+  .add-button { flex: 0 0 31px; }
+  .checkout-page { overflow-x: hidden; }
+  .checkout-inner { width: 100%; max-width: 100%; }
+  .checkout-main, .checkout-summary { width: 100%; }
+  .payment-option { align-items: flex-start; padding: 14px 12px; }
+  .payment-option input { flex: 0 0 auto; margin-top: 3px; }
+  .detail-page { padding-left: 12px; padding-right: 12px; }
+  .detail-modal { width: 100%; }
+}
+
+@media (max-width: 390px) {
+  .product-grid { grid-template-columns: 1fr; }
+  .product-name { min-height: auto; }
+  .product-footer { align-items: center; }
+}
+
 /* Clearer inventory controls and rows. */
 .admin-product-form label {
   font-size: 13px;

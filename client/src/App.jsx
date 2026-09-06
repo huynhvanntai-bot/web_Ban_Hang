@@ -555,14 +555,10 @@ function App() {
                 </div>
                 <div className="product-footer">
                   <strong>{formatPrice(product.price)}</strong>
-                  <button
-                    className="add-button"
-                    type="button"
-                    onClick={() => addToCart(product)}
-                    aria-label={`Thêm ${product.name}`}
-                  >
-                    +
-                  </button>
+                  <div className="product-actions">
+                    <button className="detail-button" type="button" onClick={() => openProductDetail(product)}>Xem chi tiết</button>
+                    <button className="add-button" type="button" onClick={() => addToCart(product)} aria-label={`Thêm ${product.name}`}>+</button>
+                  </div>
                 </div>
               </div>
             </article>
