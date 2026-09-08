@@ -1,0 +1,22 @@
+{
+  "name": "sene-handmade-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tiệm Len Sợi Thủ Công Sene Handmade - Cửa Hàng & Hệ Thống Quản Trị Toàn Diện",
+  "scripts": {
+    "build": "cd client && npm install && npm run build",
+    "start": "node server/src/index.js",
+    "client": "cd client && npm run dev",
+    "server": "cd server && npm run dev"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.9.5",
+    "multer": "^2.3.0"
+  }
+}

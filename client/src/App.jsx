@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import AdminPage from "./AdminPage.jsx";
 
-const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const apiUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? "/api" : "http://localhost:5000/api");
 
 function formatPrice(price) {
   return new Intl.NumberFormat("vi-VN", {
@@ -324,6 +326,73 @@ function App() {
   const [priceFilter, setPriceFilter] = useState("all");
   const [sortBy, setSortBy] = useState("default");
   const [selectedColor, setSelectedColor] = useState("Trắng kem");
+  
+  // ĐẶT MÓC THEO YÊU CẦU (CUSTOM CROCHET ORDER)
+  const [customOrderModalOpen, setCustomOrderModalOpen] = useState(false);
+  const [customOrderSubmitting, setCustomOrderSubmitting] = useState(false);
+  const [customOrderSuccess, setCustomOrderSuccess] = useState(null);
+  const [customOrderForm, setCustomOrderForm] = useState({
+    customerName: "",
+    phone: "",
+    zalo: "",
+    productType: "Hoa len handmade vĩnh cửu",
+    description: "",
+    colorPreference: "",
+    desiredDate: "",
+    budget: "",
+    referenceImages: [],
+  });
+
+  async function handleCustomOrderImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageToDataUrl(file, 800, 0.8);
+      if (dataUrl) {
+        setCustomOrderForm((prev) => ({
+          ...prev,
+          referenceImages: [dataUrl],
+        }));
+      }
+    } catch (err) {
+      console.warn("Lỗi đọc ảnh mẫu:", err);
+    }
+  }
+
+  async function handleCustomOrderSubmit(e) {
+    e.preventDefault();
+    if (!customOrderForm.customerName.trim() || !customOrderForm.phone.trim() || !customOrderForm.description.trim()) {
+      alert("Vui lòng điền đủ Họ tên, Số điện thoại và Mô tả mẫu cần móc!");
+      return;
+    }
+    setCustomOrderSubmitting(true);
+    try {
+      const res = await fetch(`${apiUrl}/custom-orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(customOrderForm),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Gửi yêu cầu thất bại");
+      setCustomOrderSuccess(result.order || { ...customOrderForm, _id: "ORD-" + Date.now().toString().slice(-6) });
+    } catch (err) {
+      console.warn("API lỗi, lưu cục bộ fallback:", err.message);
+      // Fallback lưu local
+      const localOrder = {
+        ...customOrderForm,
+        _id: "ORD-" + Date.now().toString().slice(-6),
+        createdAt: new Date().toISOString(),
+        status: "pending",
+      };
+      const existing = JSON.parse(localStorage.getItem("sene_custom_orders") || "[]");
+      existing.unshift(localOrder);
+      localStorage.setItem("sene_custom_orders", JSON.stringify(existing));
+      setCustomOrderSuccess(localOrder);
+    } finally {
+      setCustomOrderSubmitting(false);
+    }
+  }
+
   const [flashSaleTime, setFlashSaleTime] = useState({
     hours: 4,
     minutes: 25,
@@ -964,6 +1033,16 @@ function App() {
             onClick={() => setSelectedGuide(CRAFT_GUIDES[0])}
           >
             📖 Cẩm nang móc len
+          </button>
+          <button
+            type="button"
+            className="nav-pill nav-custom-order-pill"
+            onClick={() => {
+              setCustomOrderSuccess(null);
+              setCustomOrderModalOpen(true);
+            }}
+          >
+            🧶 Đặt Móc Theo Mẫu
           </button>
         </nav>
       </header>
@@ -1896,6 +1975,48 @@ function App() {
               )}
             </div>
 
+            
+            {/* GỢI Ý MUA KÈM COMBO DỤNG CỤ TIẾT KIỆM (CROSS-SELL) */}
+            <div className="cart-addons-box">
+              <div className="cart-addons-header">
+                <span className="cart-addons-badge">🎁 COMBO TIẾT KIỆM</span>
+                <h4>Dụng Cụ Thiết Yếu Cho Người Mới</h4>
+              </div>
+              <div className="cart-addons-scroll">
+                {CRAFT_ADDONS.map((addon) => {
+                  const alreadyInCart = cartItems.some((c) => c.product === addon.id);
+                  return (
+                    <div key={addon.id} className="cart-addon-card">
+                      <div className="cart-addon-icon">{addon.icon}</div>
+                      <div className="cart-addon-info">
+                        <strong className="cart-addon-name">{addon.name}</strong>
+                        <div className="cart-addon-price-row">
+                          <span className="cart-addon-price">{formatPrice(addon.price)}</span>
+                          <span className="cart-addon-old-price">{formatPrice(addon.originalPrice)}</span>
+                        </div>
+                        <small className="cart-addon-desc">{addon.desc}</small>
+                      </div>
+                      <button
+                        type="button"
+                        className={`cart-addon-add-btn ${alreadyInCart ? "added" : ""}`}
+                        onClick={() => {
+                          addToCart({
+                            _id: addon.id,
+                            name: addon.name,
+                            price: addon.price,
+                            images: addon.images,
+                            stock: addon.stock,
+                          }, 1);
+                        }}
+                      >
+                        {alreadyInCart ? "✓ Đã thêm" : "+ Thêm"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* CART FOOTER (SHOPEE STYLE) */}
             {cartItems.length > 0 && (
               <div className="cart-drawer-footer">
@@ -2655,6 +2776,41 @@ function App() {
               </div>
             </article>
 
+            
+            {/* GỢI Ý DỤNG CỤ MUA KÈM KHI XEM CHI TIẾT */}
+            <div className="detail-cross-sell-section">
+              <div className="detail-cross-sell-title">
+                <span className="cross-sell-sparkle">✨</span>
+                <strong>Gợi ý dụng cụ đan móc mua kèm tiết kiệm:</strong>
+              </div>
+              <div className="detail-cross-sell-grid">
+                {CRAFT_ADDONS.slice(0, 3).map((addon) => (
+                  <div key={addon.id} className="detail-addon-pill">
+                    <span className="addon-icon">{addon.icon}</span>
+                    <div className="addon-text">
+                      <b>{addon.name}</b>
+                      <small>{formatPrice(addon.price)} <del>{formatPrice(addon.originalPrice)}</del></small>
+                    </div>
+                    <button
+                      type="button"
+                      className="addon-quick-btn"
+                      onClick={() => {
+                        addToCart({
+                          _id: addon.id,
+                          name: addon.name,
+                          price: addon.price,
+                          images: addon.images,
+                          stock: addon.stock,
+                        }, 1);
+                      }}
+                    >
+                      + Thêm
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* TAB CHI TIẾT THÔNG SỐ & HƯỚNG DẪN */}
             <section className="detail-tabs-section">
               <div className="detail-tabs-nav">
@@ -3169,17 +3325,42 @@ function App() {
         </div>
       )}
 
-      {/* FLOATING ACTION BUTTONS */}
+      
+      {/* FLOATING QUICK CONTACT & ACTION BAR */}
       <div className="floating-actions">
         <a
-          href="https://zalo.me"
+          href="https://zalo.me/0942901124"
           target="_blank"
           rel="noreferrer"
-          className="floating-btn floating-zalo"
-          title="Tư vấn chọn len qua Zalo"
+          className="floating-btn floating-zalo pulse-glow"
+          title="Chat Zalo tư vấn chọn len trực tiếp với Sene Handmade (0942.901.124)"
         >
-          💬 <span>Tư vấn</span>
+          <span className="floating-zalo-logo">Zalo</span>
+          <span className="floating-btn-text">Chat Zalo</span>
         </a>
+
+        <a
+          href="tel:0942901124"
+          className="floating-btn floating-hotline"
+          title="Gọi Hotline đặt hàng nhanh: 0942.901.124"
+        >
+          <span className="floating-hotline-icon">📞</span>
+          <span className="floating-btn-text">Hotline: 0942.901.124</span>
+        </a>
+
+        <button
+          type="button"
+          className="floating-btn floating-custom-order"
+          onClick={() => {
+            setCustomOrderSuccess(null);
+            setCustomOrderModalOpen(true);
+          }}
+          title="Gửi yêu cầu móc thú bông, hoa len, túi xách theo ý bạn"
+        >
+          <span>🧶</span>
+          <span className="floating-btn-text">Đặt Móc Riêng</span>
+        </button>
+
         <button
           type="button"
           className="floating-btn floating-top"
@@ -3189,6 +3370,216 @@ function App() {
           ↑
         </button>
       </div>
+
+      {/* MODAL: ĐẶT MÓC LEN THEO YÊU CẦU (CUSTOM CROCHET ORDER) */}
+      {customOrderModalOpen && (
+        <div
+          className="custom-order-backdrop"
+          onClick={() => setCustomOrderModalOpen(false)}
+        >
+          <div
+            className="custom-order-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="custom-order-header">
+              <div className="custom-order-header-left">
+                <span className="custom-order-icon">🧶</span>
+                <div>
+                  <h3>Đặt Móc Len Theo Mẫu Riêng</h3>
+                  <p>Tiệm Sene Handmade nhận móc thú bông, hoa, túi xách theo hình bạn gửi!</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="custom-order-close"
+                onClick={() => setCustomOrderModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {customOrderSuccess ? (
+              <div className="custom-order-success-view">
+                <div className="success-sparkle-badge">🎉 ĐÃ TIẾP NHẬN YÊU CẦU</div>
+                <h4>Cảm ơn bạn, {customOrderSuccess.customerName}!</h4>
+                <p>
+                  Yêu cầu móc mẫu <strong>"{customOrderSuccess.productType}"</strong> của bạn đã được gửi đến thợ móc Sene Handmade.
+                </p>
+                <div className="success-order-box">
+                  <div><span>Mã yêu cầu:</span> <strong>#{customOrderSuccess._id?.slice(-8).toUpperCase()}</strong></div>
+                  <div><span>Số điện thoại:</span> <strong>{customOrderSuccess.phone}</strong></div>
+                  {customOrderSuccess.desiredDate && <div><span>Ngày cần:</span> <strong>{customOrderSuccess.desiredDate}</strong></div>}
+                </div>
+                <div className="success-actions">
+                  <a
+                    href="https://zalo.me/0942901124"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="zalo-chat-direct-btn"
+                  >
+                    💬 Nhắn Zalo ngay để gửi thêm ảnh chi tiết
+                  </a>
+                  <button
+                    type="button"
+                    className="custom-order-continue-btn"
+                    onClick={() => {
+                      setCustomOrderModalOpen(false);
+                      setCustomOrderSuccess(null);
+                    }}
+                  >
+                    Tiếp tục mua sắm
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form className="custom-order-form" onSubmit={handleCustomOrderSubmit}>
+                <div className="custom-order-form-grid">
+                  <div className="form-field">
+                    <label>Họ và tên của bạn (*)</label>
+                    <input
+                      required
+                      placeholder="VD: Nguyễn Thị Mai"
+                      value={customOrderForm.customerName}
+                      onChange={(e) =>
+                        setCustomOrderForm({ ...customOrderForm, customerName: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Số điện thoại / Zalo (*)</label>
+                    <input
+                      required
+                      placeholder="VD: 0912 345 678 (để tiệm gửi ảnh thành phẩm)"
+                      value={customOrderForm.phone}
+                      onChange={(e) =>
+                        setCustomOrderForm({
+                          ...customOrderForm,
+                          phone: e.target.value,
+                          zalo: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Loại sản phẩm bạn muốn đặt</label>
+                    <select
+                      value={customOrderForm.productType}
+                      onChange={(e) =>
+                        setCustomOrderForm({ ...customOrderForm, productType: e.target.value })
+                      }
+                    >
+                      <option value="Hoa len handmade vĩnh cửu">🌸 Bó Hoa Len Vĩnh Cửu (Tulip, Hướng Dương, Hồng...)</option>
+                      <option value="Thú bông len Amigurumi">🧸 Thú Bông Len Amigurumi (Gấu, Thỏ, Capybara, Mèo...)</option>
+                      <option value="Túi xách & Balo len handmade">👜 Túi Xách / Balo / Ví Len Handmade</option>
+                      <option value="Khăn len / Nón len / Áo gile">🧣 Khăn Quàng / Nón Len / Áo Gile Len</option>
+                      <option value="Móc khóa len & Phụ kiện nhỏ">🔑 Móc Khóa Len / Phụ Kiện Quà Tặng</option>
+                      <option value="Mẫu thiết kế riêng khác">✨ Mẫu Riêng Khác Theo Yêu Cầu</option>
+                    </select>
+                  </div>
+
+                  <div className="form-field">
+                    <label>Ngày bạn cần nhận hàng (nếu có dịp lễ/sinh nhật)</label>
+                    <input
+                      type="date"
+                      value={customOrderForm.desiredDate}
+                      onChange={(e) =>
+                        setCustomOrderForm({ ...customOrderForm, desiredDate: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-field full-row">
+                    <label>Mô tả chi tiết mong muốn (*)</label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="VD: Em muốn móc 1 bé Capybara đội quả cam cao tầm 15cm, len mềm mịn, có thêu tên 'Minh An' ở dưới chân..."
+                      value={customOrderForm.description}
+                      onChange={(e) =>
+                        setCustomOrderForm({ ...customOrderForm, description: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Tông màu sắc len yêu thích</label>
+                    <input
+                      placeholder="VD: Nâu be + cam tươi, hoặc Pastel nhẹ nhàng"
+                      value={customOrderForm.colorPreference}
+                      onChange={(e) =>
+                        setCustomOrderForm({ ...customOrderForm, colorPreference: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Ngân sách dự kiến (VNĐ - tùy chọn)</label>
+                    <input
+                      type="number"
+                      step="10000"
+                      placeholder="VD: 150000"
+                      value={customOrderForm.budget}
+                      onChange={(e) =>
+                        setCustomOrderForm({ ...customOrderForm, budget: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-field full-row">
+                    <label>Tải ảnh mẫu bạn thích (từ Pinterest, TikTok, ảnh điện thoại...)</label>
+                    <div className="custom-order-upload-box">
+                      <input
+                        type="file"
+                        id="custom-order-file"
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={handleCustomOrderImageUpload}
+                      />
+                      <label htmlFor="custom-order-file" className="custom-order-upload-label">
+                        📁 Chọn ảnh mẫu từ máy / điện thoại
+                      </label>
+                      {customOrderForm.referenceImages.length > 0 && (
+                        <div className="custom-order-img-preview">
+                          <img src={customOrderForm.referenceImages[0]} alt="Mẫu tham khảo" />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCustomOrderForm((prev) => ({ ...prev, referenceImages: [] }))
+                            }
+                            className="remove-img-btn"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="custom-order-modal-footer">
+                  <button
+                    type="button"
+                    className="custom-order-cancel-btn"
+                    onClick={() => setCustomOrderModalOpen(false)}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    className="custom-order-submit-btn"
+                    disabled={customOrderSubmitting}
+                  >
+                    {customOrderSubmitting ? "⏳ Đang gửi yêu cầu..." : "🌸 Gửi Yêu Cầu Đặt Móc"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

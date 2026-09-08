@@ -180,8 +180,14 @@ async function ensureSeedData() {
   }
 }
 
-// Run initial seed on load
-ensureSeedData();
+// Run initial seed once DB is connected
+if (mongoose.connection.readyState === 1) {
+  ensureSeedData();
+} else {
+  mongoose.connection.once("open", () => {
+    ensureSeedData();
+  });
+}
 
 router.use(protect, authorizeAdmin);
 
@@ -927,6 +933,60 @@ router.delete("/artisan-tasks/:id", async (req, res) => {
     res
       .status(500)
       .json({ message: "Lỗi xóa lệnh gia công", error: err.message });
+  }
+});
+
+// UPLOAD ẢNH SẢN PHẨM (Hỗ trợ Cloudinary hoặc Base64 an toàn)
+router.post("/upload", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Vui lòng chọn tệp hình ảnh" });
+    }
+
+    const hasCloudinary =
+      process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET;
+
+    if (hasCloudinary) {
+      try {
+        const streamUpload = (buffer) => {
+          return new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "sene-handmade" },
+              (error, result) => {
+                if (result) resolve(result);
+                else reject(error);
+              }
+            );
+            stream.end(buffer);
+          });
+        };
+
+        const uploadResult = await streamUpload(req.file.buffer);
+        return res.json({
+          url: uploadResult.secure_url,
+          message: "Tải ảnh lên Cloudinary thành công",
+        });
+      } catch (cloudErr) {
+        console.warn("Cloudinary upload failed, falling back to base64:", cloudErr.message);
+      }
+    }
+
+    // Fallback nếu chưa cấu hình Cloudinary: Lưu Base64 Data URL
+    const mime = req.file.mimetype || "image/jpeg";
+    const base64 = req.file.buffer.toString("base64");
+    const dataUrl = `data:${mime};base64,${base64}`;
+
+    res.json({
+      url: dataUrl,
+      message: "Tải ảnh lên thành công",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Lỗi tải ảnh lên máy chủ",
+      error: error.message,
+    });
   }
 });
 

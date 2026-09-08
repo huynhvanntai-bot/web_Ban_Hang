@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
-const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const apiUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? "/api" : "http://localhost:5000/api");
 
 const statusLabels = {
   pending: "Chờ xác nhận",
@@ -247,6 +249,130 @@ function AdminPage() {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
+  // STATE NÂNG CẤP: IN TEM GỬI HÀNG & ĐƠN ĐẶT MÓC RIÊNG
+  const [shippingLabelOrder, setShippingLabelOrder] = useState(null);
+  const [previewImageModal, setPreviewImageModal] = useState(null);
+
+  // HÀM XUẤT CSV / EXCEL CHUẨN TIẾNG VIỆT (UTF-8 BOM)
+  function exportToCsv(filename, rows) {
+    const processRow = (row) =>
+      row
+        .map((val) => {
+          if (val === null || val === undefined) return '""';
+          const str = String(val).replace(/"/g, '""');
+          return `"${str}"`;
+        })
+        .join(",");
+
+    const csvContent = "\uFEFF" + rows.map(processRow).join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("📥 Đã xuất file Excel thành công!");
+  }
+
+  function exportProductsExcel() {
+    const rows = [
+      ["STT", "Mã Sản Phẩm", "Tên Sản Phẩm Len", "Danh Mục", "Phân Loại", "Giá Bán (VNĐ)", "Giá Vốn (VNĐ)", "Lãi Gộp (VNĐ)", "Biên Lãi (%)", "Tồn Kho (Cuộn/Bộ)", "Doanh Số Đã Bán", "Trạng Thái"],
+    ];
+    data.products.forEach((p, index) => {
+      const profit = (p.price || 0) - (p.costPrice || 0);
+      const margin = p.price > 0 ? ((profit / p.price) * 100).toFixed(1) + "%" : "0%";
+      rows.push([
+        index + 1,
+        "SP-" + (p._id ? p._id.slice(-6).toUpperCase() : index + 1),
+        p.name,
+        p.category?.name || "Len Sợi",
+        p.productType === "outsourced" ? "Thợ gia công" : p.productType === "inhouse" ? "Tiệm tự móc" : "Hàng nhập sỉ",
+        p.price || 0,
+        p.costPrice || 0,
+        profit,
+        margin,
+        p.stock || 0,
+        p.sold || 0,
+        (p.stock || 0) > 0 ? "Còn hàng" : "Hết hàng",
+      ]);
+    });
+    exportToCsv("Danh_Sach_Kho_Len_Sene_Handmade", rows);
+  }
+
+  function exportShipperOrdersExcel() {
+    const rows = [
+      ["STT", "Mã Đơn Hàng", "Người Nhận", "Số Điện Thoại", "Địa Chỉ Giao Hàng", "Chi Tiết Mặt Hàng", "Hình Thức Thanh Toán", "Tiền Thu Hộ COD (VNĐ)", "Trạng Thái Đơn", "Ghi Chú Giao Hàng"],
+    ];
+    data.orders.forEach((o, index) => {
+      const itemsStr = (o.items || [])
+        .map((i) => `${i.name} (x${i.quantity})`)
+        .join("; ");
+      rows.push([
+        index + 1,
+        "#" + (o._id ? o._id.slice(-6).toUpperCase() : index + 1),
+        o.customerName || "Khách mua lẻ",
+        o.phone || "",
+        o.address || "",
+        itemsStr,
+        o.paymentMethod === "COD" ? "Thu hộ COD" : "Chuyển khoản VietQR",
+        o.paymentMethod === "COD" ? o.totalAmount : 0,
+        statusLabels[o.status] || o.status,
+        o.note || "",
+      ]);
+    });
+    exportToCsv("Bang_Ke_Giao_Hang_Shipper_COD", rows);
+  }
+
+  function exportFinancialReportExcel() {
+    const rows = [
+      ["STT", "Mã Đơn Hàng", "Ngày Đặt", "Khách Hàng", "Doanh Thu Thực Thu (VNĐ)", "Giảm Giá (VNĐ)", "Chi Phí Giá Vốn (VNĐ)", "Lợi Nhuận Gộp (VNĐ)", "Phương Thức", "Trạng Thái"],
+    ];
+    data.orders.forEach((o, index) => {
+      const estCost = Math.round((o.totalAmount || 0) * 0.55);
+      const estProfit = (o.totalAmount || 0) - estCost;
+      rows.push([
+        index + 1,
+        "#" + (o._id ? o._id.slice(-6).toUpperCase() : index + 1),
+        new Date(o.createdAt).toLocaleDateString("vi-VN"),
+        o.customerName,
+        o.totalAmount || 0,
+        o.discountAmount || 0,
+        estCost,
+        estProfit,
+        o.paymentMethod,
+        statusLabels[o.status] || o.status,
+      ]);
+    });
+    exportToCsv("Bao_Cao_Tai_Chinh_Doanh_Thu", rows);
+  }
+
+  async function updateCustomOrderStatus(id, status, quotedPrice, adminNotes) {
+    try {
+      await request(`custom-orders/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status, quotedPrice, adminNotes }),
+      });
+      showToast("✓ Đã cập nhật đơn đặt móc riêng!");
+      loadAdmin();
+    } catch (err) {
+      alert("Lỗi cập nhật: " + err.message);
+    }
+  }
+
+  async function deleteCustomOrder(id) {
+    if (!window.confirm("Bạn có chắc muốn xóa yêu cầu đặt móc này?")) return;
+    try {
+      await request(`custom-orders/${id}`, { method: "DELETE" });
+      showToast("🗑️ Đã xóa yêu cầu đặt móc");
+      loadAdmin();
+    } catch (err) {
+      alert("Lỗi xóa: " + err.message);
+    }
+  }
+
   const [editingProductId, setEditingProductId] = useState(null);
 
   // Live Clock
@@ -323,6 +449,7 @@ function AdminPage() {
         customers,
         reports,
         promotions,
+        customOrdersRes,
         suppliersRes,
         staffRes,
         importsRes,
@@ -334,6 +461,7 @@ function AdminPage() {
         request("customers"),
         request("reports"),
         request("promotions"),
+        request("custom-orders").catch(() => []),
         request("suppliers").catch(() => []),
         request("staff").catch(() => []),
         request("imports").catch(() => []),
@@ -346,6 +474,10 @@ function AdminPage() {
         customers,
         reports,
         promotions,
+        customOrders:
+          customOrdersRes && customOrdersRes.length > 0
+            ? customOrdersRes
+            : JSON.parse(localStorage.getItem("sene_custom_orders") || "[]"),
         suppliers:
           suppliersRes && suppliersRes.length > 0
             ? suppliersRes
@@ -647,7 +779,7 @@ function AdminPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     setUploadingImage(true);
-    setUploadMessage("Đang tải ảnh lên Cloudinary...");
+    setUploadMessage("Đang xử lý và tải ảnh lên...");
     try {
       const formData = new FormData();
       formData.append("image", file);
@@ -657,13 +789,48 @@ function AdminPage() {
         body: formData,
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Upload thất bại");
-      setProductForm((form) => ({ ...form, images: result.url }));
-      setUploadMessage("✓ Tải ảnh thành công!");
-    } catch (error) {
-      setUploadMessage(`Lỗi: ${error.message}`);
-    } finally {
-      setUploadingImage(false);
+      if (response.ok && result.url) {
+        setProductForm((form) => ({ ...form, images: result.url }));
+        setUploadMessage("✓ Tải ảnh thành công!");
+        setUploadingImage(false);
+        return;
+      }
+      throw new Error(result.message || "Không upload được qua máy chủ");
+    } catch (apiErr) {
+      console.warn("API upload fallback qua canvas:", apiErr.message);
+      try {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            let w = img.width;
+            let h = img.height;
+            if (w > 1000) {
+              h = Math.round((h * 1000) / w);
+              w = 1000;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+            setProductForm((form) => ({ ...form, images: dataUrl }));
+            setUploadMessage("✓ Đã chọn & nén ảnh trực tiếp từ máy!");
+            setUploadingImage(false);
+          };
+          img.onerror = () => {
+            setProductForm((form) => ({ ...form, images: e.target.result }));
+            setUploadMessage("✓ Đã chọn ảnh từ máy!");
+            setUploadingImage(false);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        setUploadMessage(`Lỗi đọc ảnh: ${err.message}`);
+        setUploadingImage(false);
+      }
     }
   }
 
@@ -1219,6 +1386,14 @@ function AdminPage() {
               icon: "🪡",
               badge: (data.staff || []).length,
             },
+            
+            {
+              key: "custom-orders",
+              label: "Đơn Móc Theo Mẫu",
+              icon: "🧶",
+              badge: (data.customOrders || []).filter((o) => o.status === "pending").length || null,
+              badgeColor: "#ec4899",
+            },
             { key: "reports", label: "Báo cáo doanh thu", icon: "📈" },
             {
               key: "promotions",
@@ -1301,6 +1476,9 @@ function AdminPage() {
               {activeTab === "customers" && "👥 Danh Sách Khách Hàng Thành Viên"}
               {activeTab === "suppliers" && "🏢 Quản Lý Nhà Cung Cấp Len Sợi & Phụ Kiện"}
               {activeTab === "staff" && "🪡 Quản Lý Thợ Móc Thủ Công & Nhân Viên"}
+              {activeTab === "custom-orders" && "🧶 Quản Lý Đơn Đặt Móc Len Theo Mẫu Riêng"}
+              {activeTab === "custom-orders" &&
+                "Xem ảnh mẫu khách gửi, chốt màu sắc, hẹn ngày hoàn thiện và liên hệ Zalo 1 chạm với khách"}
               {activeTab === "reports" && "📈 Báo Cáo Doanh Thu & Bán Chạy"}
               {activeTab === "promotions" && "🎟️ Chương Trình Khuyến Mãi & Voucher"}
             </h1>
@@ -2280,6 +2458,26 @@ function AdminPage() {
                         {uploadMessage}
                       </small>
                     )}
+                    {productForm.images && (
+                      <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "10px", background: "#fdf2f8", padding: "8px 12px", borderRadius: "10px", border: "1px solid #fbcfe8" }}>
+                        <img
+                          src={productForm.images}
+                          alt="Xem trước ảnh sản phẩm"
+                          style={{ width: "60px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1.5px solid #fda4af" }}
+                        />
+                        <div>
+                          <span style={{ fontSize: "12px", color: "#059669", fontWeight: 700, display: "block" }}>✓ Đã chọn ảnh sản phẩm</span>
+                          <button
+                            type="button"
+                            className="admin-btn-outline"
+                            onClick={() => setProductForm((prev) => ({ ...prev, images: "" }))}
+                            style={{ padding: "2px 8px", fontSize: "11px", color: "#e11d48", marginTop: "4px" }}
+                          >
+                            ✕ Xóa ảnh này
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2310,6 +2508,15 @@ function AdminPage() {
                   </p>
                 </div>
                 <div className="admin-card-actions">
+                <button
+                  type="button"
+                  className="admin-btn-outline"
+                  onClick={exportProductsExcel}
+                  style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
+                  title="Xuất file Excel danh sách toàn bộ len & phụ kiện kho"
+                >
+                  📥 Xuất Excel Kho Hàng
+                </button>
                   <input
                     className="admin-search-input"
                     placeholder="🔍 Tìm theo tên, slug..."
@@ -2776,6 +2983,15 @@ function AdminPage() {
             <div className="admin-card-header">
               <h2>📦 Quản Lý {data.orders.length} Đơn Hàng</h2>
               <div className="admin-card-actions">
+                <button
+                  type="button"
+                  className="admin-btn-outline"
+                  onClick={exportShipperOrdersExcel}
+                  style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
+                  title="Xuất bảng kê danh sách giao hàng cho Shipper bưu tá"
+                >
+                  📥 Xuất Bảng Kê Shipper COD
+                </button>
                 <input
                   className="admin-search-input"
                   placeholder="🔍 Tìm mã đơn, tên, SĐT..."
@@ -2902,14 +3118,26 @@ function AdminPage() {
                           ))}
                         </select>
                       </td>
+                      
                       <td>
-                        <button
-                          type="button"
-                          className="admin-btn-outline"
-                          onClick={() => showOrder(order._id)}
-                        >
-                          👁️ Chi tiết
-                        </button>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            type="button"
+                            className="admin-btn-outline"
+                            onClick={() => showOrder(order._id)}
+                          >
+                            👁️ Chi tiết
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn-outline"
+                            onClick={() => setShippingLabelOrder(order)}
+                            style={{ background: "#fff1f2", color: "#e11d48", borderColor: "#fecdd3", fontWeight: 700 }}
+                            title="In phiếu gửi hàng chuẩn bưu tá COD"
+                          >
+                            🏷️ In Tem
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -4979,6 +5207,147 @@ function AdminPage() {
         </div>
       )}
 
+
+      
+      {/* MODAL 6: IN TEM GỬI HÀNG / PHIẾU ĐÓNG GÓI CHO SHIPPER */}
+      {shippingLabelOrder && (
+        <div
+          className="shipping-label-backdrop"
+          onClick={() => setShippingLabelOrder(null)}
+        >
+          <div
+            className="shipping-label-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shipping-label-actions-top">
+              <h3>🏷️ Mẫu Tem Gửi Hàng / Phiếu Vận Chuyển A6</h3>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() => window.print()}
+                  style={{ background: "#e11d48", padding: "7px 18px", fontSize: "13px" }}
+                >
+                  🖨️ Bấm Để In Tem (Print)
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn-outline"
+                  onClick={() => setShippingLabelOrder(null)}
+                >
+                  ✕ Đóng
+                </button>
+              </div>
+            </div>
+
+            {/* VÙNG IN TEM CHUẨN KÍCH THƯỚC */}
+            <div id="shipping-label-printable" className="shipping-label-sheet">
+              <div className="label-header">
+                <div className="label-shop-info">
+                  <h2>🌸 TIỆM LEN SENE HANDMADE</h2>
+                  <p>Tiệm Len Sợi Thủ Công · Hoa Len Vĩnh Cửu · Quà Tặng Độc Bản</p>
+                  <p>Hotline hỗ trợ: <strong>0942.901.124</strong> | Web: sene-handmade.vercel.app</p>
+                </div>
+                <div className="label-barcode-box">
+                  <div className="label-barcode-mock">||||| | |||| || |||</div>
+                  <div className="label-code-val">#{shippingLabelOrder._id.slice(-8).toUpperCase()}</div>
+                </div>
+              </div>
+
+              <div className="label-party-grid">
+                <div className="label-box">
+                  <div className="label-box-title">Người Gửi (From):</div>
+                  <div><strong>Tiệm Len Sene Handmade</strong></div>
+                  <div>SĐT: 0942.901.124</div>
+                  <div>Địa chỉ: Cần Thơ / TP. Hồ Chí Minh</div>
+                </div>
+
+                <div className="label-box label-box-receiver">
+                  <div className="label-box-title">Người Nhận (To):</div>
+                  <div className="label-receiver-name">{shippingLabelOrder.customerName}</div>
+                  <div className="label-receiver-phone">📞 {shippingLabelOrder.phone}</div>
+                  <div style={{ marginTop: "4px" }}>📍 {shippingLabelOrder.address}</div>
+                </div>
+              </div>
+
+              <table className="label-items-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "35px" }}>STT</th>
+                    <th>Tên Sản Phẩm Len / Phụ Kiện</th>
+                    <th style={{ width: "50px", textAlign: "center" }}>SL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(shippingLabelOrder.items || []).map((item, i) => (
+                    <tr key={i}>
+                      <td style={{ textAlign: "center" }}>{i + 1}</td>
+                      <td><strong>{item.name}</strong></td>
+                      <td style={{ textAlign: "center" }}><strong>x{item.quantity}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="label-cod-highlight">
+                <div className="label-cod-title">
+                  {shippingLabelOrder.paymentMethod === "COD" ? "TIỀN THU HỘ (COD):" : "THANH TOÁN TRƯỚC:"}
+                </div>
+                <div
+                  className="label-cod-amount"
+                  style={{ color: shippingLabelOrder.paymentMethod === "COD" ? "#e11d48" : "#059669" }}
+                >
+                  {shippingLabelOrder.paymentMethod === "COD"
+                    ? money(shippingLabelOrder.totalAmount)
+                    : "0 VNĐ (ĐÃ THANH TOÁN)"}
+                </div>
+              </div>
+
+              <div className="label-footer-note">
+                <p>⚠️ <strong>LỜI DẶN SHIPPER:</strong> Cho khách đồng kiểm hàng trước khi nhận, không thử hàng.</p>
+                <p>Mọi thắc mắc về đơn hàng vui lòng gọi ngay hotline shop: <strong>0942.901.124</strong>. Cảm ơn anh shipper!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: PHÓNG TO ẢNH MẪU KHÁCH GỬI */}
+      {previewImageModal && (
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setPreviewImageModal(null)}
+          style={{ zIndex: 999999 }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "16px",
+              borderRadius: "16px",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewImageModal}
+              alt="Mẫu khách gửi"
+              style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: "10px" }}
+            />
+            <button
+              type="button"
+              className="admin-btn-primary"
+              onClick={() => setPreviewImageModal(null)}
+              style={{ marginTop: "12px" }}
+            >
+              ✕ Đóng lại
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL 5: SỬA NHANH GIÁ BÁN & GIÁ VỐN */}
       {quickPriceModal.open && (
