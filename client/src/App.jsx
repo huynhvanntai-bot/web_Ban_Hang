@@ -257,6 +257,78 @@ const CRAFT_GUIDES = [
   },
 ];
 
+// DỤNG CỤ ĐAN MÓC GỢI Ý MUA KÈM (UPSELL & CROSS-SELL)
+const CRAFT_ADDONS = [
+  {
+    id: "addon-hook-skc",
+    name: "Kim móc SKC cán dẻo êm tay",
+    price: 25000,
+    originalPrice: 35000,
+    icon: "🪡",
+    desc: "Size 2.5mm / 3.0mm đầu mạ vàng chống rít",
+    images: ["https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=400&auto=format&fit=crop&q=80"],
+    stock: 99,
+  },
+  {
+    id: "addon-stuffing-gon",
+    name: "Bông gòn bi 100g nhồi thú bông",
+    price: 15000,
+    originalPrice: 22000,
+    icon: "☁️",
+    desc: "Bông bi loại 1 trắng tinh, giặt không xẹp",
+    images: ["https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=400&auto=format&fit=crop&q=80"],
+    stock: 99,
+  },
+  {
+    id: "addon-pin-markers",
+    name: "Set 10 kẹp định vị mũi móc hoa",
+    price: 8000,
+    originalPrice: 15000,
+    icon: "📎",
+    desc: "Đủ màu pastel, kẹp chống tuột mũi đan",
+    images: ["https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&auto=format&fit=crop&q=80"],
+    stock: 99,
+  },
+  {
+    id: "addon-thread-scissors",
+    name: "Kéo bấm cắt chỉ mini có nắp chụp",
+    price: 12000,
+    originalPrice: 18000,
+    icon: "✂️",
+    desc: "Lưỡi thép siêu bén, có nắp an toàn",
+    images: ["https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=400&auto=format&fit=crop&q=80"],
+    stock: 99,
+  },
+];
+
+// Helper nén ảnh trực tiếp trên trình duyệt qua Canvas
+function compressImageToDataUrl(file, maxWidth = 800, quality = 0.8) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 function App() {
   if (window.location.pathname === "/admin") return <AdminPage />;
   const [categories, setCategories] = useState([]);
