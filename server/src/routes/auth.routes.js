@@ -73,4 +73,19 @@ router.post("/login", async (req, res) => {
 
 router.get("/me", protect, (req, res) => res.json({ user: req.user }));
 
+router.put("/profile", protect, async (req, res) => {
+  try {
+    const { name, phone, address } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    if (name && name.trim()) user.name = name.trim();
+    if (phone !== undefined) user.phone = phone.trim();
+    if (address !== undefined) user.address = address.trim();
+    await user.save();
+    res.json({ message: "Cập nhật thông tin thành công", user: safeUser(user) });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi cập nhật thông tin", error: error.message });
+  }
+});
+
 module.exports = router;

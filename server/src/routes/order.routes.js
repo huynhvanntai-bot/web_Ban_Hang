@@ -147,4 +147,39 @@ router.get("/mine", protect, async (req, res) => {
   res.json(orders);
 });
 
+router.get("/track/:lookup", async (req, res) => {
+  try {
+    const rawLookup = (req.params.lookup || "").trim();
+    if (!rawLookup) {
+      return res.status(400).json({ message: "Vui lòng nhập mã đơn hoặc số điện thoại" });
+    }
+
+    const query = [{ phone: rawLookup }];
+    if (mongoose.isValidObjectId(rawLookup)) {
+      query.push({ _id: rawLookup });
+    }
+
+    let orders = await Order.find({ $or: query }).sort({ createdAt: -1 });
+
+    if (!orders || orders.length === 0) {
+      const allRecent = await Order.find().sort({ createdAt: -1 }).limit(100);
+      orders = allRecent.filter((o) => {
+        const idStr = o._id.toString();
+        return (
+          idStr.toLowerCase().endsWith(rawLookup.toLowerCase()) ||
+          o.phone.includes(rawLookup)
+        );
+      });
+    }
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng phù hợp" });
+    }
+
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tra cứu đơn hàng", error: error.message });
+  }
+});
+
 module.exports = router;

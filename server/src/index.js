@@ -26,7 +26,7 @@ app.use("/api/promotions", promotionRoutes);
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
-    message: "Tài Computer Shop API đang hoạt động",
+    message: "Tiệm Len Sợi & Handmade API đang hoạt động",
     database:
       mongoose.connection.readyState === 1 ? "connected" : "not-connected",
   });

@@ -12,7 +12,7 @@ async function createAdmin() {
   await User.findOneAndUpdate(
     { email: process.env.ADMIN_EMAIL.toLowerCase() },
     {
-      name: process.env.ADMIN_NAME || "Tài Computer Admin",
+      name: process.env.ADMIN_NAME || "Tiệm Len Admin",
       email: process.env.ADMIN_EMAIL.toLowerCase(),
       password,
       role: "admin",
