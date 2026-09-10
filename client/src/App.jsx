@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import AdminPage from "./AdminPage.jsx";
 
@@ -329,8 +329,101 @@ function compressImageToDataUrl(file, maxWidth = 800, quality = 0.8) {
   });
 }
 
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#fff5f8",
+          padding: "24px",
+          fontFamily: "'Quicksand', system-ui, sans-serif"
+        }}>
+          <div style={{
+            maxWidth: "520px",
+            width: "100%",
+            background: "#ffffff",
+            borderRadius: "20px",
+            padding: "36px 30px",
+            boxShadow: "0 10px 30px rgba(244, 114, 182, 0.15)",
+            border: "1.5px solid #fce7f3",
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: "56px", marginBottom: "16px" }}>🌸</div>
+            <h2 style={{ color: "#3f1a26", fontSize: "22px", marginBottom: "10px", fontWeight: 800 }}>
+              Sene Handmade
+            </h2>
+            <p style={{ color: "#7a5364", fontSize: "14.5px", lineHeight: "1.6", marginBottom: "24px" }}>
+              Giao diện đã tự động bảo vệ an toàn để tránh màn hình trắng. Bạn bấm nút bên dưới để tiếp tục nhé!
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                style={{
+                  background: "linear-gradient(135deg, #f472b6, #fb7185)",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "14px",
+                  padding: "12px 24px",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(244, 114, 182, 0.35)"
+                }}
+              >
+                🔄 Tải lại trang ngay
+              </button>
+              <a
+                href="/"
+                style={{
+                  background: "#fff0f5",
+                  color: "#db2777",
+                  border: "1.5px solid #fbcfe8",
+                  borderRadius: "14px",
+                  padding: "12px 20px",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center"
+                }}
+              >
+                🏠 Về trang chủ
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
-  if (window.location.pathname === "/admin") return <AdminPage />;
+  if (window.location.pathname === "/admin") {
+    return (
+      <ErrorBoundary>
+        <AdminPage />
+      </ErrorBoundary>
+    );
+  }
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("");
@@ -1926,6 +2019,7 @@ function App() {
             <a href="#guides">Chính sách bảo hành & Đổi trả 7 ngày</a>
             <a href="#guides">Phương thức giao hàng & Thanh toán COD</a>
             <a href="#account">Kiểm tra lịch sử đơn hàng</a>
+            <a href="/admin" style={{ color: "#db2777", fontWeight: 700 }}>⚙️ Trang Quản Trị (Admin Studio)</a>
           </div>
         </div>
         <div className="footer-bottom">

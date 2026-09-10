@@ -115,6 +115,84 @@ const defaultStaff = [
   },
 ];
 
+const ADMIN_TAB_META = {
+  overview: {
+    title: "📊 Tổng Quan Kinh Doanh",
+    desc: "Số liệu thống kê thời gian thực từ cửa hàng Sene Handmade",
+  },
+  products: {
+    title: "🧶 Quản Lý Sản Phẩm & Kho Len",
+    desc: "Thêm mới, sửa giá, cập nhật số lượng tồn kho và phân loại len sợi",
+  },
+  imports: {
+    title: "📥 Quản Lý Nhập Hàng & Tồn Kho",
+    desc: "Lập phiếu nhập hàng, tự động tăng số lượng tồn kho bán hàng và tính toán công nợ",
+  },
+  orders: {
+    title: "📦 Quản Lý & Theo Dõi Đơn Hàng",
+    desc: "Kiểm tra tiến trình đóng gói, duyệt đơn COD và in phiếu giao hàng",
+  },
+  customers: {
+    title: "👥 Danh Sách Khách Hàng Thành Viên",
+    desc: "Quản lý thông tin liên hệ và lịch sử chi tiêu của người mua",
+  },
+  suppliers: {
+    title: "🏢 Quản Lý Nhà Cung Cấp Len Sợi & Phụ Kiện",
+    desc: "Theo dõi danh bạ các xưởng len sợi, đại lý phụ kiện kim móc và giá nhập hàng",
+  },
+  staff: {
+    title: "🪡 Quản Lý Thợ Móc Thủ Công & Nhân Viên",
+    desc: "Quản lý thợ gia công hoa len, thú bông, tính tiền công theo từng sản phẩm hoàn thiện",
+  },
+  "custom-orders": {
+    title: "🧶 Quản Lý Đơn Đặt Móc Len Theo Mẫu Riêng",
+    desc: "Xem ảnh mẫu khách gửi, chốt màu sắc, hẹn ngày hoàn thiện và liên hệ Zalo 1 chạm với khách",
+  },
+  reports: {
+    title: "📈 Báo Cáo Doanh Thu & Bán Chạy",
+    desc: "Thống kê các mẫu len bán chạy và doanh thu từng ngày",
+  },
+  promotions: {
+    title: "🎟️ Chương Trình Khuyến Mãi & Voucher",
+    desc: "Tạo mã voucher giảm giá %, freeship cho khách hàng",
+  },
+};
+
+function AdminClock() {
+  const [time, setTime] = useState(() => {
+    const now = new Date();
+    return now.toLocaleDateString("vi-VN", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      setTime(
+        now.toLocaleDateString("vi-VN", {
+          weekday: "short",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      );
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return <span className="admin-clock-chip">⏰ {time}</span>;
+}
+
 function AdminPage() {
   const [token, setToken] = useState(
     localStorage.getItem("tai-shop-token") || "",
@@ -156,7 +234,6 @@ function AdminPage() {
   const [selectedImportReceipt, setSelectedImportReceipt] = useState(null);
   const [toast, setToast] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentTime, setCurrentTime] = useState("");
 
   const [importModal, setImportModal] = useState({
     open: false,
@@ -374,27 +451,6 @@ function AdminPage() {
   }
 
   const [editingProductId, setEditingProductId] = useState(null);
-
-  // Live Clock
-  useEffect(() => {
-    function updateClock() {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleDateString("vi-VN", {
-          weekday: "short",
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-      );
-    }
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   function showToast(msg) {
     setToast(msg);
@@ -1266,7 +1322,7 @@ function AdminPage() {
   // LOGIN SCREEN
   if (!token) {
     return (
-      <main className="admin-login">
+      <main className="admin-login notranslate" translate="no">
         <div className="admin-login-card">
           <p className="admin-kicker">SENE HANDMADE</p>
           <h1>Admin Studio</h1>
@@ -1301,7 +1357,7 @@ function AdminPage() {
   const dashboard = data.dashboard || {};
 
   return (
-    <main className={`admin-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <main className={`admin-shell notranslate ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} translate="no">
       {/* SIDEBAR NAVIGATION (CÓ NÚT THU GỌN / MỞ RỘNG) */}
       <aside className={`admin-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
         <div className="admin-sidebar-header">
@@ -1469,44 +1525,16 @@ function AdminPage() {
                 ☰
               </button>
               <h1>
-              {activeTab === "overview" && "📊 Tổng Quan Kinh Doanh"}
-              {activeTab === "products" && "🧶 Quản Lý Sản Phẩm & Kho Len"}
-              {activeTab === "imports" && "📥 Quản Lý Nhập Hàng & Tồn Kho"}
-              {activeTab === "orders" && "📦 Quản Lý & Theo Dõi Đơn Hàng"}
-              {activeTab === "customers" && "👥 Danh Sách Khách Hàng Thành Viên"}
-              {activeTab === "suppliers" && "🏢 Quản Lý Nhà Cung Cấp Len Sợi & Phụ Kiện"}
-              {activeTab === "staff" && "🪡 Quản Lý Thợ Móc Thủ Công & Nhân Viên"}
-              {activeTab === "custom-orders" && "🧶 Quản Lý Đơn Đặt Móc Len Theo Mẫu Riêng"}
-              {activeTab === "custom-orders" &&
-                "Xem ảnh mẫu khách gửi, chốt màu sắc, hẹn ngày hoàn thiện và liên hệ Zalo 1 chạm với khách"}
-              {activeTab === "reports" && "📈 Báo Cáo Doanh Thu & Bán Chạy"}
-              {activeTab === "promotions" && "🎟️ Chương Trình Khuyến Mãi & Voucher"}
-            </h1>
+                <span>{ADMIN_TAB_META[activeTab]?.title || "Sene Handmade Quản Trị"}</span>
+              </h1>
             </div>
             <p>
-              {activeTab === "overview" &&
-                "Số liệu thống kê thời gian thực từ cửa hàng Sene Handmade"}
-              {activeTab === "products" &&
-                "Thêm mới, sửa giá, cập nhật số lượng tồn kho và phân loại len sợi"}
-              {activeTab === "imports" &&
-                "Lập phiếu nhập hàng, tự động tăng số lượng tồn kho bán hàng và tính toán công nợ"}
-              {activeTab === "orders" &&
-                "Kiểm tra tiến trình đóng gói, duyệt đơn COD và in phiếu giao hàng"}
-              {activeTab === "customers" &&
-                "Quản lý thông tin liên hệ và lịch sử chi tiêu của người mua"}
-              {activeTab === "suppliers" &&
-                "Theo dõi danh bạ các xưởng len sợi, đại lý phụ kiện kim móc và giá nhập hàng"}
-              {activeTab === "staff" &&
-                "Quản lý thợ gia công hoa len, thú bông, tính tiền công theo từng sản phẩm hoàn thiện"}
-              {activeTab === "reports" &&
-                "Thống kê các mẫu len bán chạy và doanh thu từng ngày"}
-              {activeTab === "promotions" &&
-                "Tạo mã voucher giảm giá %, freeship cho khách hàng"}
+              <span>{ADMIN_TAB_META[activeTab]?.desc || ""}</span>
             </p>
           </div>
 
           <div className="admin-topbar-actions">
-            <span className="admin-clock-chip">⏰ {currentTime}</span>
+            <AdminClock />
             <button
               type="button"
               className="admin-refresh-btn"
