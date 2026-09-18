@@ -220,6 +220,7 @@ function AdminPage() {
   const [orderSearch, setOrderSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [productCategoryFilter, setProductCategoryFilter] = useState("all");
   const [profitFilter, setProfitFilter] = useState("all");
   const [quickPriceModal, setQuickPriceModal] = useState({
@@ -1356,25 +1357,44 @@ function AdminPage() {
 
   return (
     <main className={`admin-shell notranslate ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} translate="no">
-      {/* SIDEBAR NAVIGATION (CÓ NÚT THU GỌN / MỞ RỘNG) */}
-      <aside className={`admin-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+      {/* MOBILE BACKDROP */}
+      {mobileMenuOpen && (
+        <div
+          className="admin-mobile-backdrop"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Đóng menu"
+        />
+      )}
+
+      {/* SIDEBAR NAVIGATION (DRAWER TRÊN MOBILE, CÓ NÚT THU GỌN TRÊN DESKTOP) */}
+      <aside className={`admin-sidebar ${sidebarCollapsed ? "collapsed" : ""} ${mobileMenuOpen ? "mobile-open" : ""}`}>
         <div className="admin-sidebar-header">
           <a className="admin-brand notranslate" href="/" translate="no" title="Sene Handmade Pro">
             <span>✨ SENE</span> {!sidebarCollapsed && "HANDMADE"}
             {!sidebarCollapsed && <span className="admin-brand-tag">PRO</span>}
           </a>
-          <button
-            type="button"
-            className="admin-sidebar-collapse-btn"
-            onClick={() => {
-              const next = !sidebarCollapsed;
-              setSidebarCollapsed(next);
-              localStorage.setItem("admin-sidebar-collapsed", String(next));
-            }}
-            title={sidebarCollapsed ? "Mở rộng thanh công cụ" : "Thu gọn thanh công cụ"}
-          >
-            {sidebarCollapsed ? "▶" : "◀"}
-          </button>
+          <div className="admin-sidebar-header-btns">
+            <button
+              type="button"
+              className="admin-sidebar-collapse-btn desktop-only"
+              onClick={() => {
+                const next = !sidebarCollapsed;
+                setSidebarCollapsed(next);
+                localStorage.setItem("admin-sidebar-collapsed", String(next));
+              }}
+              title={sidebarCollapsed ? "Mở rộng thanh công cụ" : "Thu gọn thanh công cụ"}
+            >
+              {sidebarCollapsed ? "▶" : "◀"}
+            </button>
+            <button
+              type="button"
+              className="admin-sidebar-close-btn mobile-only"
+              onClick={() => setMobileMenuOpen(false)}
+              title="Đóng menu"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="admin-profile-chip" title={adminUser?.name || "Quản trị viên"}>
@@ -1389,7 +1409,7 @@ function AdminPage() {
                 .toUpperCase()
               : "AD"}
           </div>
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="admin-profile-info">
               <strong>{adminUser?.name || "Quản trị viên"}</strong>
               <small>
@@ -1460,12 +1480,15 @@ function AdminPage() {
               key={item.key}
               type="button"
               className={`admin-nav-item ${activeTab === item.key ? "active" : ""}`}
-              onClick={() => setActiveTab(item.key)}
+              onClick={() => {
+                setActiveTab(item.key);
+                setMobileMenuOpen(false);
+              }}
               title={sidebarCollapsed ? item.label : undefined}
             >
               <span className="admin-nav-left">
                 <span className="admin-nav-icon">{item.icon}</span>
-                {!sidebarCollapsed && <span className="admin-nav-label">{item.label}</span>}
+                {(!sidebarCollapsed || mobileMenuOpen) && <span className="admin-nav-label">{item.label}</span>}
               </span>
               {item.badge !== null && item.badge !== undefined && (
                 <span
@@ -1484,7 +1507,7 @@ function AdminPage() {
         <div className="admin-sidebar-footer">
           <button
             type="button"
-            className="admin-toggle-full-btn"
+            className="admin-toggle-full-btn desktop-only"
             onClick={() => {
               const next = !sidebarCollapsed;
               setSidebarCollapsed(next);
@@ -1495,10 +1518,10 @@ function AdminPage() {
             {sidebarCollapsed ? "▶" : "◀ Thu gọn menu"}
           </button>
           <a className="admin-store-link" href="/" target="_blank" rel="noreferrer" title="Xem cửa hàng Sene Handmade">
-            🛍️ {!sidebarCollapsed && "Xem cửa hàng ↗"}
+            🛍️ {(!sidebarCollapsed || mobileMenuOpen) && "Xem cửa hàng ↗"}
           </a>
           <button className="admin-logout-btn" type="button" onClick={logout} title="Đăng xuất">
-            🚪 {!sidebarCollapsed && "Đăng xuất"}
+            🚪 {(!sidebarCollapsed || mobileMenuOpen) && "Đăng xuất"}
           </button>
         </div>
       </aside>
@@ -1509,18 +1532,22 @@ function AdminPage() {
           {/* TOPBAR */}
           <header className="admin-topbar">
             <div className="admin-topbar-title">
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                 <button
                   type="button"
                   className="admin-menu-toggle-btn"
                   onClick={() => {
-                    const next = !sidebarCollapsed;
-                    setSidebarCollapsed(next);
-                    localStorage.setItem("admin-sidebar-collapsed", String(next));
+                    if (window.innerWidth <= 768) {
+                      setMobileMenuOpen((prev) => !prev);
+                    } else {
+                      const next = !sidebarCollapsed;
+                      setSidebarCollapsed(next);
+                      localStorage.setItem("admin-sidebar-collapsed", String(next));
+                    }
                   }}
-                  title={sidebarCollapsed ? "Mở rộng thanh công cụ" : "Thu gọn thanh công cụ"}
+                  title="Menu danh mục quản trị"
                 >
-                  ☰
+                  ☰ <span className="admin-menu-btn-text">Menu</span>
                 </button>
                 <h1>
                   <span>{ADMIN_TAB_META[activeTab]?.title || "Sene Handmade Quản Trị"}</span>
