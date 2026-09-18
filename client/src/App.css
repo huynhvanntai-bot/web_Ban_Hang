@@ -8593,23 +8593,316 @@ footer {
 
 @media (max-width: 768px) {
   .video-showcase-section {
-    padding: 20px 14px;
-    margin: 24px auto;
+    padding: 18px 12px !important;
+    margin: 20px 8px !important;
+    border-radius: 16px !important;
+  }
+  .video-showcase-title h2 {
+    font-size: 20px !important;
   }
   .video-showcase-slider {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    gap: 14px;
-    padding-bottom: 8px;
-    -webkit-overflow-scrolling: touch;
+    display: flex !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory !important;
+    gap: 12px !important;
+    padding: 4px 2px 14px !important;
+    -webkit-overflow-scrolling: touch !important;
   }
   .video-showcase-card {
-    flex: 0 0 220px;
-    scroll-snap-align: start;
+    flex: 0 0 170px !important;
+    min-width: 170px !important;
+    max-width: 170px !important;
+    scroll-snap-align: start !important;
+    border-radius: 14px !important;
+  }
+  .video-thumbnail-box {
+    aspect-ratio: 4 / 5 !important;
+  }
+  .video-play-icon {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 16px !important;
+  }
+  .video-card-meta h4 {
+    font-size: 13px !important;
+    min-height: 36px !important;
+    margin-bottom: 6px !important;
+  }
+  .video-card-price {
+    font-size: 14px !important;
+  }
+  .video-watch-btn {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
   }
   .detail-main-video {
-    max-height: 380px;
+    max-height: 340px !important;
+  }
+}
+
+/* ==========================================================
+   HOÀN THIỆN ĐỒNG DẠNG RESPONSIVE CHO ĐIỆN THOẠI (MOBILE & TABLET)
+   ========================================================== */
+
+/* 1. Chống tràn chiều ngang & vỡ layout trên toàn trang */
+html, body {
+  width: 100% !important;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+  position: relative !important;
+  -webkit-text-size-adjust: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box !important;
+}
+
+img, video {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* 2. Banner chính (Hero Banner) trên điện thoại */
+@media (max-width: 768px) {
+  .hero-banner {
+    padding: 24px 14px 32px !important;
+    margin: 10px 8px 24px !important;
+    border-radius: 20px !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+    text-align: center !important;
+  }
+  .hero-banner h1 {
+    font-size: 28px !important;
+    line-height: 1.25 !important;
+  }
+  .hero-banner p {
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+  }
+  .banner-cta-group {
+    justify-content: center !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+  .banner-button {
+    width: 100% !important;
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+    justify-content: center !important;
+  }
+  .banner-trust-badges {
+    justify-content: center !important;
+    gap: 8px !important;
+    font-size: 11.5px !important;
+    flex-wrap: wrap !important;
+  }
+  .banner-products {
+    display: none !important;
+  }
+  .banner-sticker {
+    display: none !important;
+  }
+}
+
+/* 3. Lưới sản phẩm 2 cột chuẩn Mobile (Không bể, vuông vắn) */
+@media (max-width: 640px) {
+  .product-grid,
+  .flash-sale-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    padding: 4px 8px !important;
+  }
+  .product-card,
+  .flash-card {
+    padding: 8px !important;
+    border-radius: 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .product-image-wrap,
+  .flash-card-img {
+    aspect-ratio: 1 / 1 !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+  .product-image-wrap img,
+  .flash-card-img img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+  .product-name,
+  .flash-card-info h3 {
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+    min-height: 35px !important;
+    max-height: 35px !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    margin: 6px 0 4px !important;
+    text-align: left !important;
+  }
+  .product-meta-row {
+    font-size: 11px !important;
+  }
+  .rating {
+    font-size: 11px !important;
+  }
+  .product-footer {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-top: auto !important;
+    gap: 4px !important;
+  }
+  .price-block strong {
+    font-size: 14.5px !important;
+  }
+  .detail-button {
+    display: none !important;
+  }
+  .add-button {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    font-size: 18px !important;
+    border-radius: 8px !important;
+  }
+  .product-video-badge {
+    font-size: 9.5px !important;
+    padding: 3px 6px !important;
+    top: 6px !important;
+    right: 6px !important;
+  }
+  .product-photos-count {
+    font-size: 9.5px !important;
+    padding: 2px 5px !important;
+    bottom: 6px !important;
+    right: 6px !important;
+  }
+}
+
+/* 4. Modal Chi Tiết Sản Phẩm & Trình Phát Video Trên Điện Thoại */
+@media (max-width: 900px) {
+  .detail-backdrop {
+    padding: 10px 6px !important;
+    align-items: flex-start !important;
+  }
+  .detail-page {
+    padding: 0 0 40px !important;
+  }
+  .detail-nav-bar {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+  .detail-modal {
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+    padding: 16px 12px !important;
+    border-radius: 16px !important;
+  }
+  .detail-gallery-col {
+    width: 100% !important;
+  }
+  .detail-media-switcher {
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+  }
+  .media-switch-btn {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+  }
+  .detail-main-media-wrap {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+  .detail-main-image-wrap {
+    aspect-ratio: 1 / 1 !important;
+  }
+  .detail-main-img {
+    object-fit: cover !important;
+  }
+  .detail-video-container {
+    aspect-ratio: 4 / 5 !important;
+    max-height: 380px !important;
+  }
+  .detail-main-video {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 380px !important;
+  }
+  .detail-thumbs-list {
+    display: flex !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory !important;
+    gap: 8px !important;
+    margin-top: 10px !important;
+    padding-bottom: 6px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .detail-thumb-btn {
+    flex: 0 0 56px !important;
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    border-radius: 8px !important;
+    scroll-snap-align: start !important;
+  }
+  .detail-content h1 {
+    font-size: 20px !important;
+    line-height: 1.3 !important;
+  }
+  .detail-price strong {
+    font-size: 22px !important;
+  }
+  .detail-actions {
+    flex-direction: column !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+  .detail-btn-add,
+  .detail-btn-buy {
+    width: 100% !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+    justify-content: center !important;
+  }
+}
+
+/* 5. Giỏ Hàng & Thanh Điều Hướng Header Trên Điện Thoại */
+@media (max-width: 640px) {
+  .store-header {
+    padding: 10px 12px !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+  .header-brand {
+    font-size: 18px !important;
+  }
+  .header-search-wrap {
+    order: 3 !important;
+    width: 100% !important;
+  }
+  .header-search-input {
+    width: 100% !important;
+    font-size: 13px !important;
+  }
+  .cart-drawer {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .checkout-modal {
+    width: 100% !important;
+    padding: 16px 12px !important;
   }
 }
 
