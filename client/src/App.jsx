@@ -586,7 +586,7 @@ function App() {
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [activeCategory, setActiveCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState(() =>
     JSON.parse(localStorage.getItem("tai-shop-user") || "null"),
@@ -894,21 +894,34 @@ function App() {
             fetch(`${apiUrl}/products`),
             fetch(`${apiUrl}/promotions/active`),
           ]);
-        if (!categoryResponse.ok || !productResponse.ok)
-          throw new Error("API không phản hồi");
-        const catData = await categoryResponse.json();
-        if (catData && catData.length) setCategories(catData);
-        const prodData = await productResponse.json();
-        const loadedProducts = prodData?.products || prodData;
-        if (Array.isArray(loadedProducts) && loadedProducts.length) {
-          setProducts(loadedProducts);
+        if (!categoryResponse.ok || !productResponse.ok) return;
+
+        const catText = await categoryResponse.text();
+        if (!catText.trim().startsWith("<")) {
+          const catData = JSON.parse(catText);
+          if (Array.isArray(catData) && catData.length) setCategories(catData);
         }
-        if (promotionResponse.ok)
-          setActivePromotions(await promotionResponse.json());
+
+        const prodText = await productResponse.text();
+        if (!prodText.trim().startsWith("<")) {
+          const prodData = JSON.parse(prodText);
+          const loadedProducts = prodData?.products || prodData;
+          if (Array.isArray(loadedProducts) && loadedProducts.length) {
+            setProducts(loadedProducts);
+          }
+        }
+
+        if (promotionResponse.ok) {
+          const promoText = await promotionResponse.text();
+          if (!promoText.trim().startsWith("<")) {
+            setActivePromotions(JSON.parse(promoText));
+          }
+        }
+
         const detailSlug = window.location.pathname.startsWith("/san-pham/")
           ? window.location.pathname.replace("/san-pham/", "")
           : "";
-        const allProds = (Array.isArray(loadedProducts) && loadedProducts.length) ? loadedProducts : INITIAL_PRODUCTS;
+        const allProds = INITIAL_PRODUCTS;
         const directProduct = allProds.find(
           (product) => product.slug === detailSlug,
         );
