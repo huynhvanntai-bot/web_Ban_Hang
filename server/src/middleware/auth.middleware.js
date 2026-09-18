@@ -1,13 +1,16 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 
+const JWT_SECRET =
+  process.env.JWT_SECRET || "tai-computer-shop-local-jwt-secret-2026-change-this";
+
 async function protect(req, res, next) {
   try {
     const header = req.headers.authorization || "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : null;
     if (!token) return res.status(401).json({ message: "Vui lòng đăng nhập" });
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(payload.id).select("-password");
     if (!user)
       return res.status(401).json({ message: "Tài khoản không tồn tại" });
@@ -25,7 +28,7 @@ async function optionalProtect(req, res, next) {
   if (!token) return next();
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
     req.user = await User.findById(payload.id).select("-password");
   } catch (error) {
     req.user = null;
