@@ -219,9 +219,7 @@ function AdminPage() {
   const [orderFilter, setOrderFilter] = useState("all");
   const [orderSearch, setOrderSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem("admin-sidebar-collapsed") === "true";
-  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [productCategoryFilter, setProductCategoryFilter] = useState("all");
   const [profitFilter, setProfitFilter] = useState("all");
   const [quickPriceModal, setQuickPriceModal] = useState({
@@ -593,8 +591,8 @@ function AdminPage() {
       const type =
         p.productType ||
         (p.category?.name?.toLowerCase().includes("thành phẩm") ||
-        p.name?.toLowerCase().includes("thú") ||
-        p.name?.toLowerCase().includes("hoa")
+          p.name?.toLowerCase().includes("thú") ||
+          p.name?.toLowerCase().includes("hoa")
           ? p.name?.toLowerCase().includes("hoa")
             ? "outsourced"
             : "self_made"
@@ -720,7 +718,7 @@ function AdminPage() {
         productCategoryFilter === "all"
           ? true
           : (product.category?._id || product.category) ===
-            productCategoryFilter;
+          productCategoryFilter;
 
       let matchProfit = true;
       const price = Number(product.price) || 0;
@@ -1132,24 +1130,24 @@ function AdminPage() {
         notes: "",
         items: initialProduct
           ? [
-              {
-                productId: initialProduct._id,
-                productName: initialProduct.name,
-                quantity: 20,
-                costPrice:
-                  initialProduct.costPrice ||
-                  Math.round((initialProduct.price || 20000) * 0.6) ||
-                  12000,
-              },
-            ]
+            {
+              productId: initialProduct._id,
+              productName: initialProduct.name,
+              quantity: 20,
+              costPrice:
+                initialProduct.costPrice ||
+                Math.round((initialProduct.price || 20000) * 0.6) ||
+                12000,
+            },
+          ]
           : [
-              {
-                productId: "",
-                productName: "",
-                quantity: 20,
-                costPrice: 15000,
-              },
-            ],
+            {
+              productId: "",
+              productName: "",
+              quantity: 20,
+              costPrice: 15000,
+            },
+          ],
       },
     });
   }
@@ -1383,12 +1381,12 @@ function AdminPage() {
           <div className="admin-profile-avatar">
             {adminUser?.name
               ? adminUser.name
-                  .trim()
-                  .split(" ")
-                  .map((w) => w[0])
-                  .slice(-2)
-                  .join("")
-                  .toUpperCase()
+                .trim()
+                .split(" ")
+                .map((w) => w[0])
+                .slice(-2)
+                .join("")
+                .toUpperCase()
               : "AD"}
           </div>
           {!sidebarCollapsed && (
@@ -1442,7 +1440,7 @@ function AdminPage() {
               icon: "🪡",
               badge: (data.staff || []).length,
             },
-            
+
             {
               key: "custom-orders",
               label: "Đơn Móc Theo Mẫu",
@@ -1510,504 +1508,1563 @@ function AdminPage() {
         <div className="admin-content-inner">
           {/* TOPBAR */}
           <header className="admin-topbar">
-          <div className="admin-topbar-title">
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div className="admin-topbar-title">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="admin-menu-toggle-btn"
+                  onClick={() => {
+                    const next = !sidebarCollapsed;
+                    setSidebarCollapsed(next);
+                    localStorage.setItem("admin-sidebar-collapsed", String(next));
+                  }}
+                  title={sidebarCollapsed ? "Mở rộng thanh công cụ" : "Thu gọn thanh công cụ"}
+                >
+                  ☰
+                </button>
+                <h1>
+                  <span>{ADMIN_TAB_META[activeTab]?.title || "Sene Handmade Quản Trị"}</span>
+                </h1>
+              </div>
+              <p>
+                <span>{ADMIN_TAB_META[activeTab]?.desc || ""}</span>
+              </p>
+            </div>
+
+            <div className="admin-topbar-actions">
+              <AdminClock />
               <button
                 type="button"
-                className="admin-menu-toggle-btn"
-                onClick={() => {
-                  const next = !sidebarCollapsed;
-                  setSidebarCollapsed(next);
-                  localStorage.setItem("admin-sidebar-collapsed", String(next));
-                }}
-                title={sidebarCollapsed ? "Mở rộng thanh công cụ" : "Thu gọn thanh công cụ"}
+                className="admin-refresh-btn"
+                onClick={loadAdmin}
+                disabled={isRefreshing}
               >
-                ☰
+                {isRefreshing ? "⏳ Đang tải..." : "🔄 Cập nhật dữ liệu"}
               </button>
-              <h1>
-                <span>{ADMIN_TAB_META[activeTab]?.title || "Sene Handmade Quản Trị"}</span>
-              </h1>
             </div>
-            <p>
-              <span>{ADMIN_TAB_META[activeTab]?.desc || ""}</span>
-            </p>
-          </div>
+          </header>
 
-          <div className="admin-topbar-actions">
-            <AdminClock />
-            <button
-              type="button"
-              className="admin-refresh-btn"
-              onClick={loadAdmin}
-              disabled={isRefreshing}
-            >
-              {isRefreshing ? "⏳ Đang tải..." : "🔄 Cập nhật dữ liệu"}
-            </button>
-          </div>
-        </header>
+          {/* TOAST ALERT */}
+          {toast && <div className="toast">{toast}</div>}
 
-        {/* TOAST ALERT */}
-        {toast && <div className="toast">{toast}</div>}
-
-        {/* TAB 1: TỔNG QUAN (OVERVIEW) */}
-        {activeTab === "overview" && (
-          <>
-            {/* 4 Grand KPI Cards */}
-            <div className="admin-kpi-grid">
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon">💰</div>
-                  <span className="kpi-trend">+14.2% tuần này</span>
+          {/* TAB 1: TỔNG QUAN (OVERVIEW) */}
+          {activeTab === "overview" && (
+            <>
+              {/* 4 Grand KPI Cards */}
+              <div className="admin-kpi-grid">
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon">💰</div>
+                    <span className="kpi-trend">+14.2% tuần này</span>
+                  </div>
+                  <div className="kpi-title">Doanh thu đã thu (Giao thành công)</div>
+                  <div className="kpi-val">{money(dashboard.revenue)}</div>
                 </div>
-                <div className="kpi-title">Doanh thu đã thu (Giao thành công)</div>
-                <div className="kpi-val">{money(dashboard.revenue)}</div>
-              </div>
 
-              <div
-                className="admin-kpi-card"
-                onClick={() => {
-                  setActiveTab("orders");
-                  setOrderFilter("pending");
-                }}
-                style={{ cursor: "pointer" }}
-                title="Bấm để xem các đơn chờ xác nhận"
-              >
-                <div className="kpi-top">
-                  <div className="kpi-icon">📦</div>
-                  {pendingOrders.length > 0 ? (
-                    <span
-                      className="kpi-trend"
-                      style={{ background: "#fef2f2", color: "#e11d48" }}
-                    >
-                      {pendingOrders.length} đơn cần duyệt
+                <div
+                  className="admin-kpi-card"
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setOrderFilter("pending");
+                  }}
+                  style={{ cursor: "pointer" }}
+                  title="Bấm để xem các đơn chờ xác nhận"
+                >
+                  <div className="kpi-top">
+                    <div className="kpi-icon">📦</div>
+                    {pendingOrders.length > 0 ? (
+                      <span
+                        className="kpi-trend"
+                        style={{ background: "#fef2f2", color: "#e11d48" }}
+                      >
+                        {pendingOrders.length} đơn cần duyệt
+                      </span>
+                    ) : (
+                      <span className="kpi-trend">Đã xử lý hết</span>
+                    )}
+                  </div>
+                  <div className="kpi-title">Tổng số đơn hàng</div>
+                  <div className="kpi-val">{dashboard.totalOrders || 0}</div>
+                </div>
+
+                <div
+                  className="admin-kpi-card"
+                  onClick={() => setActiveTab("products")}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="kpi-top">
+                    <div className="kpi-icon">🧶</div>
+                    <span className="kpi-trend">
+                      {data.categories.length} danh mục
                     </span>
-                  ) : (
-                    <span className="kpi-trend">Đã xử lý hết</span>
-                  )}
+                  </div>
+                  <div className="kpi-title">Sản phẩm len đang bán</div>
+                  <div className="kpi-val">{dashboard.totalProducts || 0}</div>
                 </div>
-                <div className="kpi-title">Tổng số đơn hàng</div>
-                <div className="kpi-val">{dashboard.totalOrders || 0}</div>
+
+                <div
+                  className="admin-kpi-card"
+                  onClick={() => setActiveTab("customers")}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="kpi-top">
+                    <div className="kpi-icon">🌸</div>
+                    <span className="kpi-trend">Thành viên Tiệm</span>
+                  </div>
+                  <div className="kpi-title">Khách hàng đăng ký</div>
+                  <div className="kpi-val">{dashboard.totalCustomers || 0}</div>
+                </div>
               </div>
 
-              <div
-                className="admin-kpi-card"
-                onClick={() => setActiveTab("products")}
-                style={{ cursor: "pointer" }}
-              >
-                <div className="kpi-top">
-                  <div className="kpi-icon">🧶</div>
-                  <span className="kpi-trend">
-                    {data.categories.length} danh mục
+              {/* Pipeline Status Bar */}
+              <div className="order-pipeline-bar">
+                <div
+                  className={`pipeline-step-pill ${orderFilter === "pending" ? "active" : ""}`}
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setOrderFilter("pending");
+                  }}
+                >
+                  <span>⏳ Chờ xác nhận</span>
+                  <b>{pendingOrders.length}</b>
+                </div>
+                <div
+                  className={`pipeline-step-pill ${orderFilter === "confirmed" ? "active" : ""}`}
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setOrderFilter("confirmed");
+                  }}
+                >
+                  <span>🏪 Đã xác nhận</span>
+                  <b>{confirmedOrders.length}</b>
+                </div>
+                <div
+                  className={`pipeline-step-pill ${orderFilter === "shipping" ? "active" : ""}`}
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setOrderFilter("shipping");
+                  }}
+                >
+                  <span>🚚 Đang giao hàng</span>
+                  <b>{shippingOrders.length}</b>
+                </div>
+                <div
+                  className={`pipeline-step-pill ${orderFilter === "delivered" ? "active" : ""}`}
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setOrderFilter("delivered");
+                  }}
+                >
+                  <span>✅ Đã hoàn thành</span>
+                  <b>{deliveredOrders.length}</b>
+                </div>
+                {lowStockCount > 0 && (
+                  <div
+                    className="pipeline-step-pill"
+                    style={{ background: "#fff1f2", borderColor: "#fecdd3" }}
+                    onClick={() => setActiveTab("products")}
+                  >
+                    <span style={{ color: "#e11d48" }}>⚠️ Tồn kho thấp (&lt;10)</span>
+                    <b style={{ background: "#e11d48" }}>{lowStockCount}</b>
+                  </div>
+                )}
+              </div>
+
+              {/* BIỂU ĐỒ TRÒN DOANH THU & PHÂN TÍCH LỜI / LỖ (DONUT CHART & PROFIT ANALYSIS) */}
+              <div className="admin-card" style={{ marginBottom: "24px" }}>
+                <div className="admin-card-header">
+                  <div>
+                    <h2>📊 Biểu Đồ Tròn Doanh Thu & Phân Tích Lời / Lỗ</h2>
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        color: "#8d6271",
+                        fontSize: "14.5px",
+                      }}
+                    >
+                      Tách bạch 3 nguồn doanh thu: Len cuộn nhập bán, Sản phẩm tiệm tự móc và Nhờ thợ móc gia công.
+                    </p>
+                  </div>
+                  <span className="profit-margin-pill">
+                    ✨ Tỷ suất Lãi ròng: {revenueBreakdown.marginPct}%
                   </span>
                 </div>
-                <div className="kpi-title">Sản phẩm len đang bán</div>
-                <div className="kpi-val">{dashboard.totalProducts || 0}</div>
-              </div>
 
-              <div
-                className="admin-kpi-card"
-                onClick={() => setActiveTab("customers")}
-                style={{ cursor: "pointer" }}
-              >
-                <div className="kpi-top">
-                  <div className="kpi-icon">🌸</div>
-                  <span className="kpi-trend">Thành viên Tiệm</span>
-                </div>
-                <div className="kpi-title">Khách hàng đăng ký</div>
-                <div className="kpi-val">{dashboard.totalCustomers || 0}</div>
-              </div>
-            </div>
-
-            {/* Pipeline Status Bar */}
-            <div className="order-pipeline-bar">
-              <div
-                className={`pipeline-step-pill ${orderFilter === "pending" ? "active" : ""}`}
-                onClick={() => {
-                  setActiveTab("orders");
-                  setOrderFilter("pending");
-                }}
-              >
-                <span>⏳ Chờ xác nhận</span>
-                <b>{pendingOrders.length}</b>
-              </div>
-              <div
-                className={`pipeline-step-pill ${orderFilter === "confirmed" ? "active" : ""}`}
-                onClick={() => {
-                  setActiveTab("orders");
-                  setOrderFilter("confirmed");
-                }}
-              >
-                <span>🏪 Đã xác nhận</span>
-                <b>{confirmedOrders.length}</b>
-              </div>
-              <div
-                className={`pipeline-step-pill ${orderFilter === "shipping" ? "active" : ""}`}
-                onClick={() => {
-                  setActiveTab("orders");
-                  setOrderFilter("shipping");
-                }}
-              >
-                <span>🚚 Đang giao hàng</span>
-                <b>{shippingOrders.length}</b>
-              </div>
-              <div
-                className={`pipeline-step-pill ${orderFilter === "delivered" ? "active" : ""}`}
-                onClick={() => {
-                  setActiveTab("orders");
-                  setOrderFilter("delivered");
-                }}
-              >
-                <span>✅ Đã hoàn thành</span>
-                <b>{deliveredOrders.length}</b>
-              </div>
-              {lowStockCount > 0 && (
-                <div
-                  className="pipeline-step-pill"
-                  style={{ background: "#fff1f2", borderColor: "#fecdd3" }}
-                  onClick={() => setActiveTab("products")}
-                >
-                  <span style={{ color: "#e11d48" }}>⚠️ Tồn kho thấp (&lt;10)</span>
-                  <b style={{ background: "#e11d48" }}>{lowStockCount}</b>
-                </div>
-              )}
-            </div>
-
-            {/* BIỂU ĐỒ TRÒN DOANH THU & PHÂN TÍCH LỜI / LỖ (DONUT CHART & PROFIT ANALYSIS) */}
-            <div className="admin-card" style={{ marginBottom: "24px" }}>
-              <div className="admin-card-header">
-                <div>
-                  <h2>📊 Biểu Đồ Tròn Doanh Thu & Phân Tích Lời / Lỗ</h2>
-                  <p
-                    style={{
-                      margin: "4px 0 0",
-                      color: "#8d6271",
-                      fontSize: "14.5px",
-                    }}
-                  >
-                    Tách bạch 3 nguồn doanh thu: Len cuộn nhập bán, Sản phẩm tiệm tự móc và Nhờ thợ móc gia công.
-                  </p>
-                </div>
-                <span className="profit-margin-pill">
-                  ✨ Tỷ suất Lãi ròng: {revenueBreakdown.marginPct}%
-                </span>
-              </div>
-
-              <div className="profit-analysis-box">
-                {/* Left: Phân tích số liệu & Tư vấn kinh doanh */}
-                <div>
-                  <div className="profit-stats-summary">
-                    <div className="profit-stat-item revenue">
-                      <span>💰 Tổng Doanh Thu Ước Tính</span>
-                      <strong>{money(revenueBreakdown.total)}</strong>
-                      <small
-                        style={{
-                          color: "#8d6271",
-                          display: "block",
-                          marginTop: "4px",
-                          fontSize: "13px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        (Cả 3 nguồn sản phẩm)
-                      </small>
+                <div className="profit-analysis-box">
+                  {/* Left: Phân tích số liệu & Tư vấn kinh doanh */}
+                  <div>
+                    <div className="profit-stats-summary">
+                      <div className="profit-stat-item revenue">
+                        <span>💰 Tổng Doanh Thu Ước Tính</span>
+                        <strong>{money(revenueBreakdown.total)}</strong>
+                        <small
+                          style={{
+                            color: "#8d6271",
+                            display: "block",
+                            marginTop: "4px",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          (Cả 3 nguồn sản phẩm)
+                        </small>
+                      </div>
+                      <div className="profit-stat-item cogs">
+                        <span>📦 Chi Phí Vốn & Tiền Công</span>
+                        <strong>{money(revenueBreakdown.totalCost)}</strong>
+                        <small
+                          style={{
+                            color: "#8d6271",
+                            display: "block",
+                            marginTop: "4px",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          (Giá vốn len + Công thợ)
+                        </small>
+                      </div>
+                      <div className="profit-stat-item net-profit">
+                        <span>📈 Lợi Nhuận Ròng (LÃI LỜI)</span>
+                        <strong>{money(revenueBreakdown.netProfit)}</strong>
+                        <small
+                          style={{
+                            color: "#059669",
+                            display: "block",
+                            marginTop: "4px",
+                            fontSize: "13.5px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Biên lãi ròng: {revenueBreakdown.marginPct}%
+                        </small>
+                      </div>
                     </div>
-                    <div className="profit-stat-item cogs">
-                      <span>📦 Chi Phí Vốn & Tiền Công</span>
-                      <strong>{money(revenueBreakdown.totalCost)}</strong>
-                      <small
+
+                    {/* Hộp Tư Vấn Chiến Lược: Có nên nhập hàng từ đầu về bán không? */}
+                    <div className="strategy-advice-card">
+                      <div
                         style={{
-                          color: "#8d6271",
-                          display: "block",
-                          marginTop: "4px",
-                          fontSize: "13px",
-                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          marginBottom: "8px",
                         }}
                       >
-                        (Giá vốn len + Công thợ)
-                      </small>
-                    </div>
-                    <div className="profit-stat-item net-profit">
-                      <span>📈 Lợi Nhuận Ròng (LÃI LỜI)</span>
-                      <strong>{money(revenueBreakdown.netProfit)}</strong>
-                      <small
+                        <span style={{ fontSize: "18px" }}>💡</span>
+                        <strong style={{ fontSize: "14px" }}>
+                          TƯ VẤN THIẾT LẬP KINH DOANH: CÓ NÊN NHẬP HÀNG TỪ ĐẦU VỀ BÁN KHÔNG?
+                        </strong>
+                      </div>
+                      <div
                         style={{
-                          color: "#059669",
-                          display: "block",
-                          marginTop: "4px",
-                          fontSize: "13.5px",
-                          fontWeight: 700,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
                         }}
                       >
-                        Biên lãi ròng: {revenueBreakdown.marginPct}%
-                      </small>
+                        <div>
+                          <strong>
+                            1. Len cuộn & phụ kiện nhập bán (
+                            {revenueBreakdown.pctYarn}% DT):
+                          </strong>{" "}
+                          <em>Rất nên nhập từ đầu!</em> Giúp tiệm xoay vòng vốn cực nhanh, có đơn hàng phát sinh mỗi ngày vì người đan móc luôn cần nguyên liệu. Khách mua len sẽ có xu hướng mua kèm kim móc, bông gòn, mắt thú.
+                        </div>
+                        <div>
+                          <strong>
+                            2. Tiệm tự móc thành phẩm (
+                            {revenueBreakdown.pctSelf}% DT):
+                          </strong>{" "}
+                          <em>Tỷ suất lợi nhuận cao nhất (~75%)</em>. Dùng để quay video làm mẫu (TikTok, Reels) khẳng định tay nghề của Tiệm. Chỉ nên nhận số lượng vừa sức để đảm bảo độ tỉ mỉ.
+                        </div>
+                        <div>
+                          <strong>
+                            3. Nhờ thợ móc gia công (
+                            {revenueBreakdown.pctOutsource}% DT):
+                          </strong>{" "}
+                          <em>Bí quyết mở rộng quy mô khi đông khách!</em> Vào các dịp lễ (20/10, Valentine, 8/3, Giáng sinh), shop dùng đòn bẩy thợ móc trả công theo sản phẩm ({money(20000)} - {money(50000)}/món) để trả hàng loạt bó hoa, thú len mà không lo thiếu hàng hay kiệt sức.
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Hộp Tư Vấn Chiến Lược: Có nên nhập hàng từ đầu về bán không? */}
-                  <div className="strategy-advice-card">
+                  {/* Right: SVG Donut Chart */}
+                  <div className="donut-container">
+                    <div className="donut-svg-wrap">
+                      <svg
+                        viewBox="0 0 160 160"
+                        width="160"
+                        height="160"
+                        style={{ transform: "rotate(-90deg)" }}
+                      >
+                        {/* Background circle */}
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="60"
+                          fill="transparent"
+                          stroke="#ffe4e6"
+                          strokeWidth="22"
+                        />
+
+                        {/* Slice 1: Len nhập bán (#f43f5e) */}
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="60"
+                          fill="transparent"
+                          stroke="#f43f5e"
+                          strokeWidth="22"
+                          strokeDasharray={`${(revenueBreakdown.pctYarn / 100) * 377} 377`}
+                          strokeDashoffset="0"
+                          strokeLinecap="round"
+                        />
+
+                        {/* Slice 2: Tự móc (#f59e0b) */}
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="60"
+                          fill="transparent"
+                          stroke="#f59e0b"
+                          strokeWidth="22"
+                          strokeDasharray={`${(revenueBreakdown.pctSelf / 100) * 377} 377`}
+                          strokeDashoffset={`-${(revenueBreakdown.pctYarn / 100) * 377}`}
+                          strokeLinecap="round"
+                        />
+
+                        {/* Slice 3: Thợ gia công (#10b981) */}
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="60"
+                          fill="transparent"
+                          stroke="#10b981"
+                          strokeWidth="22"
+                          strokeDasharray={`${(revenueBreakdown.pctOutsource / 100) * 377} 377`}
+                          strokeDashoffset={`-${((revenueBreakdown.pctYarn + revenueBreakdown.pctSelf) / 100) * 377}`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+
+                      <div className="donut-center-text">
+                        <small>TỶ SUẤT LÃI</small>
+                        <strong>{revenueBreakdown.marginPct}%</strong>
+                      </div>
+                    </div>
+
+                    <div className="donut-legend">
+                      <div className="legend-item">
+                        <div className="legend-dot-label">
+                          <span
+                            className="legend-dot"
+                            style={{ background: "#f43f5e" }}
+                          ></span>
+                          <span>Len nhập bán</span>
+                        </div>
+                        <strong>
+                          {money(revenueBreakdown.revYarn)} (
+                          {revenueBreakdown.pctYarn}%)
+                        </strong>
+                      </div>
+                      <div className="legend-item">
+                        <div className="legend-dot-label">
+                          <span
+                            className="legend-dot"
+                            style={{ background: "#f59e0b" }}
+                          ></span>
+                          <span>Tiệm tự móc</span>
+                        </div>
+                        <strong>
+                          {money(revenueBreakdown.revSelf)} (
+                          {revenueBreakdown.pctSelf}%)
+                        </strong>
+                      </div>
+                      <div className="legend-item">
+                        <div className="legend-dot-label">
+                          <span
+                            className="legend-dot"
+                            style={{ background: "#10b981" }}
+                          ></span>
+                          <span>Thợ gia công</span>
+                        </div>
+                        <strong>
+                          {money(revenueBreakdown.revOutsource)} (
+                          {revenueBreakdown.pctOutsource}%)
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BÁO CÁO HÀNG SẮP HẾT KHO (COMPACT LOW STOCK ALERT) */}
+              {lowStockProducts.length > 0 && (
+                <div className="low-stock-bar">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: "10px",
+                    }}
+                  >
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        marginBottom: "8px",
                       }}
                     >
-                      <span style={{ fontSize: "18px" }}>💡</span>
-                      <strong style={{ fontSize: "14px" }}>
-                        TƯ VẤN THIẾT LẬP KINH DOANH: CÓ NÊN NHẬP HÀNG TỪ ĐẦU VỀ BÁN KHÔNG?
+                      <span style={{ fontSize: "18px" }}>⚠️</span>
+                      <strong style={{ fontSize: "16px", color: "#be123c" }}>
+                        BÁO CÁO HÀNG SẮP HẾT KHO ({lowStockProducts.length} sản phẩm dưới 10 cuộn)
                       </strong>
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "6px",
-                      }}
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      style={{ fontSize: "14px", padding: "6px 16px", fontWeight: 700 }}
+                      onClick={() => setActiveTab("products")}
                     >
-                      <div>
-                        <strong>
-                          1. Len cuộn & phụ kiện nhập bán (
-                          {revenueBreakdown.pctYarn}% DT):
-                        </strong>{" "}
-                        <em>Rất nên nhập từ đầu!</em> Giúp tiệm xoay vòng vốn cực nhanh, có đơn hàng phát sinh mỗi ngày vì người đan móc luôn cần nguyên liệu. Khách mua len sẽ có xu hướng mua kèm kim móc, bông gòn, mắt thú.
+                      Xem toàn bộ kho hàng →
+                    </button>
+                  </div>
+
+                  <div className="low-stock-grid">
+                    {lowStockProducts.slice(0, 4).map((p) => (
+                      <div key={p._id} className="low-stock-card">
+                        <img
+                          src={p.images?.[0] || "/placeholder.jpg"}
+                          alt={p.name}
+                          style={{
+                            width: "50px",
+                            height: "50px",
+                            borderRadius: "10px",
+                            objectFit: "cover",
+                            border: "1px solid #fecdd3",
+                          }}
+                        />
+                        <div className="low-stock-info">
+                          <strong title={p.name}>{p.name}</strong>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              marginTop: "2px",
+                            }}
+                          >
+                            <span className="low-stock-badge">
+                              Còn {p.stock || 0} cuộn
+                            </span>
+                            <span
+                              style={{ fontSize: "11px", color: "#8d6271" }}
+                            >
+                              Bán: <strong style={{ color: "#e11d48" }}>{money(p.price)}</strong>
+                              {p.costPrice > 0 && (
+                                <> · Vốn: <strong style={{ color: "#475569" }}>{money(p.costPrice)}</strong></>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="admin-btn-outline"
+                          style={{
+                            fontSize: "13px",
+                            padding: "6px 12px",
+                            fontWeight: 700,
+                            borderColor: "#f43f5e",
+                            color: "#f43f5e",
+                            whiteSpace: "nowrap",
+                          }}
+                          onClick={() =>
+                            setQuickStockModal({
+                              open: true,
+                              product: p,
+                              addStock: 20,
+                            })
+                          }
+                        >
+                          ⚡ +20 cuộn
+                        </button>
                       </div>
-                      <div>
-                        <strong>
-                          2. Tiệm tự móc thành phẩm (
-                          {revenueBreakdown.pctSelf}% DT):
-                        </strong>{" "}
-                        <em>Tỷ suất lợi nhuận cao nhất (~75%)</em>. Dùng để quay video làm mẫu (TikTok, Reels) khẳng định tay nghề của Tiệm. Chỉ nên nhận số lượng vừa sức để đảm bảo độ tỉ mỉ.
-                      </div>
-                      <div>
-                        <strong>
-                          3. Nhờ thợ móc gia công (
-                          {revenueBreakdown.pctOutsource}% DT):
-                        </strong>{" "}
-                        <em>Bí quyết mở rộng quy mô khi đông khách!</em> Vào các dịp lễ (20/10, Valentine, 8/3, Giáng sinh), shop dùng đòn bẩy thợ móc trả công theo sản phẩm ({money(20000)} - {money(50000)}/món) để trả hàng loạt bó hoa, thú len mà không lo thiếu hàng hay kiệt sức.
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                {/* Right: SVG Donut Chart */}
-                <div className="donut-container">
-                  <div className="donut-svg-wrap">
-                    <svg
-                      viewBox="0 0 160 160"
-                      width="160"
-                      height="160"
-                      style={{ transform: "rotate(-90deg)" }}
-                    >
-                      {/* Background circle */}
-                      <circle
-                        cx="80"
-                        cy="80"
-                        r="60"
-                        fill="transparent"
-                        stroke="#ffe4e6"
-                        strokeWidth="22"
-                      />
-
-                      {/* Slice 1: Len nhập bán (#f43f5e) */}
-                      <circle
-                        cx="80"
-                        cy="80"
-                        r="60"
-                        fill="transparent"
-                        stroke="#f43f5e"
-                        strokeWidth="22"
-                        strokeDasharray={`${(revenueBreakdown.pctYarn / 100) * 377} 377`}
-                        strokeDashoffset="0"
-                        strokeLinecap="round"
-                      />
-
-                      {/* Slice 2: Tự móc (#f59e0b) */}
-                      <circle
-                        cx="80"
-                        cy="80"
-                        r="60"
-                        fill="transparent"
-                        stroke="#f59e0b"
-                        strokeWidth="22"
-                        strokeDasharray={`${(revenueBreakdown.pctSelf / 100) * 377} 377`}
-                        strokeDashoffset={`-${(revenueBreakdown.pctYarn / 100) * 377}`}
-                        strokeLinecap="round"
-                      />
-
-                      {/* Slice 3: Thợ gia công (#10b981) */}
-                      <circle
-                        cx="80"
-                        cy="80"
-                        r="60"
-                        fill="transparent"
-                        stroke="#10b981"
-                        strokeWidth="22"
-                        strokeDasharray={`${(revenueBreakdown.pctOutsource / 100) * 377} 377`}
-                        strokeDashoffset={`-${((revenueBreakdown.pctYarn + revenueBreakdown.pctSelf) / 100) * 377}`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-
-                    <div className="donut-center-text">
-                      <small>TỶ SUẤT LÃI</small>
-                      <strong>{revenueBreakdown.marginPct}%</strong>
-                    </div>
-                  </div>
-
-                  <div className="donut-legend">
-                    <div className="legend-item">
-                      <div className="legend-dot-label">
-                        <span
-                          className="legend-dot"
-                          style={{ background: "#f43f5e" }}
-                        ></span>
-                        <span>Len nhập bán</span>
-                      </div>
-                      <strong>
-                        {money(revenueBreakdown.revYarn)} (
-                        {revenueBreakdown.pctYarn}%)
-                      </strong>
-                    </div>
-                    <div className="legend-item">
-                      <div className="legend-dot-label">
-                        <span
-                          className="legend-dot"
-                          style={{ background: "#f59e0b" }}
-                        ></span>
-                        <span>Tiệm tự móc</span>
-                      </div>
-                      <strong>
-                        {money(revenueBreakdown.revSelf)} (
-                        {revenueBreakdown.pctSelf}%)
-                      </strong>
-                    </div>
-                    <div className="legend-item">
-                      <div className="legend-dot-label">
-                        <span
-                          className="legend-dot"
-                          style={{ background: "#10b981" }}
-                        ></span>
-                        <span>Thợ gia công</span>
-                      </div>
-                      <strong>
-                        {money(revenueBreakdown.revOutsource)} (
-                        {revenueBreakdown.pctOutsource}%)
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* BÁO CÁO HÀNG SẮP HẾT KHO (COMPACT LOW STOCK ALERT) */}
-            {lowStockProducts.length > 0 && (
-              <div className="low-stock-bar">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <span style={{ fontSize: "18px" }}>⚠️</span>
-                    <strong style={{ fontSize: "16px", color: "#be123c" }}>
-                      BÁO CÁO HÀNG SẮP HẾT KHO ({lowStockProducts.length} sản phẩm dưới 10 cuộn)
-                    </strong>
-                  </div>
+              {/* Bảng đơn hàng mới nhất */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <h2>📦 5 Đơn Hàng Mới Đặt Gần Nhất</h2>
                   <button
                     type="button"
                     className="admin-btn-outline"
-                    style={{ fontSize: "14px", padding: "6px 16px", fontWeight: 700 }}
-                    onClick={() => setActiveTab("products")}
+                    onClick={() => setActiveTab("orders")}
                   >
-                    Xem toàn bộ kho hàng →
+                    Xem tất cả {data.orders.length} đơn hàng →
                   </button>
                 </div>
 
-                <div className="low-stock-grid">
-                  {lowStockProducts.slice(0, 4).map((p) => (
-                    <div key={p._id} className="low-stock-card">
-                      <img
-                        src={p.images?.[0] || "/placeholder.jpg"}
-                        alt={p.name}
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Mã đơn</th>
+                        <th>Khách hàng</th>
+                        <th>Số món</th>
+                        <th>Tổng tiền</th>
+                        <th>Thanh toán</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.orders.slice(0, 5).map((order) => (
+                        <tr key={order._id}>
+                          <td>
+                            <strong>#{order._id.slice(-6).toUpperCase()}</strong>
+                          </td>
+                          <td>
+                            <strong>{order.customerName}</strong>
+                            <small style={{ display: "block", color: "#8d6271" }}>
+                              📱 {order.phone}
+                            </small>
+                          </td>
+                          <td>{order.items?.length || 0} món</td>
+                          <td>
+                            <strong style={{ color: "#e11d48" }}>
+                              {money(order.totalAmount)}
+                            </strong>
+                          </td>
+                          <td>
+                            <span
+                              className="status-pill-badge"
+                              style={{ background: "#fdf2f8", color: "#be123c" }}
+                            >
+                              {order.paymentMethod === "COD"
+                                ? "💵 Thu hộ COD"
+                                : "💳 VietQR"}
+                            </span>
+                          </td>
+                          <td>
+                            <select
+                              className="order-status-select"
+                              value={order.status}
+                              onChange={(e) =>
+                                updateOrderStatus(order._id, e.target.value)
+                              }
+                            >
+                              {Object.entries(statusLabels).map(
+                                ([key, label]) => (
+                                  <option key={key} value={key}>
+                                    {statusIcons[key]} {label}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              onClick={() => showOrder(order._id)}
+                            >
+                              👁️ Xem hóa đơn
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {data.orders.length === 0 && (
+                        <tr>
+                          <td colSpan="7" style={{ textAlign: "center", padding: "30px" }}>
+                            Chưa có đơn hàng nào phát sinh.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Top 4 Bán chạy leaderboard */}
+              {data.reports.bestSelling?.length > 0 && (
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <h2>🔥 Top Sản Phẩm Len Bán Chạy Nhất</h2>
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                      gap: "16px",
+                    }}
+                  >
+                    {data.reports.bestSelling.slice(0, 4).map((item, idx) => (
+                      <div
+                        key={item._id}
                         style={{
-                          width: "50px",
-                          height: "50px",
-                          borderRadius: "10px",
-                          objectFit: "cover",
-                          border: "1px solid #fecdd3",
+                          background: "#fffafc",
+                          border: "1.5px solid #fce7f3",
+                          borderRadius: "14px",
+                          padding: "16px",
                         }}
-                      />
-                      <div className="low-stock-info">
-                        <strong title={p.name}>{p.name}</strong>
+                      >
                         <div
                           style={{
                             display: "flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            marginTop: "2px",
+                            justifyContent: "space-between",
+                            marginBottom: "8px",
                           }}
                         >
-                          <span className="low-stock-badge">
-                            Còn {p.stock || 0} cuộn
+                          <span
+                            style={{
+                              fontWeight: 800,
+                              color: idx === 0 ? "#f59e0b" : "#f43f5e",
+                            }}
+                          >
+                            {idx === 0 ? "🥇 Hạng 1" : `#${idx + 1}`}
                           </span>
                           <span
-                            style={{ fontSize: "11px", color: "#8d6271" }}
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#059669",
+                            }}
                           >
-                            Bán: <strong style={{ color: "#e11d48" }}>{money(p.price)}</strong>
-                            {p.costPrice > 0 && (
-                              <> · Vốn: <strong style={{ color: "#475569" }}>{money(p.costPrice)}</strong></>
-                            )}
+                            Đã bán {item.quantity} cuộn
                           </span>
                         </div>
+                        <strong
+                          style={{
+                            display: "block",
+                            fontSize: "14px",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          {item.name}
+                        </strong>
+                        <div style={{ fontSize: "13px", color: "#e11d48", fontWeight: 700 }}>
+                          {money(item.revenue)}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        className="admin-btn-outline"
-                        style={{
-                          fontSize: "13px",
-                          padding: "6px 12px",
-                          fontWeight: 700,
-                          borderColor: "#f43f5e",
-                          color: "#f43f5e",
-                          whiteSpace: "nowrap",
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* TAB 2: SẢN PHẨM & KHO (PRODUCTS) */}
+          {activeTab === "products" && (
+            <>
+              {/* THỐNG KÊ LỜI / LỖ & TỒN KHO */}
+              <div className="admin-kpi-grid">
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon">🧶</div>
+                    <span className="kpi-trend">{data.products.length} mặt hàng</span>
+                  </div>
+                  <div className="kpi-title">Tổng tồn kho hàng len</div>
+                  <h3 className="kpi-val">{productInventoryStats.totalStock} cuộn/bó</h3>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon" style={{ background: "#f1f5f9", borderColor: "#cbd5e1" }}>💰</div>
+                    <span className="kpi-trend" style={{ background: "#f1f5f9", color: "#475569", borderColor: "#cbd5e1" }}>
+                      Giá nhập vốn
+                    </span>
+                  </div>
+                  <div className="kpi-title">Tổng tiền vốn tồn kho</div>
+                  <h3 className="kpi-val" style={{ color: "#475569" }}>
+                    {money(productInventoryStats.totalCostVal)}
+                  </h3>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon" style={{ background: "#fff1f5", borderColor: "#fecdd3" }}>🏷️</div>
+                    <span className="kpi-trend" style={{ background: "#fff1f5", color: "#be123c", borderColor: "#fecdd3" }}>
+                      Giá bán ra
+                    </span>
+                  </div>
+                  <div className="kpi-title">Dự kiến thu khi bán hết</div>
+                  <h3 className="kpi-val" style={{ color: "#e11d48" }}>
+                    {money(productInventoryStats.totalRetailVal)}
+                  </h3>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>💎</div>
+                    <span className="kpi-trend" style={{ background: "#ecfdf5", color: "#047857" }}>
+                      +{productInventoryStats.marginPercent}% Biên lời
+                    </span>
+                  </div>
+                  <div className="kpi-title">Lợi nhuận gộp dự kiến</div>
+                  <h3 className="kpi-val" style={{ color: "#047857" }}>
+                    {money(productInventoryStats.projectedProfit)}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Form Thêm/Sửa Sản Phẩm */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <h2>
+                      {editingProductId
+                        ? "✏️ Chỉnh Sửa Thông Tin Sản Phẩm"
+                        : "➕ Thêm Sản Phẩm Len / Dụng Cụ Mới"}
+                    </h2>
+                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                      Cập nhật giá, số lượng tồn kho và thông tin để sản phẩm xuất hiện trên trang chủ.
+                    </p>
+                  </div>
+                  {editingProductId && (
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      onClick={resetProductForm}
+                    >
+                      ✕ Hủy chỉnh sửa
+                    </button>
+                  )}
+                </div>
+
+                <form onSubmit={addProduct}>
+                  <div className="admin-product-grid-form">
+                    <div className="admin-form-group">
+                      <label>Tên sản phẩm (*)</label>
+                      <input
+                        required
+                        placeholder="VD: Len Milk Bò 50g Siêu Mềm"
+                        value={productForm.name}
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          setProductForm((prev) => ({
+                            ...prev,
+                            name,
+                            slug: editingProductId ? prev.slug : slugify(name),
+                          }));
                         }}
-                        onClick={() =>
-                          setQuickStockModal({
-                            open: true,
-                            product: p,
-                            addStock: 20,
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Đường dẫn tĩnh (Slug URL) (*)</label>
+                      <input
+                        required
+                        placeholder="len-milk-bo-50g-sieu-mem"
+                        value={productForm.slug}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, slug: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Giá bán (VNĐ) (*)</label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        step="1000"
+                        placeholder="18000"
+                        value={productForm.price}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            price: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Giá vốn / Chi phí nguyên liệu (VNĐ)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        placeholder="VD: 10000"
+                        value={productForm.costPrice}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            costPrice: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    {(() => {
+                      const p = Number(productForm.price) || 0;
+                      const c = Number(productForm.costPrice) || 0;
+                      if (p > 0 && c > 0) {
+                        const diff = p - c;
+                        const pct = Math.round((diff / p) * 100);
+                        return (
+                          <div
+                            style={{
+                              gridColumn: "1 / -1",
+                              padding: "12px 18px",
+                              borderRadius: "12px",
+                              background: diff >= 0 ? "#ecfdf5" : "#fee2e2",
+                              border: `1.5px solid ${diff >= 0 ? "#a7f3d0" : "#fca5a5"}`,
+                              fontSize: "14px",
+                              fontWeight: 700,
+                              color: diff >= 0 ? "#047857" : "#b91c1c",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span>
+                              {diff >= 0 ? "📈 Dự kiến lợi nhuận bán ra: " : "📉 Cảnh báo bán lỗ: "}
+                              <strong>{diff >= 0 ? `+${money(diff)}` : `-${money(Math.abs(diff))}`}</strong> ({pct}% trên giá bán)
+                            </span>
+                            <span style={{ fontSize: "12.5px", fontWeight: 600 }}>
+                              {diff >= 0 ? "✅ Giá bán có lời" : "⚠️ Giá bán thấp hơn giá vốn nhập"}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    <div className="admin-form-group">
+                      <label>Mô hình / Nguồn gốc sản phẩm (*)</label>
+                      <select
+                        value={productForm.productType}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            productType: e.target.value,
                           })
                         }
                       >
-                        ⚡ +20 cuộn
-                      </button>
+                        <option value="yarn_retail">
+                          🧶 Len cuộn & Phụ kiện nhập về bán
+                        </option>
+                        <option value="self_made">
+                          🌸 Tiệm tự móc (In-house thủ công)
+                        </option>
+                        <option value="outsourced">
+                          🪡 Nhờ thợ gia công móc thành phẩm
+                        </option>
+                      </select>
                     </div>
-                  ))}
+
+                    <div className="admin-form-group">
+                      <label>Số lượng tồn kho (Cuộn/Bộ) (*)</label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        placeholder="50"
+                        value={productForm.stock}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            stock: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Danh mục sản phẩm (*)</label>
+                      <select
+                        required
+                        value={productForm.category}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            category: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="">-- Chọn danh mục --</option>
+                        {data.categories.map((c) => (
+                          <option key={c._id} value={c._id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Chất liệu sợi / Nhãn hiệu</label>
+                      <input
+                        placeholder="VD: Milk Cotton, Chenille, Tự móc..."
+                        value={productForm.brand}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            brand: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    {Number(productForm.price) > 0 &&
+                      Number(productForm.costPrice) > 0 && (
+                        <div
+                          className="full-width"
+                          style={{
+                            background: "#f0fdf4",
+                            border: "1px solid #bbf7d0",
+                            borderRadius: "10px",
+                            padding: "10px 14px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            color: "#166534",
+                            fontSize: "13px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          <span>
+                            💡 Ước tính Lãi gộp mỗi món:{" "}
+                            <strong style={{ color: "#15803d", fontSize: "15px" }}>
+                              {money(
+                                Number(productForm.price) -
+                                Number(productForm.costPrice),
+                              )}
+                            </strong>
+                          </span>
+                          <span>
+                            Tỷ suất sinh lời:{" "}
+                            <strong style={{ color: "#15803d" }}>
+                              {(
+                                ((Number(productForm.price) -
+                                  Number(productForm.costPrice)) /
+                                  Number(productForm.price)) *
+                                100
+                              ).toFixed(1)}
+                              %
+                            </strong>
+                          </span>
+                        </div>
+                      )}
+
+                    <div className="admin-form-group full-width">
+                      <label>Link hình ảnh sản phẩm (Cloudinary hoặc URL)</label>
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <input
+                          style={{ flex: 1 }}
+                          placeholder="https://images.unsplash.com/... hoặc link ảnh"
+                          value={productForm.images}
+                          onChange={(e) =>
+                            setProductForm({
+                              ...productForm,
+                              images: e.target.value,
+                            })
+                          }
+                        />
+                        <label
+                          className="admin-btn-outline"
+                          style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}
+                        >
+                          📁 Tải ảnh từ máy
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            onChange={uploadProductImage}
+                          />
+                        </label>
+                      </div>
+                      {uploadMessage && (
+                        <small style={{ color: uploadingImage ? "#e11d48" : "#059669", fontWeight: 600 }}>
+                          {uploadMessage}
+                        </small>
+                      )}
+                      {productForm.images && (
+                        <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "10px", background: "#fdf2f8", padding: "8px 12px", borderRadius: "10px", border: "1px solid #fbcfe8" }}>
+                          <img
+                            src={productForm.images}
+                            alt="Xem trước ảnh sản phẩm"
+                            style={{ width: "60px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1.5px solid #fda4af" }}
+                          />
+                          <div>
+                            <span style={{ fontSize: "12px", color: "#059669", fontWeight: 700, display: "block" }}>✓ Đã chọn ảnh sản phẩm</span>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              onClick={() => setProductForm((prev) => ({ ...prev, images: "" }))}
+                              style={{ padding: "2px 8px", fontSize: "11px", color: "#e11d48", marginTop: "4px" }}
+                            >
+                              ✕ Xóa ảnh này
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                    <button type="submit" className="admin-btn-primary">
+                      {editingProductId ? "💾 Lưu Thay Đổi" : "➕ Thêm Sản Phẩm Mới"}
+                    </button>
+                    {editingProductId && (
+                      <button
+                        type="button"
+                        className="admin-btn-outline"
+                        onClick={resetProductForm}
+                      >
+                        ✕ Hủy Chỉnh Sửa
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              {/* Danh Sách Sản Phẩm */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <h2>Kho Hàng & Đối Soát Lời Lỗ ({filteredProducts.length} sản phẩm)</h2>
+                    <p style={{ margin: "4px 0 0", color: "#7b4b5c", fontSize: "14.5px" }}>
+                      Đối chiếu trực quan giữa Giá Vốn Nhập Kho và Giá Bán Ra để kiểm soát biên lợi nhuận
+                    </p>
+                  </div>
+                  <div className="admin-card-actions">
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      onClick={exportProductsExcel}
+                      style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
+                      title="Xuất file Excel danh sách toàn bộ len & phụ kiện kho"
+                    >
+                      📥 Xuất Excel Kho Hàng
+                    </button>
+                    <input
+                      className="admin-search-input"
+                      placeholder="🔍 Tìm theo tên, slug..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                    />
+                    <select
+                      className="admin-select-input"
+                      value={productCategoryFilter}
+                      onChange={(e) => setProductCategoryFilter(e.target.value)}
+                    >
+                      <option value="all">Tất cả danh mục</option>
+                      {data.categories.map((c) => (
+                        <option key={c._id} value={c._id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* PROFIT FILTER BAR */}
+                <div className="profit-filter-bar">
+                  <span style={{ fontWeight: 800, color: "#471827", fontSize: "14.5px" }}>
+                    📊 Bộ lọc lời / lỗ:
+                  </span>
+                  <button
+                    type="button"
+                    className={`profit-filter-pill ${profitFilter === "all" ? "active" : ""}`}
+                    onClick={() => setProfitFilter("all")}
+                  >
+                    Tất cả ({data.products.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`profit-filter-pill profit ${profitFilter === "profit" ? "active" : ""}`}
+                    onClick={() => setProfitFilter("profit")}
+                  >
+                    📈 Đang có lời ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) > Number(p.costPrice)).length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`profit-filter-pill loss ${profitFilter === "loss" ? "active" : ""}`}
+                    onClick={() => setProfitFilter("loss")}
+                  >
+                    📉 Cảnh báo lỗ ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) < Number(p.costPrice)).length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`profit-filter-pill ${profitFilter === "breakeven" ? "active" : ""}`}
+                    onClick={() => setProfitFilter("breakeven")}
+                  >
+                    ⚖️ Hòa vốn ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) === Number(p.costPrice)).length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`profit-filter-pill nocost ${profitFilter === "nocost" ? "active" : ""}`}
+                    onClick={() => setProfitFilter("nocost")}
+                  >
+                    ⚠️ Chưa có giá vốn ({data.products.filter((p) => !p.costPrice || Number(p.costPrice) <= 0).length})
+                  </button>
+                </div>
+
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: "60px" }}>Ảnh</th>
+                        <th>Tên sản phẩm</th>
+                        <th>Danh mục</th>
+                        <th>Giá Bán & Giá Vốn (Nhập - Lời)</th>
+                        <th>Tồn kho</th>
+                        <th>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProducts.map((product) => (
+                        <tr key={product._id}>
+                          <td style={{ width: "60px" }}>
+                            <img
+                              src={product.images?.[0] || "/placeholder.jpg"}
+                              alt={product.name}
+                              style={{
+                                width: "56px",
+                                height: "56px",
+                                objectFit: "cover",
+                                borderRadius: "12px",
+                                border: "1.5px solid #fce7f3",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <strong style={{ fontSize: "16px", color: "#2c0e17" }}>{product.name}</strong>
+                            <small style={{ display: "block", color: "#8d6271", marginTop: "3px", fontSize: "13px" }}>
+                              🔗 /{product.slug} · {product.brand || "Sene Handmade"}
+                            </small>
+                            <span
+                              style={{
+                                fontSize: "12px",
+                                display: "inline-block",
+                                marginTop: "4px",
+                                color: "#be123c",
+                                background: "#fff1f5",
+                                padding: "3px 10px",
+                                borderRadius: "10px",
+                                border: "1px solid #fce7f3",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {productTypeLabels[product.productType || "yarn_retail"]}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              style={{
+                                background: "#fff1f2",
+                                color: "#be123c",
+                                padding: "5px 12px",
+                                borderRadius: "12px",
+                                fontSize: "13.5px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {product.category?.name || "Chưa phân loại"}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="price-compare-cell">
+                              <div className="price-compare-row">
+                                <div className="price-pill-item sell" title="Giá bán ra niêm yết">
+                                  <span className="price-pill-label">Bán</span>
+                                  <span className="price-pill-val">{money(product.price)}</span>
+                                </div>
+                                <div className="price-pill-item cost" title="Giá vốn nhập kho">
+                                  <span className="price-pill-label">Vốn</span>
+                                  {product.costPrice > 0 ? (
+                                    <span className="price-pill-val">{money(product.costPrice)}</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="btn-add-cost-inline"
+                                      onClick={() =>
+                                        setQuickPriceModal({
+                                          open: true,
+                                          product,
+                                          price: product.price || 0,
+                                          costPrice: 0,
+                                        })
+                                      }
+                                    >
+                                      + Nhập vốn
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {(() => {
+                                const cost = Number(product.costPrice) || 0;
+                                const price = Number(product.price) || 0;
+                                if (!cost || cost <= 0) {
+                                  return (
+                                    <span className="profit-mini-badge neutral">
+                                      ⚠️ Chưa có giá vốn
+                                    </span>
+                                  );
+                                }
+                                const profit = price - cost;
+                                const pct = price > 0 ? Math.round((profit / price) * 100) : 0;
+                                if (profit > 0) {
+                                  return (
+                                    <span className="profit-mini-badge positive">
+                                      📈 Lời +{money(profit)} ({pct}%)
+                                    </span>
+                                  );
+                                }
+                                if (profit === 0) {
+                                  return (
+                                    <span className="profit-mini-badge neutral">
+                                      ⚖️ Hòa vốn (0đ)
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="profit-mini-badge negative">
+                                    📉 Lỗ -{money(Math.abs(profit))} ({pct}%)
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              {product.stock > 10 ? (
+                                <span className="status-pill-badge delivered">
+                                  Còn {product.stock} cuộn
+                                </span>
+                              ) : product.stock > 0 ? (
+                                <span className="status-pill-badge pending">
+                                  ⚠️ Sắp hết ({product.stock})
+                                </span>
+                              ) : (
+                                <span className="status-pill-badge cancelled">
+                                  ❌ Hết hàng
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ padding: "3px 8px", fontSize: "12px", borderColor: "#f43f5e", color: "#f43f5e", fontWeight: 700 }}
+                                title="Nhập thêm hàng vào kho"
+                                onClick={() => setQuickStockModal({ open: true, product, addStock: 20 })}
+                              >
+                                ⚡ +20
+                              </button>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ borderColor: "#2563eb", color: "#2563eb", fontWeight: 700, padding: "7px 12px" }}
+                                title="Sửa nhanh giá vốn và giá bán"
+                                onClick={() =>
+                                  setQuickPriceModal({
+                                    open: true,
+                                    product,
+                                    price: product.price || 0,
+                                    costPrice: product.costPrice || 0,
+                                  })
+                                }
+                              >
+                                💰 Sửa giá
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ borderColor: "#059669", color: "#059669", fontWeight: 700, padding: "7px 12px" }}
+                                title="Lập phiếu nhập hàng cho sản phẩm này"
+                                onClick={() => openCreateImport(product)}
+                              >
+                                📥 Nhập kho
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ padding: "7px 12px" }}
+                                onClick={() => editProduct(product)}
+                              >
+                                ✏️ Sửa
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ color: "#dc2626", borderColor: "#fecaca", padding: "7px 12px" }}
+                                onClick={() => deleteProduct(product._id)}
+                              >
+                                🗑️ Xóa
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredProducts.length === 0 && (
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: "center", padding: "40px" }}>
+                            Không tìm thấy sản phẩm nào phù hợp với từ khóa.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
+            </>
+          )}
 
-            {/* Bảng đơn hàng mới nhất */}
+          {/* TAB: QUẢN LÝ NHẬP HÀNG & TỒN KHO (IMPORTS) */}
+          {activeTab === "imports" && (
+            <>
+              {/* KPI Thống Kê Nhập Hàng */}
+              <div className="admin-kpi-grid">
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon">📦</div>
+                    <span className="kpi-trend">Lịch sử</span>
+                  </div>
+                  <div className="kpi-title">Tổng số phiếu nhập</div>
+                  <h3 className="kpi-val">{data.imports?.length || 0} phiếu</h3>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>💰</div>
+                    <span className="kpi-trend" style={{ background: "#ecfdf5", color: "#047857" }}>Vốn nhập</span>
+                  </div>
+                  <div className="kpi-title">Tổng tiền nhập hàng</div>
+                  <h3 className="kpi-val" style={{ color: "#047857" }}>
+                    {money((data.imports || []).reduce((s, i) => s + (i.totalAmount || 0), 0))}
+                  </h3>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon" style={{ background: "#fdf2f8", borderColor: "#fbcfe8" }}>🧶</div>
+                    <span className="kpi-trend">Tồn kho đã tăng</span>
+                  </div>
+                  <div className="kpi-title">Tổng lượng len đã nhập</div>
+                  <h3 className="kpi-val" style={{ color: "#be123c" }}>
+                    {(data.imports || []).reduce(
+                      (s, i) => s + (i.items || []).reduce((sub, it) => sub + (it.quantity || 0), 0),
+                      0
+                    )} cuộn/bó
+                  </h3>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top">
+                    <div className="kpi-icon" style={{ background: "#eff6ff", borderColor: "#bfdbfe" }}>🏢</div>
+                    <span className="kpi-trend" style={{ background: "#eff6ff", color: "#1d4ed8" }}>Đối tác</span>
+                  </div>
+                  <div className="kpi-title">Nhà cung cấp đối tác</div>
+                  <h3 className="kpi-val" style={{ color: "#1d4ed8" }}>{data.suppliers?.length || 0} đối tác</h3>
+                </div>
+              </div>
+
+              {/* Bảng Danh Sách Phiếu Nhập */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <h2>📦 Lịch Sử Nhập Hàng & Tồn Kho ({filteredImports.length})</h2>
+                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                      Mỗi phiếu nhập hàng sẽ tự động tăng số lượng tồn kho của sản phẩm để phục vụ bán hàng ngay trên shop.
+                    </p>
+                  </div>
+                  <div className="admin-card-actions">
+                    <input
+                      className="admin-search-input"
+                      placeholder="🔍 Tìm theo mã PN, NCC, tên len..."
+                      value={importSearch}
+                      onChange={(e) => setImportSearch(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="admin-btn-primary"
+                      style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)", boxShadow: "0 4px 14px rgba(5, 150, 105, 0.4)" }}
+                      onClick={() => openCreateImport()}
+                    >
+                      ➕ Lập Phiếu Nhập Hàng Mới
+                    </button>
+                  </div>
+                </div>
+
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Mã Phiếu</th>
+                        <th>Nhà Cung Cấp & SĐT</th>
+                        <th>Thời Gian Nhập</th>
+                        <th>Mặt Hàng Nhập Kho</th>
+                        <th>Tổng Tiền Vốn</th>
+                        <th>Người Lập</th>
+                        <th>Trạng Thái</th>
+                        <th>Thao Tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredImports.map((imp) => (
+                        <tr key={imp._id}>
+                          <td>
+                            <strong>{imp.code}</strong>
+                          </td>
+                          <td>
+                            <strong>{imp.supplierName}</strong>
+                            {imp.supplierPhone && (
+                              <small style={{ display: "block", color: "#8d6271" }}>
+                                📱 {imp.supplierPhone}
+                              </small>
+                            )}
+                          </td>
+                          <td>
+                            {new Date(imp.createdAt).toLocaleDateString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })}
+                          </td>
+                          <td>
+                            <div className="import-items-list-cell">
+                              {imp.items?.slice(0, 3).map((item, idx) => (
+                                <span key={idx} className="import-item-tag">
+                                  <strong>{item.productName}</strong>
+                                  <span style={{ color: "#be123c", fontWeight: 700 }}>
+                                    x{item.quantity}
+                                  </span>
+                                  <small style={{ color: "#8d6271" }}>
+                                    ({money(item.costPrice)})
+                                  </small>
+                                </span>
+                              ))}
+                              {imp.items?.length > 3 && (
+                                <small style={{ color: "#8d6271" }}>
+                                  + thêm {imp.items.length - 3} mặt hàng nữa...
+                                </small>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <strong style={{ color: "#047857", fontSize: "14px" }}>
+                              {money(imp.totalAmount)}
+                            </strong>
+                          </td>
+                          <td>{imp.importedBy || "Admin Kho"}</td>
+                          <td>
+                            <span className="import-badge-pill">
+                              ✅ Đã nhập kho (+Tồn)
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                onClick={() => setSelectedImportReceipt(imp)}
+                                title="Xem và in phiếu nhập kho"
+                              >
+                                👁️ Xem phiếu
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ color: "#dc2626", borderColor: "#fecaca" }}
+                                onClick={() => handleDeleteImport(imp._id)}
+                                title="Xóa phiếu nhập"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredImports.length === 0 && (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: "center", padding: "40px" }}>
+                            {importSearch
+                              ? "Không tìm thấy phiếu nhập nào với từ khóa này."
+                              : "Chưa có phiếu nhập hàng nào. Bấm nút '+ Lập Phiếu Nhập Hàng Mới' để nhập hàng vào kho và tăng số lượng bán."}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 3: QUẢN LÝ ĐƠN HÀNG (ORDERS) */}
+          {activeTab === "orders" && (
             <div className="admin-card">
               <div className="admin-card-header">
-                <h2>📦 5 Đơn Hàng Mới Đặt Gần Nhất</h2>
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={() => setActiveTab("orders")}
-                >
-                  Xem tất cả {data.orders.length} đơn hàng →
-                </button>
+                <h2>📦 Quản Lý {data.orders.length} Đơn Hàng</h2>
+                <div className="admin-card-actions">
+                  <button
+                    type="button"
+                    className="admin-btn-outline"
+                    onClick={exportShipperOrdersExcel}
+                    style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
+                    title="Xuất bảng kê danh sách giao hàng cho Shipper bưu tá"
+                  >
+                    📥 Xuất Bảng Kê Shipper COD
+                  </button>
+                  <input
+                    className="admin-search-input"
+                    placeholder="🔍 Tìm mã đơn, tên, SĐT..."
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Filter Tabs */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                  marginBottom: "20px",
+                  borderBottom: "1.5px solid #fce7f3",
+                  paddingBottom: "12px",
+                }}
+              >
+                {[
+                  { id: "all", label: "Tất cả", count: data.orders.length },
+                  { id: "pending", label: "⏳ Chờ xác nhận", count: pendingOrders.length },
+                  { id: "confirmed", label: "🏪 Đã xác nhận", count: confirmedOrders.length },
+                  { id: "shipping", label: "🚚 Đang giao", count: shippingOrders.length },
+                  { id: "delivered", label: "✅ Đã giao", count: deliveredOrders.length },
+                  { id: "cancelled", label: "❌ Đã hủy", count: cancelledOrders.length },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setOrderFilter(tab.id)}
+                    style={{
+                      border: "0",
+                      background: orderFilter === tab.id ? "#f43f5e" : "#fff1f5",
+                      color: orderFilter === tab.id ? "#fff" : "#be123c",
+                      padding: "6px 14px",
+                      borderRadius: "16px",
+                      fontSize: "12.5px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {tab.label} ({tab.count})
+                  </button>
+                ))}
               </div>
 
               <div className="admin-table-wrap">
@@ -2015,16 +3072,17 @@ function AdminPage() {
                   <thead>
                     <tr>
                       <th>Mã đơn</th>
-                      <th>Khách hàng</th>
+                      <th>Khách hàng & SĐT</th>
+                      <th>Ngày đặt</th>
                       <th>Số món</th>
                       <th>Tổng tiền</th>
                       <th>Thanh toán</th>
-                      <th>Trạng thái</th>
-                      <th>Hành động</th>
+                      <th>Trạng thái đơn</th>
+                      <th>Hóa đơn</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.orders.slice(0, 5).map((order) => (
+                    {filteredOrders.map((order) => (
                       <tr key={order._id}>
                         <td>
                           <strong>#{order._id.slice(-6).toUpperCase()}</strong>
@@ -2034,10 +3092,30 @@ function AdminPage() {
                           <small style={{ display: "block", color: "#8d6271" }}>
                             📱 {order.phone}
                           </small>
+                          <small
+                            style={{
+                              display: "block",
+                              color: "#8d6271",
+                              maxWidth: "180px",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            📍 {order.address}
+                          </small>
+                        </td>
+                        <td>
+                          {new Date(order.createdAt).toLocaleDateString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
                         </td>
                         <td>{order.items?.length || 0} món</td>
                         <td>
-                          <strong style={{ color: "#e11d48" }}>
+                          <strong style={{ color: "#e11d48", fontSize: "14px" }}>
                             {money(order.totalAmount)}
                           </strong>
                         </td>
@@ -2059,942 +3137,40 @@ function AdminPage() {
                               updateOrderStatus(order._id, e.target.value)
                             }
                           >
-                            {Object.entries(statusLabels).map(
-                              ([key, label]) => (
-                                <option key={key} value={key}>
-                                  {statusIcons[key]} {label}
-                                </option>
-                              ),
-                            )}
+                            {Object.entries(statusLabels).map(([key, label]) => (
+                              <option key={key} value={key}>
+                                {statusIcons[key]} {label}
+                              </option>
+                            ))}
                           </select>
                         </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-btn-outline"
-                            onClick={() => showOrder(order._id)}
-                          >
-                            👁️ Xem hóa đơn
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {data.orders.length === 0 && (
-                      <tr>
-                        <td colSpan="7" style={{ textAlign: "center", padding: "30px" }}>
-                          Chưa có đơn hàng nào phát sinh.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
 
-            {/* Top 4 Bán chạy leaderboard */}
-            {data.reports.bestSelling?.length > 0 && (
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h2>🔥 Top Sản Phẩm Len Bán Chạy Nhất</h2>
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                    gap: "16px",
-                  }}
-                >
-                  {data.reports.bestSelling.slice(0, 4).map((item, idx) => (
-                    <div
-                      key={item._id}
-                      style={{
-                        background: "#fffafc",
-                        border: "1.5px solid #fce7f3",
-                        borderRadius: "14px",
-                        padding: "16px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontWeight: 800,
-                            color: idx === 0 ? "#f59e0b" : "#f43f5e",
-                          }}
-                        >
-                          {idx === 0 ? "🥇 Hạng 1" : `#${idx + 1}`}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#059669",
-                          }}
-                        >
-                          Đã bán {item.quantity} cuộn
-                        </span>
-                      </div>
-                      <strong
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {item.name}
-                      </strong>
-                      <div style={{ fontSize: "13px", color: "#e11d48", fontWeight: 700 }}>
-                        {money(item.revenue)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* TAB 2: SẢN PHẨM & KHO (PRODUCTS) */}
-        {activeTab === "products" && (
-          <>
-            {/* THỐNG KÊ LỜI / LỖ & TỒN KHO */}
-            <div className="admin-kpi-grid">
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon">🧶</div>
-                  <span className="kpi-trend">{data.products.length} mặt hàng</span>
-                </div>
-                <div className="kpi-title">Tổng tồn kho hàng len</div>
-                <h3 className="kpi-val">{productInventoryStats.totalStock} cuộn/bó</h3>
-              </div>
-
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon" style={{ background: "#f1f5f9", borderColor: "#cbd5e1" }}>💰</div>
-                  <span className="kpi-trend" style={{ background: "#f1f5f9", color: "#475569", borderColor: "#cbd5e1" }}>
-                    Giá nhập vốn
-                  </span>
-                </div>
-                <div className="kpi-title">Tổng tiền vốn tồn kho</div>
-                <h3 className="kpi-val" style={{ color: "#475569" }}>
-                  {money(productInventoryStats.totalCostVal)}
-                </h3>
-              </div>
-
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon" style={{ background: "#fff1f5", borderColor: "#fecdd3" }}>🏷️</div>
-                  <span className="kpi-trend" style={{ background: "#fff1f5", color: "#be123c", borderColor: "#fecdd3" }}>
-                    Giá bán ra
-                  </span>
-                </div>
-                <div className="kpi-title">Dự kiến thu khi bán hết</div>
-                <h3 className="kpi-val" style={{ color: "#e11d48" }}>
-                  {money(productInventoryStats.totalRetailVal)}
-                </h3>
-              </div>
-
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>💎</div>
-                  <span className="kpi-trend" style={{ background: "#ecfdf5", color: "#047857" }}>
-                    +{productInventoryStats.marginPercent}% Biên lời
-                  </span>
-                </div>
-                <div className="kpi-title">Lợi nhuận gộp dự kiến</div>
-                <h3 className="kpi-val" style={{ color: "#047857" }}>
-                  {money(productInventoryStats.projectedProfit)}
-                </h3>
-              </div>
-            </div>
-
-            {/* Form Thêm/Sửa Sản Phẩm */}
-            <div className="admin-card">
-              <div className="admin-card-header">
-                <div>
-                  <h2>
-                    {editingProductId
-                      ? "✏️ Chỉnh Sửa Thông Tin Sản Phẩm"
-                      : "➕ Thêm Sản Phẩm Len / Dụng Cụ Mới"}
-                  </h2>
-                  <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                    Cập nhật giá, số lượng tồn kho và thông tin để sản phẩm xuất hiện trên trang chủ.
-                  </p>
-                </div>
-                {editingProductId && (
-                  <button
-                    type="button"
-                    className="admin-btn-outline"
-                    onClick={resetProductForm}
-                  >
-                    ✕ Hủy chỉnh sửa
-                  </button>
-                )}
-              </div>
-
-              <form onSubmit={addProduct}>
-                <div className="admin-product-grid-form">
-                  <div className="admin-form-group">
-                    <label>Tên sản phẩm (*)</label>
-                    <input
-                      required
-                      placeholder="VD: Len Milk Bò 50g Siêu Mềm"
-                      value={productForm.name}
-                      onChange={(e) => {
-                        const name = e.target.value;
-                        setProductForm((prev) => ({
-                          ...prev,
-                          name,
-                          slug: editingProductId ? prev.slug : slugify(name),
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Đường dẫn tĩnh (Slug URL) (*)</label>
-                    <input
-                      required
-                      placeholder="len-milk-bo-50g-sieu-mem"
-                      value={productForm.slug}
-                      onChange={(e) =>
-                        setProductForm({ ...productForm, slug: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Giá bán (VNĐ) (*)</label>
-                    <input
-                      required
-                      type="number"
-                      min="0"
-                      step="1000"
-                      placeholder="18000"
-                      value={productForm.price}
-                      onChange={(e) =>
-                        setProductForm({
-                          ...productForm,
-                          price: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Giá vốn / Chi phí nguyên liệu (VNĐ)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      placeholder="VD: 10000"
-                      value={productForm.costPrice}
-                      onChange={(e) =>
-                        setProductForm({
-                          ...productForm,
-                          costPrice: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  {(() => {
-                    const p = Number(productForm.price) || 0;
-                    const c = Number(productForm.costPrice) || 0;
-                    if (p > 0 && c > 0) {
-                      const diff = p - c;
-                      const pct = Math.round((diff / p) * 100);
-                      return (
-                        <div
-                          style={{
-                            gridColumn: "1 / -1",
-                            padding: "12px 18px",
-                            borderRadius: "12px",
-                            background: diff >= 0 ? "#ecfdf5" : "#fee2e2",
-                            border: `1.5px solid ${diff >= 0 ? "#a7f3d0" : "#fca5a5"}`,
-                            fontSize: "14px",
-                            fontWeight: 700,
-                            color: diff >= 0 ? "#047857" : "#b91c1c",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <span>
-                            {diff >= 0 ? "📈 Dự kiến lợi nhuận bán ra: " : "📉 Cảnh báo bán lỗ: "}
-                            <strong>{diff >= 0 ? `+${money(diff)}` : `-${money(Math.abs(diff))}`}</strong> ({pct}% trên giá bán)
-                          </span>
-                          <span style={{ fontSize: "12.5px", fontWeight: 600 }}>
-                            {diff >= 0 ? "✅ Giá bán có lời" : "⚠️ Giá bán thấp hơn giá vốn nhập"}
-                          </span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  <div className="admin-form-group">
-                    <label>Mô hình / Nguồn gốc sản phẩm (*)</label>
-                    <select
-                      value={productForm.productType}
-                      onChange={(e) =>
-                        setProductForm({
-                          ...productForm,
-                          productType: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="yarn_retail">
-                        🧶 Len cuộn & Phụ kiện nhập về bán
-                      </option>
-                      <option value="self_made">
-                        🌸 Tiệm tự móc (In-house thủ công)
-                      </option>
-                      <option value="outsourced">
-                        🪡 Nhờ thợ gia công móc thành phẩm
-                      </option>
-                    </select>
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Số lượng tồn kho (Cuộn/Bộ) (*)</label>
-                    <input
-                      required
-                      type="number"
-                      min="0"
-                      placeholder="50"
-                      value={productForm.stock}
-                      onChange={(e) =>
-                        setProductForm({
-                          ...productForm,
-                          stock: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Danh mục sản phẩm (*)</label>
-                    <select
-                      required
-                      value={productForm.category}
-                      onChange={(e) =>
-                        setProductForm({
-                          ...productForm,
-                          category: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="">-- Chọn danh mục --</option>
-                      {data.categories.map((c) => (
-                        <option key={c._id} value={c._id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Chất liệu sợi / Nhãn hiệu</label>
-                    <input
-                      placeholder="VD: Milk Cotton, Chenille, Tự móc..."
-                      value={productForm.brand}
-                      onChange={(e) =>
-                        setProductForm({
-                          ...productForm,
-                          brand: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  {Number(productForm.price) > 0 &&
-                    Number(productForm.costPrice) > 0 && (
-                      <div
-                        className="full-width"
-                        style={{
-                          background: "#f0fdf4",
-                          border: "1px solid #bbf7d0",
-                          borderRadius: "10px",
-                          padding: "10px 14px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          color: "#166534",
-                          fontSize: "13px",
-                          fontWeight: 700,
-                        }}
-                      >
-                        <span>
-                          💡 Ước tính Lãi gộp mỗi món:{" "}
-                          <strong style={{ color: "#15803d", fontSize: "15px" }}>
-                            {money(
-                              Number(productForm.price) -
-                                Number(productForm.costPrice),
-                            )}
-                          </strong>
-                        </span>
-                        <span>
-                          Tỷ suất sinh lời:{" "}
-                          <strong style={{ color: "#15803d" }}>
-                            {(
-                              ((Number(productForm.price) -
-                                Number(productForm.costPrice)) /
-                                Number(productForm.price)) *
-                              100
-                            ).toFixed(1)}
-                            %
-                          </strong>
-                        </span>
-                      </div>
-                    )}
-
-                  <div className="admin-form-group full-width">
-                    <label>Link hình ảnh sản phẩm (Cloudinary hoặc URL)</label>
-                    <div style={{ display: "flex", gap: "10px" }}>
-                      <input
-                        style={{ flex: 1 }}
-                        placeholder="https://images.unsplash.com/... hoặc link ảnh"
-                        value={productForm.images}
-                        onChange={(e) =>
-                          setProductForm({
-                            ...productForm,
-                            images: e.target.value,
-                          })
-                        }
-                      />
-                      <label
-                        className="admin-btn-outline"
-                        style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}
-                      >
-                        📁 Tải ảnh từ máy
-                        <input
-                          type="file"
-                          accept="image/*"
-                          style={{ display: "none" }}
-                          onChange={uploadProductImage}
-                        />
-                      </label>
-                    </div>
-                    {uploadMessage && (
-                      <small style={{ color: uploadingImage ? "#e11d48" : "#059669", fontWeight: 600 }}>
-                        {uploadMessage}
-                      </small>
-                    )}
-                    {productForm.images && (
-                      <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "10px", background: "#fdf2f8", padding: "8px 12px", borderRadius: "10px", border: "1px solid #fbcfe8" }}>
-                        <img
-                          src={productForm.images}
-                          alt="Xem trước ảnh sản phẩm"
-                          style={{ width: "60px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1.5px solid #fda4af" }}
-                        />
-                        <div>
-                          <span style={{ fontSize: "12px", color: "#059669", fontWeight: 700, display: "block" }}>✓ Đã chọn ảnh sản phẩm</span>
-                          <button
-                            type="button"
-                            className="admin-btn-outline"
-                            onClick={() => setProductForm((prev) => ({ ...prev, images: "" }))}
-                            style={{ padding: "2px 8px", fontSize: "11px", color: "#e11d48", marginTop: "4px" }}
-                          >
-                            ✕ Xóa ảnh này
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                  <button type="submit" className="admin-btn-primary">
-                    {editingProductId ? "💾 Lưu Thay Đổi" : "➕ Thêm Sản Phẩm Mới"}
-                  </button>
-                  {editingProductId && (
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      onClick={resetProductForm}
-                    >
-                      ✕ Hủy Chỉnh Sửa
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-
-            {/* Danh Sách Sản Phẩm */}
-            <div className="admin-card">
-              <div className="admin-card-header">
-                <div>
-                  <h2>Kho Hàng & Đối Soát Lời Lỗ ({filteredProducts.length} sản phẩm)</h2>
-                  <p style={{ margin: "4px 0 0", color: "#7b4b5c", fontSize: "14.5px" }}>
-                    Đối chiếu trực quan giữa Giá Vốn Nhập Kho và Giá Bán Ra để kiểm soát biên lợi nhuận
-                  </p>
-                </div>
-                <div className="admin-card-actions">
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={exportProductsExcel}
-                  style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
-                  title="Xuất file Excel danh sách toàn bộ len & phụ kiện kho"
-                >
-                  📥 Xuất Excel Kho Hàng
-                </button>
-                  <input
-                    className="admin-search-input"
-                    placeholder="🔍 Tìm theo tên, slug..."
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                  />
-                  <select
-                    className="admin-select-input"
-                    value={productCategoryFilter}
-                    onChange={(e) => setProductCategoryFilter(e.target.value)}
-                  >
-                    <option value="all">Tất cả danh mục</option>
-                    {data.categories.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* PROFIT FILTER BAR */}
-              <div className="profit-filter-bar">
-                <span style={{ fontWeight: 800, color: "#471827", fontSize: "14.5px" }}>
-                  📊 Bộ lọc lời / lỗ:
-                </span>
-                <button
-                  type="button"
-                  className={`profit-filter-pill ${profitFilter === "all" ? "active" : ""}`}
-                  onClick={() => setProfitFilter("all")}
-                >
-                  Tất cả ({data.products.length})
-                </button>
-                <button
-                  type="button"
-                  className={`profit-filter-pill profit ${profitFilter === "profit" ? "active" : ""}`}
-                  onClick={() => setProfitFilter("profit")}
-                >
-                  📈 Đang có lời ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) > Number(p.costPrice)).length})
-                </button>
-                <button
-                  type="button"
-                  className={`profit-filter-pill loss ${profitFilter === "loss" ? "active" : ""}`}
-                  onClick={() => setProfitFilter("loss")}
-                >
-                  📉 Cảnh báo lỗ ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) < Number(p.costPrice)).length})
-                </button>
-                <button
-                  type="button"
-                  className={`profit-filter-pill ${profitFilter === "breakeven" ? "active" : ""}`}
-                  onClick={() => setProfitFilter("breakeven")}
-                >
-                  ⚖️ Hòa vốn ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) === Number(p.costPrice)).length})
-                </button>
-                <button
-                  type="button"
-                  className={`profit-filter-pill nocost ${profitFilter === "nocost" ? "active" : ""}`}
-                  onClick={() => setProfitFilter("nocost")}
-                >
-                  ⚠️ Chưa có giá vốn ({data.products.filter((p) => !p.costPrice || Number(p.costPrice) <= 0).length})
-                </button>
-              </div>
-
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: "60px" }}>Ảnh</th>
-                      <th>Tên sản phẩm</th>
-                      <th>Danh mục</th>
-                      <th>Giá Bán & Giá Vốn (Nhập - Lời)</th>
-                      <th>Tồn kho</th>
-                      <th>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProducts.map((product) => (
-                      <tr key={product._id}>
-                        <td style={{ width: "60px" }}>
-                          <img
-                            src={product.images?.[0] || "/placeholder.jpg"}
-                            alt={product.name}
-                            style={{
-                              width: "56px",
-                              height: "56px",
-                              objectFit: "cover",
-                              borderRadius: "12px",
-                              border: "1.5px solid #fce7f3",
-                              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <strong style={{ fontSize: "16px", color: "#2c0e17" }}>{product.name}</strong>
-                          <small style={{ display: "block", color: "#8d6271", marginTop: "3px", fontSize: "13px" }}>
-                            🔗 /{product.slug} · {product.brand || "Sene Handmade"}
-                          </small>
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              display: "inline-block",
-                              marginTop: "4px",
-                              color: "#be123c",
-                              background: "#fff1f5",
-                              padding: "3px 10px",
-                              borderRadius: "10px",
-                              border: "1px solid #fce7f3",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {productTypeLabels[product.productType || "yarn_retail"]}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            style={{
-                              background: "#fff1f2",
-                              color: "#be123c",
-                              padding: "5px 12px",
-                              borderRadius: "12px",
-                              fontSize: "13.5px",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {product.category?.name || "Chưa phân loại"}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="price-compare-cell">
-                            <div className="price-compare-row">
-                              <div className="price-pill-item sell" title="Giá bán ra niêm yết">
-                                <span className="price-pill-label">Bán</span>
-                                <span className="price-pill-val">{money(product.price)}</span>
-                              </div>
-                              <div className="price-pill-item cost" title="Giá vốn nhập kho">
-                                <span className="price-pill-label">Vốn</span>
-                                {product.costPrice > 0 ? (
-                                  <span className="price-pill-val">{money(product.costPrice)}</span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="btn-add-cost-inline"
-                                    onClick={() =>
-                                      setQuickPriceModal({
-                                        open: true,
-                                        product,
-                                        price: product.price || 0,
-                                        costPrice: 0,
-                                      })
-                                    }
-                                  >
-                                    + Nhập vốn
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {(() => {
-                              const cost = Number(product.costPrice) || 0;
-                              const price = Number(product.price) || 0;
-                              if (!cost || cost <= 0) {
-                                return (
-                                  <span className="profit-mini-badge neutral">
-                                    ⚠️ Chưa có giá vốn
-                                  </span>
-                                );
-                              }
-                              const profit = price - cost;
-                              const pct = price > 0 ? Math.round((profit / price) * 100) : 0;
-                              if (profit > 0) {
-                                return (
-                                  <span className="profit-mini-badge positive">
-                                    📈 Lời +{money(profit)} ({pct}%)
-                                  </span>
-                                );
-                              }
-                              if (profit === 0) {
-                                return (
-                                  <span className="profit-mini-badge neutral">
-                                    ⚖️ Hòa vốn (0đ)
-                                  </span>
-                                );
-                              }
-                              return (
-                                <span className="profit-mini-badge negative">
-                                  📉 Lỗ -{money(Math.abs(profit))} ({pct}%)
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            {product.stock > 10 ? (
-                              <span className="status-pill-badge delivered">
-                                Còn {product.stock} cuộn
-                              </span>
-                            ) : product.stock > 0 ? (
-                              <span className="status-pill-badge pending">
-                                ⚠️ Sắp hết ({product.stock})
-                              </span>
-                            ) : (
-                              <span className="status-pill-badge cancelled">
-                                ❌ Hết hàng
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              style={{ padding: "3px 8px", fontSize: "12px", borderColor: "#f43f5e", color: "#f43f5e", fontWeight: 700 }}
-                              title="Nhập thêm hàng vào kho"
-                              onClick={() => setQuickStockModal({ open: true, product, addStock: 20 })}
-                            >
-                              ⚡ +20
-                            </button>
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              style={{ borderColor: "#2563eb", color: "#2563eb", fontWeight: 700, padding: "7px 12px" }}
-                              title="Sửa nhanh giá vốn và giá bán"
-                              onClick={() =>
-                                setQuickPriceModal({
-                                  open: true,
-                                  product,
-                                  price: product.price || 0,
-                                  costPrice: product.costPrice || 0,
-                                })
-                              }
-                            >
-                              💰 Sửa giá
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              style={{ borderColor: "#059669", color: "#059669", fontWeight: 700, padding: "7px 12px" }}
-                              title="Lập phiếu nhập hàng cho sản phẩm này"
-                              onClick={() => openCreateImport(product)}
-                            >
-                              📥 Nhập kho
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              style={{ padding: "7px 12px" }}
-                              onClick={() => editProduct(product)}
-                            >
-                              ✏️ Sửa
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              style={{ color: "#dc2626", borderColor: "#fecaca", padding: "7px 12px" }}
-                              onClick={() => deleteProduct(product._id)}
-                            >
-                              🗑️ Xóa
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredProducts.length === 0 && (
-                      <tr>
-                        <td colSpan="6" style={{ textAlign: "center", padding: "40px" }}>
-                          Không tìm thấy sản phẩm nào phù hợp với từ khóa.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* TAB: QUẢN LÝ NHẬP HÀNG & TỒN KHO (IMPORTS) */}
-        {activeTab === "imports" && (
-          <>
-            {/* KPI Thống Kê Nhập Hàng */}
-            <div className="admin-kpi-grid">
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon">📦</div>
-                  <span className="kpi-trend">Lịch sử</span>
-                </div>
-                <div className="kpi-title">Tổng số phiếu nhập</div>
-                <h3 className="kpi-val">{data.imports?.length || 0} phiếu</h3>
-              </div>
-
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>💰</div>
-                  <span className="kpi-trend" style={{ background: "#ecfdf5", color: "#047857" }}>Vốn nhập</span>
-                </div>
-                <div className="kpi-title">Tổng tiền nhập hàng</div>
-                <h3 className="kpi-val" style={{ color: "#047857" }}>
-                  {money((data.imports || []).reduce((s, i) => s + (i.totalAmount || 0), 0))}
-                </h3>
-              </div>
-
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon" style={{ background: "#fdf2f8", borderColor: "#fbcfe8" }}>🧶</div>
-                  <span className="kpi-trend">Tồn kho đã tăng</span>
-                </div>
-                <div className="kpi-title">Tổng lượng len đã nhập</div>
-                <h3 className="kpi-val" style={{ color: "#be123c" }}>
-                  {(data.imports || []).reduce(
-                    (s, i) => s + (i.items || []).reduce((sub, it) => sub + (it.quantity || 0), 0),
-                    0
-                  )} cuộn/bó
-                </h3>
-              </div>
-
-              <div className="admin-kpi-card">
-                <div className="kpi-top">
-                  <div className="kpi-icon" style={{ background: "#eff6ff", borderColor: "#bfdbfe" }}>🏢</div>
-                  <span className="kpi-trend" style={{ background: "#eff6ff", color: "#1d4ed8" }}>Đối tác</span>
-                </div>
-                <div className="kpi-title">Nhà cung cấp đối tác</div>
-                <h3 className="kpi-val" style={{ color: "#1d4ed8" }}>{data.suppliers?.length || 0} đối tác</h3>
-              </div>
-            </div>
-
-            {/* Bảng Danh Sách Phiếu Nhập */}
-            <div className="admin-card">
-              <div className="admin-card-header">
-                <div>
-                  <h2>📦 Lịch Sử Nhập Hàng & Tồn Kho ({filteredImports.length})</h2>
-                  <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                    Mỗi phiếu nhập hàng sẽ tự động tăng số lượng tồn kho của sản phẩm để phục vụ bán hàng ngay trên shop.
-                  </p>
-                </div>
-                <div className="admin-card-actions">
-                  <input
-                    className="admin-search-input"
-                    placeholder="🔍 Tìm theo mã PN, NCC, tên len..."
-                    value={importSearch}
-                    onChange={(e) => setImportSearch(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="admin-btn-primary"
-                    style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)", boxShadow: "0 4px 14px rgba(5, 150, 105, 0.4)" }}
-                    onClick={() => openCreateImport()}
-                  >
-                    ➕ Lập Phiếu Nhập Hàng Mới
-                  </button>
-                </div>
-              </div>
-
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Mã Phiếu</th>
-                      <th>Nhà Cung Cấp & SĐT</th>
-                      <th>Thời Gian Nhập</th>
-                      <th>Mặt Hàng Nhập Kho</th>
-                      <th>Tổng Tiền Vốn</th>
-                      <th>Người Lập</th>
-                      <th>Trạng Thái</th>
-                      <th>Thao Tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredImports.map((imp) => (
-                      <tr key={imp._id}>
-                        <td>
-                          <strong>{imp.code}</strong>
-                        </td>
-                        <td>
-                          <strong>{imp.supplierName}</strong>
-                          {imp.supplierPhone && (
-                            <small style={{ display: "block", color: "#8d6271" }}>
-                              📱 {imp.supplierPhone}
-                            </small>
-                          )}
-                        </td>
-                        <td>
-                          {new Date(imp.createdAt).toLocaleDateString("vi-VN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })}
-                        </td>
-                        <td>
-                          <div className="import-items-list-cell">
-                            {imp.items?.slice(0, 3).map((item, idx) => (
-                              <span key={idx} className="import-item-tag">
-                                <strong>{item.productName}</strong>
-                                <span style={{ color: "#be123c", fontWeight: 700 }}>
-                                  x{item.quantity}
-                                </span>
-                                <small style={{ color: "#8d6271" }}>
-                                  ({money(item.costPrice)})
-                                </small>
-                              </span>
-                            ))}
-                            {imp.items?.length > 3 && (
-                              <small style={{ color: "#8d6271" }}>
-                                + thêm {imp.items.length - 3} mặt hàng nữa...
-                              </small>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <strong style={{ color: "#047857", fontSize: "14px" }}>
-                            {money(imp.totalAmount)}
-                          </strong>
-                        </td>
-                        <td>{imp.importedBy || "Admin Kho"}</td>
-                        <td>
-                          <span className="import-badge-pill">
-                            ✅ Đã nhập kho (+Tồn)
-                          </span>
-                        </td>
                         <td>
                           <div style={{ display: "flex", gap: "6px" }}>
                             <button
                               type="button"
                               className="admin-btn-outline"
-                              onClick={() => setSelectedImportReceipt(imp)}
-                              title="Xem và in phiếu nhập kho"
+                              onClick={() => showOrder(order._id)}
                             >
-                              👁️ Xem phiếu
+                              👁️ Chi tiết
                             </button>
                             <button
                               type="button"
                               className="admin-btn-outline"
-                              style={{ color: "#dc2626", borderColor: "#fecaca" }}
-                              onClick={() => handleDeleteImport(imp._id)}
-                              title="Xóa phiếu nhập"
+                              onClick={() => setShippingLabelOrder(order)}
+                              style={{ background: "#fff1f2", color: "#e11d48", borderColor: "#fecdd3", fontWeight: 700 }}
+                              title="In phiếu gửi hàng chuẩn bưu tá COD"
                             >
-                              🗑️
+                              🏷️ In Tem
                             </button>
                           </div>
                         </td>
                       </tr>
                     ))}
-                    {filteredImports.length === 0 && (
+                    {filteredOrders.length === 0 && (
                       <tr>
                         <td colSpan="8" style={{ textAlign: "center", padding: "40px" }}>
-                          {importSearch
-                            ? "Không tìm thấy phiếu nhập nào với từ khóa này."
-                            : "Chưa có phiếu nhập hàng nào. Bấm nút '+ Lập Phiếu Nhập Hàng Mới' để nhập hàng vào kho và tăng số lượng bán."}
+                          Không có đơn hàng nào trong mục này.
                         </td>
                       </tr>
                     )}
@@ -3002,489 +3178,187 @@ function AdminPage() {
                 </table>
               </div>
             </div>
-          </>
-        )}
+          )}
 
-        {/* TAB 3: QUẢN LÝ ĐƠN HÀNG (ORDERS) */}
-        {activeTab === "orders" && (
-          <div className="admin-card">
-            <div className="admin-card-header">
-              <h2>📦 Quản Lý {data.orders.length} Đơn Hàng</h2>
-              <div className="admin-card-actions">
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={exportShipperOrdersExcel}
-                  style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
-                  title="Xuất bảng kê danh sách giao hàng cho Shipper bưu tá"
-                >
-                  📥 Xuất Bảng Kê Shipper COD
-                </button>
-                <input
-                  className="admin-search-input"
-                  placeholder="🔍 Tìm mã đơn, tên, SĐT..."
-                  value={orderSearch}
-                  onChange={(e) => setOrderSearch(e.target.value)}
-                />
+          {/* TAB 4: KHÁCH HÀNG (CUSTOMERS) */}
+          {activeTab === "customers" && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <h2>👥 Danh Sách Khách Hàng Thành Viên ({data.customers.length})</h2>
               </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "20px",
-                borderBottom: "1.5px solid #fce7f3",
-                paddingBottom: "12px",
-              }}
-            >
-              {[
-                { id: "all", label: "Tất cả", count: data.orders.length },
-                { id: "pending", label: "⏳ Chờ xác nhận", count: pendingOrders.length },
-                { id: "confirmed", label: "🏪 Đã xác nhận", count: confirmedOrders.length },
-                { id: "shipping", label: "🚚 Đang giao", count: shippingOrders.length },
-                { id: "delivered", label: "✅ Đã giao", count: deliveredOrders.length },
-                { id: "cancelled", label: "❌ Đã hủy", count: cancelledOrders.length },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setOrderFilter(tab.id)}
-                  style={{
-                    border: "0",
-                    background: orderFilter === tab.id ? "#f43f5e" : "#fff1f5",
-                    color: orderFilter === tab.id ? "#fff" : "#be123c",
-                    padding: "6px 14px",
-                    borderRadius: "16px",
-                    fontSize: "12.5px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {tab.label} ({tab.count})
-                </button>
-              ))}
-            </div>
-
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Mã đơn</th>
-                    <th>Khách hàng & SĐT</th>
-                    <th>Ngày đặt</th>
-                    <th>Số món</th>
-                    <th>Tổng tiền</th>
-                    <th>Thanh toán</th>
-                    <th>Trạng thái đơn</th>
-                    <th>Hóa đơn</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOrders.map((order) => (
-                    <tr key={order._id}>
-                      <td>
-                        <strong>#{order._id.slice(-6).toUpperCase()}</strong>
-                      </td>
-                      <td>
-                        <strong>{order.customerName}</strong>
-                        <small style={{ display: "block", color: "#8d6271" }}>
-                          📱 {order.phone}
-                        </small>
-                        <small
-                          style={{
-                            display: "block",
-                            color: "#8d6271",
-                            maxWidth: "180px",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          📍 {order.address}
-                        </small>
-                      </td>
-                      <td>
-                        {new Date(order.createdAt).toLocaleDateString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          day: "2-digit",
-                          month: "2-digit",
-                        })}
-                      </td>
-                      <td>{order.items?.length || 0} món</td>
-                      <td>
-                        <strong style={{ color: "#e11d48", fontSize: "14px" }}>
-                          {money(order.totalAmount)}
-                        </strong>
-                      </td>
-                      <td>
-                        <span
-                          className="status-pill-badge"
-                          style={{ background: "#fdf2f8", color: "#be123c" }}
-                        >
-                          {order.paymentMethod === "COD"
-                            ? "💵 Thu hộ COD"
-                            : "💳 VietQR"}
-                        </span>
-                      </td>
-                      <td>
-                        <select
-                          className="order-status-select"
-                          value={order.status}
-                          onChange={(e) =>
-                            updateOrderStatus(order._id, e.target.value)
-                          }
-                        >
-                          {Object.entries(statusLabels).map(([key, label]) => (
-                            <option key={key} value={key}>
-                              {statusIcons[key]} {label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      
-                      <td>
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <button
-                            type="button"
-                            className="admin-btn-outline"
-                            onClick={() => showOrder(order._id)}
-                          >
-                            👁️ Chi tiết
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn-outline"
-                            onClick={() => setShippingLabelOrder(order)}
-                            style={{ background: "#fff1f2", color: "#e11d48", borderColor: "#fecdd3", fontWeight: 700 }}
-                            title="In phiếu gửi hàng chuẩn bưu tá COD"
-                          >
-                            🏷️ In Tem
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredOrders.length === 0 && (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
                     <tr>
-                      <td colSpan="8" style={{ textAlign: "center", padding: "40px" }}>
-                        Không có đơn hàng nào trong mục này.
-                      </td>
+                      <th>Khách hàng</th>
+                      <th>Email</th>
+                      <th>Số điện thoại</th>
+                      <th>Số đơn đã mua</th>
+                      <th>Tổng chi tiêu</th>
+                      <th>Đơn gần nhất</th>
+                      <th>Khôi phục mật khẩu</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: KHÁCH HÀNG (CUSTOMERS) */}
-        {activeTab === "customers" && (
-          <div className="admin-card">
-            <div className="admin-card-header">
-              <h2>👥 Danh Sách Khách Hàng Thành Viên ({data.customers.length})</h2>
-            </div>
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Khách hàng</th>
-                    <th>Email</th>
-                    <th>Số điện thoại</th>
-                    <th>Số đơn đã mua</th>
-                    <th>Tổng chi tiêu</th>
-                    <th>Đơn gần nhất</th>
-                    <th>Khôi phục mật khẩu</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.customers.map((c) => (
-                    <tr key={c._id}>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <div
-                            style={{
-                              width: "34px",
-                              height: "34px",
-                              borderRadius: "50%",
-                              background: "linear-gradient(135deg, #f43f5e, #fb7185)",
-                              color: "#fff",
-                              display: "grid",
-                              placeItems: "center",
-                              fontWeight: 800,
-                              fontSize: "12px",
-                            }}
-                          >
-                            {c.name ? c.name[0].toUpperCase() : "U"}
+                  </thead>
+                  <tbody>
+                    {data.customers.map((c) => (
+                      <tr key={c._id}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <div
+                              style={{
+                                width: "34px",
+                                height: "34px",
+                                borderRadius: "50%",
+                                background: "linear-gradient(135deg, #f43f5e, #fb7185)",
+                                color: "#fff",
+                                display: "grid",
+                                placeItems: "center",
+                                fontWeight: 800,
+                                fontSize: "12px",
+                              }}
+                            >
+                              {c.name ? c.name[0].toUpperCase() : "U"}
+                            </div>
+                            <strong>{c.name}</strong>
                           </div>
-                          <strong>{c.name}</strong>
-                        </div>
-                      </td>
-                      <td>{c.email}</td>
-                      <td>{c.phone || <em>(Chưa có)</em>}</td>
-                      <td>
-                        <span
-                          className="status-pill-badge"
-                          style={{ background: "#ecfdf5", color: "#047857" }}
-                        >
-                          {c.orderCount} đơn
-                        </span>
-                      </td>
-                      <td>
-                        <strong style={{ color: "#e11d48" }}>
-                          {money(c.totalSpent)}
-                        </strong>
-                      </td>
-                      <td>
-                        {c.lastOrderAt
-                          ? new Date(c.lastOrderAt).toLocaleDateString("vi-VN")
-                          : "Chưa đặt"}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="admin-btn-outline"
-                          style={{
-                            fontSize: "12px",
-                            padding: "4px 10px",
-                            color: "#be123c",
-                            borderColor: "#fecdd3",
-                            whiteSpace: "nowrap",
-                          }}
-                          onClick={() =>
-                            setResetPasswordModal({
-                              open: true,
-                              customer: c,
-                              newPassword:
-                                "LenXinh@" +
-                                Math.floor(1000 + Math.random() * 9000),
-                              resultMsg: "",
-                              errorMsg: "",
-                            })
-                          }
-                        >
-                          🔑 Cấp lại MK
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {data.customers.length === 0 && (
-                    <tr>
-                      <td colSpan="7" style={{ textAlign: "center", padding: "40px" }}>
-                        Chưa có khách hàng nào đăng ký.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 5: NHÀ CUNG CẤP (SUPPLIERS) */}
-        {activeTab === "suppliers" && (
-          <div className="admin-card">
-            <div className="admin-card-header">
-              <div>
-                <h2>🏢 Danh Sách Nhà Cung Cấp Len & Phụ Kiện ({(data.suppliers || []).length})</h2>
-                <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                  Quản lý nguồn nhập sỉ len sợi, kim móc, phụ kiện và lịch sử chi phí đã nhập.
-                </p>
+                        </td>
+                        <td>{c.email}</td>
+                        <td>{c.phone || <em>(Chưa có)</em>}</td>
+                        <td>
+                          <span
+                            className="status-pill-badge"
+                            style={{ background: "#ecfdf5", color: "#047857" }}
+                          >
+                            {c.orderCount} đơn
+                          </span>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#e11d48" }}>
+                            {money(c.totalSpent)}
+                          </strong>
+                        </td>
+                        <td>
+                          {c.lastOrderAt
+                            ? new Date(c.lastOrderAt).toLocaleDateString("vi-VN")
+                            : "Chưa đặt"}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="admin-btn-outline"
+                            style={{
+                              fontSize: "12px",
+                              padding: "4px 10px",
+                              color: "#be123c",
+                              borderColor: "#fecdd3",
+                              whiteSpace: "nowrap",
+                            }}
+                            onClick={() =>
+                              setResetPasswordModal({
+                                open: true,
+                                customer: c,
+                                newPassword:
+                                  "LenXinh@" +
+                                  Math.floor(1000 + Math.random() * 9000),
+                                resultMsg: "",
+                                errorMsg: "",
+                              })
+                            }
+                          >
+                            🔑 Cấp lại MK
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {data.customers.length === 0 && (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: "center", padding: "40px" }}>
+                          Chưa có khách hàng nào đăng ký.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <button
-                type="button"
-                className="admin-btn-primary"
-                onClick={() =>
-                  setSupplierModal({
-                    open: true,
-                    isEdit: false,
-                    supplierId: null,
-                    form: {
-                      name: "",
-                      phone: "",
-                      address: "",
-                      supplyItems: "",
-                      rating: 5,
-                      totalImported: 0,
-                      notes: "",
-                    },
-                  })
-                }
-              >
-                ➕ Thêm Nhà Cung Cấp Mới
-              </button>
             </div>
+          )}
 
-            <div className="entity-grid">
-              {(data.suppliers || []).map((sup) => (
-                <div key={sup._id} className="entity-card">
-                  <div>
-                    <div className="entity-card-top">
-                      <div>
-                        <h3 className="entity-card-title">{sup.name}</h3>
-                        <span className="entity-role-badge">⭐ {sup.rating || 5}/5 sao uy tín</span>
-                      </div>
-                    </div>
-
-                    <div className="entity-card-body">
-                      <div>📞 <strong>SĐT:</strong> {sup.phone || "(Chưa có)"}</div>
-                      <div>📍 <strong>Địa chỉ:</strong> {sup.address || "TP. Hồ Chí Minh"}</div>
-                      <div>🧶 <strong>Mặt hàng:</strong> {sup.supplyItems || "Len sợi, kim móc"}</div>
-                      <div>💰 <strong>Tổng đã nhập:</strong> <strong style={{ color: "#e11d48" }}>{money(sup.totalImported)}</strong></div>
-                      {sup.notes && (
-                        <div style={{ fontStyle: "italic", color: "#8d6271", background: "#fff5f8", padding: "6px 10px", borderRadius: "8px", marginTop: "4px" }}>
-                          📝 {sup.notes}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="entity-card-footer">
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      style={{ fontSize: "12px", padding: "4px 10px" }}
-                      onClick={() =>
-                        setSupplierModal({
-                          open: true,
-                          isEdit: true,
-                          supplierId: sup._id,
-                          form: {
-                            name: sup.name,
-                            phone: sup.phone || "",
-                            address: sup.address || "",
-                            supplyItems: sup.supplyItems || "",
-                            rating: sup.rating || 5,
-                            totalImported: sup.totalImported || 0,
-                            notes: sup.notes || "",
-                          },
-                        })
-                      }
-                    >
-                      ✏️ Sửa
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      style={{ fontSize: "12px", padding: "4px 10px", color: "#dc2626", borderColor: "#fecaca" }}
-                      onClick={() => handleDeleteSupplier(sup._id)}
-                    >
-                      🗑️ Xóa
-                    </button>
-                  </div>
+          {/* TAB 5: NHÀ CUNG CẤP (SUPPLIERS) */}
+          {activeTab === "suppliers" && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <h2>🏢 Danh Sách Nhà Cung Cấp Len & Phụ Kiện ({(data.suppliers || []).length})</h2>
+                  <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Quản lý nguồn nhập sỉ len sợi, kim móc, phụ kiện và lịch sử chi phí đã nhập.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 6: THỢ MÓC & NHÂN SỰ (STAFF & ARTISANS) */}
-        {activeTab === "staff" && (
-          <div className="admin-card">
-            <div className="admin-card-header">
-              <div>
-                <h2>🪡 Đội Ngũ Thợ Móc Thủ Công & Nhân Viên ({(data.staff || []).length})</h2>
-                <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                  Theo dõi tiến độ gia công hoa len, thú bông, đơn giá khoán theo sản phẩm và chi phí công thợ.
-                </p>
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() =>
+                    setSupplierModal({
+                      open: true,
+                      isEdit: false,
+                      supplierId: null,
+                      form: {
+                        name: "",
+                        phone: "",
+                        address: "",
+                        supplyItems: "",
+                        rating: 5,
+                        totalImported: 0,
+                        notes: "",
+                      },
+                    })
+                  }
+                >
+                  ➕ Thêm Nhà Cung Cấp Mới
+                </button>
               </div>
-              <button
-                type="button"
-                className="admin-btn-primary"
-                onClick={() =>
-                  setStaffModal({
-                    open: true,
-                    isEdit: false,
-                    staffId: null,
-                    form: {
-                      name: "",
-                      phone: "",
-                      role: "Thợ gia công hoa len",
-                      pieceRate: 20000,
-                      completedCount: 0,
-                      totalPaid: 0,
-                      skills: "",
-                      status: "active",
-                      notes: "",
-                    },
-                  })
-                }
-              >
-                ➕ Thêm Thợ / Nhân Sự Mới
-              </button>
-            </div>
 
-            <div className="entity-grid">
-              {(data.staff || []).map((member) => (
-                <div key={member._id} className="entity-card">
-                  <div>
-                    <div className="entity-card-top">
-                      <div>
-                        <h3 className="entity-card-title">{member.name}</h3>
-                        <span className="entity-role-badge">{member.role}</span>
-                      </div>
-                      <span
-                        className="status-pill-badge"
-                        style={{
-                          background: member.status === "active" ? "#ecfdf5" : "#f3f4f6",
-                          color: member.status === "active" ? "#047857" : "#6b7280",
-                          fontSize: "11px",
-                        }}
-                      >
-                        {member.status === "active" ? "✓ Đang nhận mẫu" : "Tạm ngưng"}
-                      </span>
-                    </div>
-
-                    <div className="entity-card-body">
-                      <div>📞 <strong>SĐT:</strong> {member.phone || "(Chưa có)"}</div>
-                      <div>💵 <strong>Tiền công:</strong> <strong style={{ color: "#e11d48" }}>{money(member.pieceRate)}/món</strong></div>
-                      <div>📦 <strong>Đã hoàn thành:</strong> <strong>{member.completedCount || 0} sản phẩm</strong></div>
-                      <div>💳 <strong>Tổng tiền công:</strong> <strong style={{ color: "#059669" }}>{money(member.totalPaid || ((member.completedCount || 0) * (member.pieceRate || 20000)))}</strong></div>
-                      {member.skills && (
-                        <div>✨ <strong>Tay nghề:</strong> {member.skills}</div>
-                      )}
-                      {member.notes && (
-                        <div style={{ fontStyle: "italic", color: "#8d6271", background: "#fff5f8", padding: "6px 10px", borderRadius: "8px", marginTop: "4px" }}>
-                          📝 {member.notes}
+              <div className="entity-grid">
+                {(data.suppliers || []).map((sup) => (
+                  <div key={sup._id} className="entity-card">
+                    <div>
+                      <div className="entity-card-top">
+                        <div>
+                          <h3 className="entity-card-title">{sup.name}</h3>
+                          <span className="entity-role-badge">⭐ {sup.rating || 5}/5 sao uy tín</span>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      </div>
 
-                  <div className="entity-card-footer">
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      style={{ fontSize: "11.5px", padding: "4px 8px", borderColor: "#f43f5e", color: "#f43f5e" }}
-                      title="Ghi nhận giao thêm 5 sản phẩm móc xong"
-                      onClick={() => handleIncrementStaffCount(member, 5)}
-                    >
-                      ➕ Xong +5 món
-                    </button>
-                    <div style={{ display: "flex", gap: "6px" }}>
+                      <div className="entity-card-body">
+                        <div>📞 <strong>SĐT:</strong> {sup.phone || "(Chưa có)"}</div>
+                        <div>📍 <strong>Địa chỉ:</strong> {sup.address || "TP. Hồ Chí Minh"}</div>
+                        <div>🧶 <strong>Mặt hàng:</strong> {sup.supplyItems || "Len sợi, kim móc"}</div>
+                        <div>💰 <strong>Tổng đã nhập:</strong> <strong style={{ color: "#e11d48" }}>{money(sup.totalImported)}</strong></div>
+                        {sup.notes && (
+                          <div style={{ fontStyle: "italic", color: "#8d6271", background: "#fff5f8", padding: "6px 10px", borderRadius: "8px", marginTop: "4px" }}>
+                            📝 {sup.notes}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="entity-card-footer">
                       <button
                         type="button"
                         className="admin-btn-outline"
-                        style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                        style={{ fontSize: "12px", padding: "4px 10px" }}
                         onClick={() =>
-                          setStaffModal({
+                          setSupplierModal({
                             open: true,
                             isEdit: true,
-                            staffId: member._id,
+                            supplierId: sup._id,
                             form: {
-                              name: member.name,
-                              phone: member.phone || "",
-                              role: member.role || "Thợ gia công hoa len",
-                              pieceRate: member.pieceRate || 20000,
-                              completedCount: member.completedCount || 0,
-                              totalPaid: member.totalPaid || 0,
-                              skills: member.skills || "",
-                              status: member.status || "active",
-                              notes: member.notes || "",
+                              name: sup.name,
+                              phone: sup.phone || "",
+                              address: sup.address || "",
+                              supplyItems: sup.supplyItems || "",
+                              rating: sup.rating || 5,
+                              totalImported: sup.totalImported || 0,
+                              notes: sup.notes || "",
                             },
                           })
                         }
@@ -3494,347 +3368,471 @@ function AdminPage() {
                       <button
                         type="button"
                         className="admin-btn-outline"
-                        style={{ fontSize: "11.5px", padding: "4px 8px", color: "#dc2626", borderColor: "#fecaca" }}
-                        onClick={() => handleDeleteStaff(member._id)}
+                        style={{ fontSize: "12px", padding: "4px 10px", color: "#dc2626", borderColor: "#fecaca" }}
+                        onClick={() => handleDeleteSupplier(sup._id)}
                       >
                         🗑️ Xóa
                       </button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 7: BÁO CÁO (REPORTS) */}
-        {activeTab === "reports" && (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h2>🥇 Mẫu Bán Chạy Nhất</h2>
-                </div>
-                {data.reports.bestSelling?.map((item, idx) => (
-                  <div
-                    key={item._id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 0",
-                      borderBottom: "1px solid #fdf2f8",
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: idx === 0 ? "#f59e0b" : "#f43f5e" }}>
-                        #{idx + 1} {item.name}
-                      </strong>
-                      <small style={{ display: "block", color: "#8d6271" }}>
-                        Số lượng đã bán: {item.quantity} cuộn
-                      </small>
-                    </div>
-                    <strong style={{ color: "#e11d48" }}>{money(item.revenue)}</strong>
-                  </div>
-                ))}
-              </div>
-
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h2>💡 Sản Phẩm Bán Chậm (Gợi Ý Flash Sale)</h2>
-                </div>
-                {data.reports.slowSelling?.map((item, idx) => (
-                  <div
-                    key={item._id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 0",
-                      borderBottom: "1px solid #fdf2f8",
-                    }}
-                  >
-                    <div>
-                      <strong>{item.name}</strong>
-                      <small style={{ display: "block", color: "#8d6271" }}>
-                        Mới bán: {item.quantity} sản phẩm
-                      </small>
-                    </div>
-                    <span style={{ color: "#8d6271", fontSize: "13px" }}>
-                      Tồn kho cần kích cầu
-                    </span>
-                  </div>
                 ))}
               </div>
             </div>
+          )}
 
-            {/* Doanh thu theo ngày */}
+          {/* TAB 6: THỢ MÓC & NHÂN SỰ (STAFF & ARTISANS) */}
+          {activeTab === "staff" && (
             <div className="admin-card">
               <div className="admin-card-header">
-                <h2>📅 Báo Cáo Doanh Thu Theo Ngày</h2>
-              </div>
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Ngày</th>
-                      <th>Số đơn hoàn tất</th>
-                      <th>Doanh thu ngày</th>
-                      <th>Kiểm tra hóa đơn</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.reports.dailyRevenue?.map((d) => (
-                      <tr key={d._id}>
-                        <td>
-                          <strong>{d._id}</strong>
-                        </td>
-                        <td>{d.orders} đơn</td>
-                        <td>
-                          <strong style={{ color: "#e11d48" }}>
-                            {money(d.revenue)}
-                          </strong>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-btn-outline"
-                            style={{ fontSize: "12px", padding: "4px 10px" }}
-                            onClick={() => {
-                              setOrderFilter("all");
-                              setOrderSearch(d._id);
-                              setActiveTab("orders");
-                            }}
-                          >
-                            👁️ Xem {d.orders} đơn ngày này →
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {(!data.reports.dailyRevenue ||
-                      data.reports.dailyRevenue.length === 0) && (
-                      <tr>
-                        <td colSpan="3" style={{ textAlign: "center", padding: "30px" }}>
-                          Chưa có phát sinh doanh thu.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* TAB 6: KHUYẾN MÃI (PROMOTIONS) */}
-        {activeTab === "promotions" && (
-          <>
-            <div className="admin-card">
-              <div className="admin-card-header">
-                <h2>🎟️ Tạo Mã Giảm Giá / Voucher Mới</h2>
-              </div>
-              <form onSubmit={addPromotion}>
-                <div className="admin-product-grid-form">
-                  <div className="admin-form-group">
-                    <label>Tên chương trình ưu đãi</label>
-                    <input
-                      required
-                      placeholder="VD: Tri Ân Khách Mới Mua Len"
-                      value={promotionForm.title}
-                      onChange={(e) =>
-                        setPromotionForm({
-                          ...promotionForm,
-                          title: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Mã Voucher (Viết hoa)</label>
-                    <input
-                      required
-                      placeholder="VD: LENMOI15"
-                      value={promotionForm.code}
-                      onChange={(e) =>
-                        setPromotionForm({
-                          ...promotionForm,
-                          code: e.target.value.toUpperCase(),
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Loại giảm giá</label>
-                    <select
-                      value={promotionForm.type}
-                      onChange={(e) =>
-                        setPromotionForm({
-                          ...promotionForm,
-                          type: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="percent">Giảm theo phần trăm (%)</option>
-                      <option value="fixed">Giảm số tiền cố định (VNĐ)</option>
-                    </select>
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Giá trị giảm (VD: 15 cho 15%, hoặc 30000 cho 30k)</label>
-                    <input
-                      required
-                      type="number"
-                      min="0"
-                      placeholder="15"
-                      value={promotionForm.value}
-                      onChange={(e) =>
-                        setPromotionForm({
-                          ...promotionForm,
-                          value: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Thời gian bắt đầu</label>
-                    <input
-                      required
-                      type="datetime-local"
-                      value={promotionForm.startAt}
-                      onChange={(e) =>
-                        setPromotionForm({
-                          ...promotionForm,
-                          startAt: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Thời gian kết thúc</label>
-                    <input
-                      required
-                      type="datetime-local"
-                      value={promotionForm.endAt}
-                      onChange={(e) =>
-                        setPromotionForm({
-                          ...promotionForm,
-                          endAt: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group full-width">
-                    <label>Mô tả ưu đãi & điều kiện áp dụng</label>
-                    <textarea
-                      placeholder="Áp dụng cho đơn hàng mua từ 150.000đ trở lên..."
-                      value={promotionForm.description}
-                      onChange={(e) =>
-                        setPromotionForm({
-                          ...promotionForm,
-                          description: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
+                <div>
+                  <h2>🪡 Đội Ngũ Thợ Móc Thủ Công & Nhân Viên ({(data.staff || []).length})</h2>
+                  <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Theo dõi tiến độ gia công hoa len, thú bông, đơn giá khoán theo sản phẩm và chi phí công thợ.
+                  </p>
                 </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button type="submit" className="admin-btn-primary">
-                    🎟️ Phát Hành Voucher Mới
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Danh sách Voucher đã tạo */}
-            <div className="admin-card">
-              <div className="admin-card-header">
-                <h2>Các Mã Voucher Đang Hoạt Động</h2>
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() =>
+                    setStaffModal({
+                      open: true,
+                      isEdit: false,
+                      staffId: null,
+                      form: {
+                        name: "",
+                        phone: "",
+                        role: "Thợ gia công hoa len",
+                        pieceRate: 20000,
+                        completedCount: 0,
+                        totalPaid: 0,
+                        skills: "",
+                        status: "active",
+                        notes: "",
+                      },
+                    })
+                  }
+                >
+                  ➕ Thêm Thợ / Nhân Sự Mới
+                </button>
               </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                  gap: "16px",
-                }}
-              >
-                {data.promotions.map((p) => (
-                  <div
-                    key={p._id}
-                    style={{
-                      background: "#fffafc",
-                      border: "1.5px dashed #f43f5e",
-                      borderRadius: "16px",
-                      padding: "18px",
-                      position: "relative",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      <strong style={{ fontSize: "16px", color: "#e11d48" }}>
-                        {p.code}
-                      </strong>
-                      <span
-                        className="status-pill-badge"
-                        style={{
-                          background: p.isActive ? "#ecfdf5" : "#f3f4f6",
-                          color: p.isActive ? "#047857" : "#6b7280",
-                        }}
-                      >
-                        {p.isActive ? "✓ Đang kích hoạt" : "Tạm ngưng"}
-                      </span>
+
+              <div className="entity-grid">
+                {(data.staff || []).map((member) => (
+                  <div key={member._id} className="entity-card">
+                    <div>
+                      <div className="entity-card-top">
+                        <div>
+                          <h3 className="entity-card-title">{member.name}</h3>
+                          <span className="entity-role-badge">{member.role}</span>
+                        </div>
+                        <span
+                          className="status-pill-badge"
+                          style={{
+                            background: member.status === "active" ? "#ecfdf5" : "#f3f4f6",
+                            color: member.status === "active" ? "#047857" : "#6b7280",
+                            fontSize: "11px",
+                          }}
+                        >
+                          {member.status === "active" ? "✓ Đang nhận mẫu" : "Tạm ngưng"}
+                        </span>
+                      </div>
+
+                      <div className="entity-card-body">
+                        <div>📞 <strong>SĐT:</strong> {member.phone || "(Chưa có)"}</div>
+                        <div>💵 <strong>Tiền công:</strong> <strong style={{ color: "#e11d48" }}>{money(member.pieceRate)}/món</strong></div>
+                        <div>📦 <strong>Đã hoàn thành:</strong> <strong>{member.completedCount || 0} sản phẩm</strong></div>
+                        <div>💳 <strong>Tổng tiền công:</strong> <strong style={{ color: "#059669" }}>{money(member.totalPaid || ((member.completedCount || 0) * (member.pieceRate || 20000)))}</strong></div>
+                        {member.skills && (
+                          <div>✨ <strong>Tay nghề:</strong> {member.skills}</div>
+                        )}
+                        {member.notes && (
+                          <div style={{ fontStyle: "italic", color: "#8d6271", background: "#fff5f8", padding: "6px 10px", borderRadius: "8px", marginTop: "4px" }}>
+                            📝 {member.notes}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>
-                      {p.title}
-                    </div>
-                    <p style={{ margin: "0 0 10px", fontSize: "12.5px", color: "#8d6271" }}>
-                      {p.description || "Ưu đãi dành cho khách mua len"}
-                    </p>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        fontSize: "12px",
-                        paddingTop: "8px",
-                        borderTop: "1px solid #fce7f3",
-                      }}
-                    >
-                      <span>
-                        Giảm:{" "}
-                        <strong style={{ color: "#e11d48" }}>
-                          {p.type === "percent" ? `${p.value}%` : money(p.value)}
-                        </strong>
-                      </span>
+
+                    <div className="entity-card-footer">
                       <button
                         type="button"
                         className="admin-btn-outline"
-                        style={{ padding: "4px 10px", fontSize: "11px" }}
-                        onClick={() => {
-                          navigator.clipboard.writeText(p.code);
-                          showToast(`✓ Đã sao chép mã: ${p.code}`);
-                        }}
+                        style={{ fontSize: "11.5px", padding: "4px 8px", borderColor: "#f43f5e", color: "#f43f5e" }}
+                        title="Ghi nhận giao thêm 5 sản phẩm móc xong"
+                        onClick={() => handleIncrementStaffCount(member, 5)}
                       >
-                        📋 Sao chép
+                        ➕ Xong +5 món
                       </button>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button
+                          type="button"
+                          className="admin-btn-outline"
+                          style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                          onClick={() =>
+                            setStaffModal({
+                              open: true,
+                              isEdit: true,
+                              staffId: member._id,
+                              form: {
+                                name: member.name,
+                                phone: member.phone || "",
+                                role: member.role || "Thợ gia công hoa len",
+                                pieceRate: member.pieceRate || 20000,
+                                completedCount: member.completedCount || 0,
+                                totalPaid: member.totalPaid || 0,
+                                skills: member.skills || "",
+                                status: member.status || "active",
+                                notes: member.notes || "",
+                              },
+                            })
+                          }
+                        >
+                          ✏️ Sửa
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn-outline"
+                          style={{ fontSize: "11.5px", padding: "4px 8px", color: "#dc2626", borderColor: "#fecaca" }}
+                          onClick={() => handleDeleteStaff(member._id)}
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          </>
-        )}
+          )}
+
+          {/* TAB 7: BÁO CÁO (REPORTS) */}
+          {activeTab === "reports" && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <h2>🥇 Mẫu Bán Chạy Nhất</h2>
+                  </div>
+                  {data.reports.bestSelling?.map((item, idx) => (
+                    <div
+                      key={item._id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "12px 0",
+                        borderBottom: "1px solid #fdf2f8",
+                      }}
+                    >
+                      <div>
+                        <strong style={{ color: idx === 0 ? "#f59e0b" : "#f43f5e" }}>
+                          #{idx + 1} {item.name}
+                        </strong>
+                        <small style={{ display: "block", color: "#8d6271" }}>
+                          Số lượng đã bán: {item.quantity} cuộn
+                        </small>
+                      </div>
+                      <strong style={{ color: "#e11d48" }}>{money(item.revenue)}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <h2>💡 Sản Phẩm Bán Chậm (Gợi Ý Flash Sale)</h2>
+                  </div>
+                  {data.reports.slowSelling?.map((item, idx) => (
+                    <div
+                      key={item._id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "12px 0",
+                        borderBottom: "1px solid #fdf2f8",
+                      }}
+                    >
+                      <div>
+                        <strong>{item.name}</strong>
+                        <small style={{ display: "block", color: "#8d6271" }}>
+                          Mới bán: {item.quantity} sản phẩm
+                        </small>
+                      </div>
+                      <span style={{ color: "#8d6271", fontSize: "13px" }}>
+                        Tồn kho cần kích cầu
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Doanh thu theo ngày */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <h2>📅 Báo Cáo Doanh Thu Theo Ngày</h2>
+                </div>
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Ngày</th>
+                        <th>Số đơn hoàn tất</th>
+                        <th>Doanh thu ngày</th>
+                        <th>Kiểm tra hóa đơn</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.reports.dailyRevenue?.map((d) => (
+                        <tr key={d._id}>
+                          <td>
+                            <strong>{d._id}</strong>
+                          </td>
+                          <td>{d.orders} đơn</td>
+                          <td>
+                            <strong style={{ color: "#e11d48" }}>
+                              {money(d.revenue)}
+                            </strong>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ fontSize: "12px", padding: "4px 10px" }}
+                              onClick={() => {
+                                setOrderFilter("all");
+                                setOrderSearch(d._id);
+                                setActiveTab("orders");
+                              }}
+                            >
+                              👁️ Xem {d.orders} đơn ngày này →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!data.reports.dailyRevenue ||
+                        data.reports.dailyRevenue.length === 0) && (
+                          <tr>
+                            <td colSpan="3" style={{ textAlign: "center", padding: "30px" }}>
+                              Chưa có phát sinh doanh thu.
+                            </td>
+                          </tr>
+                        )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 6: KHUYẾN MÃI (PROMOTIONS) */}
+          {activeTab === "promotions" && (
+            <>
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <h2>🎟️ Tạo Mã Giảm Giá / Voucher Mới</h2>
+                </div>
+                <form onSubmit={addPromotion}>
+                  <div className="admin-product-grid-form">
+                    <div className="admin-form-group">
+                      <label>Tên chương trình ưu đãi</label>
+                      <input
+                        required
+                        placeholder="VD: Tri Ân Khách Mới Mua Len"
+                        value={promotionForm.title}
+                        onChange={(e) =>
+                          setPromotionForm({
+                            ...promotionForm,
+                            title: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Mã Voucher (Viết hoa)</label>
+                      <input
+                        required
+                        placeholder="VD: LENMOI15"
+                        value={promotionForm.code}
+                        onChange={(e) =>
+                          setPromotionForm({
+                            ...promotionForm,
+                            code: e.target.value.toUpperCase(),
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Loại giảm giá</label>
+                      <select
+                        value={promotionForm.type}
+                        onChange={(e) =>
+                          setPromotionForm({
+                            ...promotionForm,
+                            type: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="percent">Giảm theo phần trăm (%)</option>
+                        <option value="fixed">Giảm số tiền cố định (VNĐ)</option>
+                      </select>
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Giá trị giảm (VD: 15 cho 15%, hoặc 30000 cho 30k)</label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        placeholder="15"
+                        value={promotionForm.value}
+                        onChange={(e) =>
+                          setPromotionForm({
+                            ...promotionForm,
+                            value: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Thời gian bắt đầu</label>
+                      <input
+                        required
+                        type="datetime-local"
+                        value={promotionForm.startAt}
+                        onChange={(e) =>
+                          setPromotionForm({
+                            ...promotionForm,
+                            startAt: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group">
+                      <label>Thời gian kết thúc</label>
+                      <input
+                        required
+                        type="datetime-local"
+                        value={promotionForm.endAt}
+                        onChange={(e) =>
+                          setPromotionForm({
+                            ...promotionForm,
+                            endAt: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="admin-form-group full-width">
+                      <label>Mô tả ưu đãi & điều kiện áp dụng</label>
+                      <textarea
+                        placeholder="Áp dụng cho đơn hàng mua từ 150.000đ trở lên..."
+                        value={promotionForm.description}
+                        onChange={(e) =>
+                          setPromotionForm({
+                            ...promotionForm,
+                            description: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button type="submit" className="admin-btn-primary">
+                      🎟️ Phát Hành Voucher Mới
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Danh sách Voucher đã tạo */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <h2>Các Mã Voucher Đang Hoạt Động</h2>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gap: "16px",
+                  }}
+                >
+                  {data.promotions.map((p) => (
+                    <div
+                      key={p._id}
+                      style={{
+                        background: "#fffafc",
+                        border: "1.5px dashed #f43f5e",
+                        borderRadius: "16px",
+                        padding: "18px",
+                        position: "relative",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <strong style={{ fontSize: "16px", color: "#e11d48" }}>
+                          {p.code}
+                        </strong>
+                        <span
+                          className="status-pill-badge"
+                          style={{
+                            background: p.isActive ? "#ecfdf5" : "#f3f4f6",
+                            color: p.isActive ? "#047857" : "#6b7280",
+                          }}
+                        >
+                          {p.isActive ? "✓ Đang kích hoạt" : "Tạm ngưng"}
+                        </span>
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>
+                        {p.title}
+                      </div>
+                      <p style={{ margin: "0 0 10px", fontSize: "12.5px", color: "#8d6271" }}>
+                        {p.description || "Ưu đãi dành cho khách mua len"}
+                      </p>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "12px",
+                          paddingTop: "8px",
+                          borderTop: "1px solid #fce7f3",
+                        }}
+                      >
+                        <span>
+                          Giảm:{" "}
+                          <strong style={{ color: "#e11d48" }}>
+                            {p.type === "percent" ? `${p.value}%` : money(p.value)}
+                          </strong>
+                        </span>
+                        <button
+                          type="button"
+                          className="admin-btn-outline"
+                          style={{ padding: "4px 10px", fontSize: "11px" }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(p.code);
+                            showToast(`✓ Đã sao chép mã: ${p.code}`);
+                          }}
+                        >
+                          📋 Sao chép
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div> {/* end of admin-content-inner */}
       </section>
 
@@ -5236,7 +5234,7 @@ function AdminPage() {
       )}
 
 
-      
+
       {/* MODAL 6: IN TEM GỬI HÀNG / PHIẾU ĐÓNG GÓI CHO SHIPPER */}
       {shippingLabelOrder && (
         <div

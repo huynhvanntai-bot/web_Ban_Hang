@@ -50,6 +50,164 @@ const YARN_COLORS = [
   { name: "Nâu cacao", hex: "#b08968", border: "#936639" },
 ];
 
+const INITIAL_CATEGORIES = [
+  { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade", description: "Thú bông đan móc thủ công Amigurumi dễ thương, an toàn cho bé." },
+  { _id: "c2", name: "Hoa len vĩnh cửu", slug: "hoa-len-vinh-cuu", description: "Bó hoa tulip, hoa hướng dương, hoa hồng đan móc tinh tế, giữ màu sắc bền lâu." },
+  { _id: "c3", name: "Len sợi", slug: "len-soi", description: "Các dòng len sợi cao cấp, len milk bò, len nhung đũa, len baby yarn không xù." },
+  { _id: "c4", name: "Dụng cụ đan móc", slug: "dung-cu-dan-moc", description: "Kim móc cán dẻo, kim đan vòng, kéo cắt chỉ, kim khâu len và phụ kiện." },
+  { _id: "c5", name: "Túi & Phụ kiện len", slug: "tui-phu-kien-len", description: "Túi xách dệt, mũ bucket, khăn choàng và móc khóa len handmade." },
+  { _id: "c6", name: "Set DIY tự làm", slug: "set-diy-tu-lam", description: "Bộ kit tự đan móc kèm đầy đủ len sợi, dụng cụ và video hướng dẫn chi tiết." },
+];
+
+const INITIAL_PRODUCTS = [
+  {
+    _id: "p1",
+    name: "Bé Thỏ Len Nhung Đũa Cỡ Đại Váy Hồng Pastel",
+    slug: "be-tho-len-nhung-dua-co-dai-vay-hong",
+    price: 285000,
+    costPrice: 130000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 25,
+    images: ["/products/2.3.jpg", "/products/2.2.jpg", "/products/2.jpg", "/products/2.1.jpg"],
+    videos: ["/products/1.mp4"],
+    videoPoster: "/products/1_thumb.jpg",
+    description: "Bé thỏ bông đan móc thủ công tỉ mỉ bằng len nhung đũa sợi lớn siêu mềm mịn bồng bềnh, mặc váy xòe tiểu thư phối ren hồng đậm, đầu đội mũ len chụp tai phong cách vintage. Kèm video quay cận cảnh chất len và phom dáng êm ái.",
+  },
+  {
+    _id: "p2",
+    name: "Bé Heo Bông Len Mũi Hồng Váy Xanh Bơ Cài Nơ",
+    slug: "be-heo-bong-len-mui-hong-vay-xanh-bo",
+    price: 165000,
+    costPrice: 75000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 30,
+    images: ["/products/6.1.jpg", "/products/6.2.jpg", "/products/6.3.jpg"],
+    videos: ["/products/6.mp4"],
+    videoPoster: "/products/6_thumb.jpg",
+    description: "Bé heo con móc tay bằng len nhung tuyết trắng muốt, mũi nút hồng chúm chím cực yêu, diện váy yếm màu xanh bơ dịu mát và cài nơ mầm cây xinh xắn, hai tay giang rộng đòi ôm.",
+  },
+  {
+    _id: "p3",
+    name: "Bé Chuột Con Xám Len Nhung Mũi Hồng Váy Vàng",
+    slug: "be-chuot-con-xam-len-nhung-vay-vang",
+    price: 165000,
+    costPrice: 75000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: false,
+    stock: 28,
+    images: ["/products/7.1.jpg", "/products/7.2.jpg", "/products/7.3.jpg", "/products/7.4.jpg"],
+    videos: ["/products/7.mp4"],
+    videoPoster: "/products/7_thumb.jpg",
+    description: "Bé chuột xám đáng yêu với đôi tai tròn lót hồng xinh xắn, mũi hồng và râu thêu tay tinh xảo, mặc váy xòe màu vàng hoa cúc nổi bật, sợi len êm mềm không gây ngứa ráp.",
+  },
+  {
+    _id: "p4",
+    name: "Chú Hươu Cao Cổ Len Nhung Vàng Đốm Nâu Cổ Dài",
+    slug: "huou-cao-co-len-nhung-vang-dom-nau",
+    price: 195000,
+    costPrice: 90000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 20,
+    images: ["/products/5.1.jpg", "/products/5.2.jpg", "/products/5.3.jpg", "/products/5.4.jpg", "/products/5.5.jpg", "/products/5.6.jpg", "/products/5.7.jpg"],
+    videos: ["/products/5.mp4"],
+    videoPoster: "/products/5_thumb.jpg",
+    description: "Chú hươu cao cổ đan móc bằng len nhung vàng ấm áp, mõm trắng tròn xoe, có sừng nhỏ và các đốm nâu thủ công tỉ mỉ trên lưng và chân, cổ dài đứng dáng siêu ngộ nghĩnh.",
+  },
+  {
+    _id: "p5",
+    name: "Lạc Đà Llama Alpaca Len Nhung Xanh Bơ Cổ Cao",
+    slug: "lac-da-alpaca-len-nhung-xanh-bo",
+    price: 185000,
+    costPrice: 85000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 22,
+    images: ["/products/8.4.jpg", "/products/8.1.jpg", "/products/8.2.jpg", "/products/8.3.jpg"],
+    videos: ["/products/8.mp4"],
+    videoPoster: "/products/8_thumb.jpg",
+    description: "Lạc đà không bướu Alpaca dáng chibi cổ cao kiêu hãnh, sắc len nhung xanh bơ pastel độc lạ, 4 chân phối móng len trắng và tai vểnh tinh nghịch, đặt bàn làm việc hay quà tặng đều siêu xinh.",
+  },
+  {
+    _id: "p6",
+    name: "Cặp Đôi Ngựa Bông Len Bờm Xoăn Mini",
+    slug: "cap-doi-ngua-bong-len-bom-xoan-mini",
+    price: 245000,
+    costPrice: 110000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 18,
+    images: ["/products/9.5.jpg", "/products/9.7.jpg", "/products/9.1.jpg", "/products/9.2.jpg", "/products/9.3.jpg", "/products/9.4.jpg", "/products/9.6.jpg", "/products/9.8.jpg", "/products/9.9.jpg"],
+    videos: ["/products/9.mp4"],
+    videoPoster: "/products/9_thumb.jpg",
+    description: "Set quà cặp đôi gồm Bé Ngựa Nâu hạt dẻ bờm xoăn đậm và Bé Ngựa Hồng pastel bờm tím hồng đeo lục lạc chuông đỏ leng keng, biểu tượng tình bạn và tình yêu gắn kết ấm áp.",
+  },
+  {
+    _id: "p7",
+    name: "Bé Gà Con Len Hồng Mông Đào Đội Mũ Trứng Ốp La",
+    slug: "be-ga-con-hong-mong-dao-doi-mu-trung-op-la",
+    price: 155000,
+    costPrice: 70000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 35,
+    images: ["/products/10.1_thumb.jpg", "/products/10.2.jpg", "/products/10_thumb.jpg"],
+    videos: ["/products/10.mp4", "/products/10.1.mp4"],
+    videoPoster: "/products/10.1_thumb.jpg",
+    description: "Bé gà con tròn xoe màu hồng phấn, trên đầu đội mũ trứng ốp la lòng đào hài hước, phía sau là chiếc mông đào cong vút ửng hồng phấn cực kỳ dễ thương và xả stress khi bóp nhẹ.",
+  },
+  {
+    _id: "p8",
+    name: "Hộp Quà Tiểu Cảnh Bé Vịt Vàng Đội Mũ Ếch & Bó Hoa Cẩm Tú Cầu",
+    slug: "hop-qua-tieu-canh-vit-vang-doi-mu-ech",
+    price: 220000,
+    costPrice: 105000,
+    category: { _id: "c2", name: "Hoa len vĩnh cửu", slug: "hoa-len-vinh-cuu" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 15,
+    images: ["/products/3.jpg", "/products/3.1.jpg", "/products/3.2.jpg", "/products/3.3.jpg", "/products/3.4.jpg", "/products/3.5.jpg", "/products/3.6.jpg"],
+    description: "Hộp quà tiểu cảnh mica trong suốt cao cấp gồm: Chú Vịt Vàng mini đội mũ chú ếch xanh ngộ nghĩnh, bó hoa len cẩm tú cầu xanh búp trắng, suối đá pha lê ngũ sắc, nấm đỏ và bé thỏ mini trên thảm rêu xanh thiên nhiên.",
+  },
+  {
+    _id: "p9",
+    name: "Bó Hoa Hồng Len Mini Pastel Phối Viền Ren Trắng",
+    slug: "bo-hoa-hong-len-mini-pastel-kem-ren",
+    price: 145000,
+    costPrice: 65000,
+    category: { _id: "c2", name: "Hoa len vĩnh cửu", slug: "hoa-len-vinh-cuu" },
+    brand: "Sene Handmade",
+    featured: true,
+    stock: 26,
+    images: ["/products/4.2.jpg", "/products/4.3.jpg", "/products/4_thumb.jpg"],
+    videos: ["/products/4.mp4", "/products/4.1.mp4"],
+    videoPoster: "/products/4_thumb.jpg",
+    description: "Bó hoa hồng đan tay nhỏ xinh gồm các đóa hồng nhung đỏ thắm và hồng pastel ngọt ngào, gói giấy bọc len xanh coban / tím mộng mơ phối ren bèo trắng tinh tế, quà tặng ý nghĩa giữ màu bền lâu mãi mãi.",
+  },
+  {
+    _id: "p10",
+    name: "Bé Vịt Vàng Đội Mũ Chú Ếch Xanh Handmade",
+    slug: "be-vit-vang-doi-mu-chu-ech-xanh",
+    price: 125000,
+    costPrice: 55000,
+    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
+    brand: "Sene Handmade",
+    featured: false,
+    stock: 20,
+    images: ["/products/3.1.jpg", "/products/3.2.jpg", "/products/3.5.jpg"],
+    description: "Bé vịt vàng lông len tơ mịn màng, đội chiếc mũ len hình chú ếch xanh hai mắt tròn xoe ngộ nghĩnh, biểu cảm dễ thương thích hợp làm móc khóa hoặc quà tặng để bàn.",
+  },
+];
+
 const CUSTOMER_REVIEWS = [
   {
     id: 1,
@@ -424,8 +582,8 @@ function App() {
       </ErrorBoundary>
     );
   }
-  const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState(INITIAL_CATEGORIES);
+  const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [activeCategory, setActiveCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -462,6 +620,8 @@ function App() {
   const [selectedGuide, setSelectedGuide] = useState(null);
   const [detailTab, setDetailTab] = useState("specs");
   const [detailImageIdx, setDetailImageIdx] = useState(0);
+  const [detailMediaType, setDetailMediaType] = useState("image"); // 'image' | 'video'
+  const [detailVideoIdx, setDetailVideoIdx] = useState(0);
   const [checkoutForm, setCheckoutForm] = useState({
     customerName: "",
     phone: "",
@@ -491,7 +651,7 @@ function App() {
   const [priceFilter, setPriceFilter] = useState("all");
   const [sortBy, setSortBy] = useState("default");
   const [selectedColor, setSelectedColor] = useState("Trắng kem");
-  
+
   // ĐẶT MÓC THEO YÊU CẦU (CUSTOM CROCHET ORDER)
   const [customOrderModalOpen, setCustomOrderModalOpen] = useState(false);
   const [customOrderSubmitting, setCustomOrderSubmitting] = useState(false);
@@ -722,7 +882,7 @@ function App() {
         );
         setLocations(mapped);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -736,21 +896,25 @@ function App() {
           ]);
         if (!categoryResponse.ok || !productResponse.ok)
           throw new Error("API không phản hồi");
-        setCategories(await categoryResponse.json());
-        const loadedProducts = (await productResponse.json()).products;
-        setProducts(loadedProducts);
+        const catData = await categoryResponse.json();
+        if (catData && catData.length) setCategories(catData);
+        const prodData = await productResponse.json();
+        const loadedProducts = prodData?.products || prodData;
+        if (Array.isArray(loadedProducts) && loadedProducts.length) {
+          setProducts(loadedProducts);
+        }
         if (promotionResponse.ok)
           setActivePromotions(await promotionResponse.json());
         const detailSlug = window.location.pathname.startsWith("/san-pham/")
           ? window.location.pathname.replace("/san-pham/", "")
           : "";
-        const directProduct = loadedProducts.find(
+        const allProds = (Array.isArray(loadedProducts) && loadedProducts.length) ? loadedProducts : INITIAL_PRODUCTS;
+        const directProduct = allProds.find(
           (product) => product.slug === detailSlug,
         );
         if (directProduct) setSelectedProduct(directProduct);
       } catch (loadError) {
-        setError("Chưa tải được sản phẩm. Hãy kiểm tra backend đang chạy.");
-        console.error(loadError);
+        console.warn("Dùng dữ liệu sản phẩm tích hợp sẵn:", loadError);
       } finally {
         setLoading(false);
       }
@@ -866,9 +1030,9 @@ function App() {
         return items.map((item) =>
           item.product === product._id
             ? {
-                ...item,
-                quantity: Math.min(item.quantity + quantity, product.stock),
-              }
+              ...item,
+              quantity: Math.min(item.quantity + quantity, product.stock),
+            }
             : item,
         );
       return [
@@ -893,22 +1057,24 @@ function App() {
         .map((item) =>
           item.product === productId
             ? {
-                ...item,
-                quantity: Math.min(
-                  Math.max(item.quantity + change, 0),
-                  item.stock,
-                ),
-              }
+              ...item,
+              quantity: Math.min(
+                Math.max(item.quantity + change, 0),
+                item.stock,
+              ),
+            }
             : item,
         )
         .filter((item) => item.quantity > 0),
     );
   }
-  function openProductDetail(product) {
+  function openProductDetail(product, mediaType = "image", videoIdx = 0) {
     setSelectedProduct(product);
     setDetailQuantity(1);
     setDetailTab("specs");
     setDetailImageIdx(0);
+    setDetailMediaType(mediaType);
+    setDetailVideoIdx(videoIdx);
     window.history.pushState({}, "", `/san-pham/${product.slug}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1063,6 +1229,7 @@ function App() {
 
   const heroProducts = products.slice(0, 3);
   const flashSaleProducts = products.filter((p) => p.featured).slice(0, 4);
+  const videoProducts = products.filter((p) => p.videos && p.videos.length > 0);
   const freeshipRemaining = Math.max(0, FREESHIP_THRESHOLD - cartTotal);
   const freeshipPercent = Math.min(
     100,
@@ -1329,6 +1496,62 @@ function App() {
         </section>
       )}
 
+      {/* GÓC VIDEO SẢN PHẨM THỰC TẾ (REELS / SHOWCASE) */}
+      {videoProducts.length > 0 && (
+        <section className="video-showcase-section">
+          <div className="video-showcase-header">
+            <div className="video-showcase-title">
+              <span className="video-pill-badge">🎬 REVIEW THỰC TẾ</span>
+              <h2>Video Cận Cảnh Thú Móc Len & Quà Tặng</h2>
+              <p>
+                Trải nghiệm chân thực từng mũi móc len đũa, độ bồng bềnh và phom dáng chuẩn của thú bông handmade
+              </p>
+            </div>
+            <div className="video-header-hint">
+              <span>Bấm vào để xem video chi tiết ↗</span>
+            </div>
+          </div>
+
+          <div className="video-showcase-slider">
+            {videoProducts.map((product) => (
+              <div
+                key={`video-card-${product._id}`}
+                className="video-showcase-card"
+                onClick={() => openProductDetail(product, "video")}
+              >
+                <div className="video-thumbnail-box">
+                  <img
+                    src={product.videoPoster || product.images?.[0]}
+                    alt={product.name}
+                    loading="lazy"
+                  />
+                  <div className="video-play-overlay">
+                    <span className="video-play-icon">▶</span>
+                  </div>
+                  <span className="video-duration-tag">Video Full HD</span>
+                </div>
+                <div className="video-card-meta">
+                  <h4>{product.name}</h4>
+                  <div className="video-card-bottom">
+                    <span className="video-card-price">{formatPrice(product.price)}</span>
+                    <button
+                      type="button"
+                      className="video-watch-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openProductDetail(product, "video");
+                      }}
+                    >
+                      Xem video ↗
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* DANH MỤC TRỰC QUAN VỚI ICON */}
       <section className="categories-showcase">
         <div className="section-title-wrap">
@@ -1518,12 +1741,38 @@ function App() {
                   onClick={() => openProductDetail(product)}
                 >
                   <img
+                    className="card-primary-img"
                     src={product.images?.[0]}
                     alt={product.name}
                     loading="lazy"
                   />
+                  {product.images?.[1] && (
+                    <img
+                      className="card-hover-img"
+                      src={product.images[1]}
+                      alt={`${product.name} - góc khác`}
+                      loading="lazy"
+                    />
+                  )}
                   {product.featured && (
                     <span className="product-badge">Bán chạy ★</span>
+                  )}
+                  {product.videos?.length > 0 && (
+                    <span
+                      className="product-video-badge"
+                      title="Có video quay thực tế sản phẩm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openProductDetail(product, "video");
+                      }}
+                    >
+                      ▶ Video thật
+                    </span>
+                  )}
+                  {product.images?.length > 1 && (
+                    <span className="product-photos-count">
+                      📷 {product.images.length}
+                    </span>
                   )}
                 </button>
                 <button
@@ -1629,13 +1878,13 @@ function App() {
               <div className="member-avatar">
                 {currentUser.name
                   ? currentUser.name
-                      .trim()
-                      .split(" ")
-                      .filter(Boolean)
-                      .map((w) => w[0])
-                      .slice(-2)
-                      .join("")
-                      .toUpperCase()
+                    .trim()
+                    .split(" ")
+                    .filter(Boolean)
+                    .map((w) => w[0])
+                    .slice(-2)
+                    .join("")
+                    .toUpperCase()
                   : "TL"}
               </div>
               <div className="member-details">
@@ -2141,7 +2390,7 @@ function App() {
               )}
             </div>
 
-            
+
             {/* GỢI Ý MUA KÈM COMBO DỤNG CỤ TIẾT KIỆM (CROSS-SELL) */}
             <div className="cart-addons-box">
               <div className="cart-addons-header">
@@ -2424,7 +2673,7 @@ function App() {
                         <option value="">-- Chọn Phường / Xã --</option>
                         {(
                           locations[checkoutForm.province]?.[
-                            checkoutForm.district
+                          checkoutForm.district
                           ] || []
                         ).map((ward) => (
                           <option key={ward} value={ward}>
@@ -2777,50 +3026,99 @@ function App() {
             </div>
 
             <article className="detail-modal" role="main">
-              {/* CỘT TRÁI: HÌNH ẢNH & GALLERY THUMBNAILS */}
+              {/* CỘT TRÁI: HÌNH ẢNH, VIDEO & GALLERY THUMBNAILS */}
               <div className="detail-gallery-col">
-                <div className="detail-main-image-wrap">
-                  <img
-                    src={
-                      detailImageIdx === 0
-                        ? selectedProduct.images?.[0]
-                        : detailImageIdx === 1
-                        ? "https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80"
-                        : detailImageIdx === 2
-                        ? "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&w=800&q=80"
-                        : "https://images.unsplash.com/photo-1598880940371-c756e015fea1?auto=format&fit=crop&w=800&q=80"
-                    }
-                    alt={selectedProduct.name}
-                    className="detail-main-img"
-                  />
-                  <div className="detail-badges-overlay">
-                    <span className="overlay-badge">✨ 100% Sợi chọn lọc</span>
-                    <span className="overlay-badge warm">🌿 Không ngứa da</span>
+                {/* Media Switcher Tabs (khi sản phẩm có cả video) */}
+                {selectedProduct.videos?.length > 0 && (
+                  <div className="detail-media-switcher">
+                    <button
+                      type="button"
+                      className={`media-switch-btn ${detailMediaType === "image" ? "active" : ""}`}
+                      onClick={() => setDetailMediaType("image")}
+                    >
+                      📸 Ảnh chi tiết ({selectedProduct.images?.length || 1})
+                    </button>
+                    <button
+                      type="button"
+                      className={`media-switch-btn ${detailMediaType === "video" ? "active" : ""}`}
+                      onClick={() => setDetailMediaType("video")}
+                    >
+                      🎬 Video thực tế ({selectedProduct.videos?.length})
+                    </button>
                   </div>
+                )}
+
+                <div className="detail-main-media-wrap">
+                  {detailMediaType === "video" && selectedProduct.videos?.length > 0 ? (
+                    <div className="detail-video-container">
+                      <video
+                        key={selectedProduct.videos[detailVideoIdx] || selectedProduct.videos[0]}
+                        src={selectedProduct.videos[detailVideoIdx] || selectedProduct.videos[0]}
+                        poster={selectedProduct.videoPoster || selectedProduct.images?.[0]}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="detail-main-video"
+                      />
+                    </div>
+                  ) : (
+                    <div className="detail-main-image-wrap">
+                      <img
+                        src={
+                          selectedProduct.images?.[detailImageIdx] ||
+                          selectedProduct.images?.[0] ||
+                          "https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80"
+                        }
+                        alt={selectedProduct.name}
+                        className="detail-main-img"
+                      />
+                      <div className="detail-badges-overlay">
+                        <span className="overlay-badge">✨ 100% Thủ công tỉ mỉ</span>
+                        <span className="overlay-badge warm">🌿 Len nhung êm mịn</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* THUMBNAILS HÀNG DƯỚI */}
+                {/* THUMBNAILS HÀNG DƯỚI: TẤT CẢ ẢNH & VIDEO CỦA SẢN PHẨM */}
                 <div className="detail-thumbs-list">
-                  {[
-                    selectedProduct.images?.[0],
-                    "https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=300&q=80",
-                    "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&w=300&q=80",
-                    "https://images.unsplash.com/photo-1598880940371-c756e015fea1?auto=format&fit=crop&w=300&q=80",
-                  ].map((thumbUrl, idx) => (
+                  {selectedProduct.images?.map((thumbUrl, idx) => (
                     <button
-                      key={idx}
+                      key={`thumb-img-${idx}`}
                       type="button"
-                      className={`detail-thumb-btn ${detailImageIdx === idx ? "active" : ""}`}
-                      onClick={() => setDetailImageIdx(idx)}
+                      className={`detail-thumb-btn ${detailMediaType === "image" && detailImageIdx === idx ? "active" : ""}`}
+                      onClick={() => {
+                        setDetailMediaType("image");
+                        setDetailImageIdx(idx);
+                      }}
+                      title={`Xem ảnh chi tiết góc ${idx + 1}`}
                     >
                       <img src={thumbUrl} alt={`Góc nhìn ${idx + 1}`} />
+                    </button>
+                  ))}
+                  {selectedProduct.videos?.map((videoUrl, vIdx) => (
+                    <button
+                      key={`thumb-vid-${vIdx}`}
+                      type="button"
+                      className={`detail-thumb-btn thumb-video-btn ${detailMediaType === "video" && detailVideoIdx === vIdx ? "active" : ""}`}
+                      onClick={() => {
+                        setDetailMediaType("video");
+                        setDetailVideoIdx(vIdx);
+                      }}
+                      title={`Xem Video ${vIdx + 1}`}
+                    >
+                      <img
+                        src={selectedProduct.videoPoster || selectedProduct.images?.[0]}
+                        alt={`Video ${vIdx + 1}`}
+                      />
+                      <span className="thumb-video-badge">▶</span>
                     </button>
                   ))}
                 </div>
 
                 <div className="detail-trust-points">
                   <span>✓ Bao đổi trả miễn phí 7 ngày</span>
-                  <span>✓ Tặng kèm mã QR video hướng dẫn</span>
+                  <span>✓ Ảnh & Video quay thực tế 100% tại xưởng</span>
                 </div>
               </div>
 
@@ -2942,7 +3240,7 @@ function App() {
               </div>
             </article>
 
-            
+
             {/* GỢI Ý DỤNG CỤ MUA KÈM KHI XEM CHI TIẾT */}
             <div className="detail-cross-sell-section">
               <div className="detail-cross-sell-title">
@@ -3175,20 +3473,20 @@ function App() {
                                 {key === "name"
                                   ? "Dòng Len"
                                   : key === "type"
-                                  ? "Thành phần"
-                                  : key === "needle"
-                                  ? "Cỡ kim khuyên dùng"
-                                  : key === "feature"
-                                  ? "Đặc điểm"
-                                  : key === "suitable"
-                                  ? "Thích hợp móc"
-                                  : key === "symbol"
-                                  ? "Ký hiệu"
-                                  : key === "en"
-                                  ? "Tên Quốc Tế"
-                                  : key === "vi"
-                                  ? "Tên Tiếng Việt"
-                                  : "Công dụng chính"}
+                                    ? "Thành phần"
+                                    : key === "needle"
+                                      ? "Cỡ kim khuyên dùng"
+                                      : key === "feature"
+                                        ? "Đặc điểm"
+                                        : key === "suitable"
+                                          ? "Thích hợp móc"
+                                          : key === "symbol"
+                                            ? "Ký hiệu"
+                                            : key === "en"
+                                              ? "Tên Quốc Tế"
+                                              : key === "vi"
+                                                ? "Tên Tiếng Việt"
+                                                : "Công dụng chính"}
                               </th>
                             ))}
                           </tr>
@@ -3491,7 +3789,7 @@ function App() {
         </div>
       )}
 
-      
+
       {/* FLOATING QUICK CONTACT & ACTION BAR */}
       <div className="floating-actions">
         <a

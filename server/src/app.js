@@ -13,11 +13,14 @@ const adminRoutes = require("./routes/admin.routes");
 const promotionRoutes = require("./routes/promotion.routes");
 const customOrderRoutes = require("./routes/customOrder.routes");
 
+const path = require("path");
+
 const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use("/products", express.static(path.join(__dirname, "../../client/public/products")));
 
 // Middleware tự động kết nối MongoDB Atlas cho mỗi request trong Serverless
 app.use(async (req, res, next) => {

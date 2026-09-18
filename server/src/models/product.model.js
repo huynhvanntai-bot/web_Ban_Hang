@@ -26,6 +26,8 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
     images: [{ type: String, trim: true }],
+    videos: [{ type: String, trim: true }],
+    videoPoster: { type: String, trim: true },
     description: { type: String, trim: true },
     brand: { type: String, trim: true },
     featured: { type: Boolean, default: false },
