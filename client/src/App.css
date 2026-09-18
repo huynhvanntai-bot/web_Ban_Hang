@@ -9076,7 +9076,18 @@ img, video {
   }
 }
 
-/* 6. Admin Page Mobile Responsive (Trang Quản Trị Đẹp Tuyệt Đối Trên Điện Thoại) */
+/* 6. UNIFIED RESPONSIVE DESIGN SYSTEM (Tất cả giao diện đồng nhất & không bị bể trên mọi thiết bị) */
+*, *::before, *::after {
+  box-sizing: border-box !important;
+}
+
+html, body {
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .mobile-only {
   display: none !important;
 }
@@ -9089,7 +9100,7 @@ img, video {
   inset: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  background: rgba(15, 23, 42, 0.55) !important;
+  background: rgba(15, 23, 42, 0.6) !important;
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
   z-index: 9998 !important;
@@ -9108,12 +9119,17 @@ img, video {
   .mobile-only {
     display: inline-flex !important;
   }
+
+  /* --- 1. ADMIN SHELL & SIDEBAR --- */
   .admin-shell {
     flex-direction: column !important;
     width: 100% !important;
     max-width: 100vw !important;
+    min-height: 100vh !important;
     overflow-x: hidden !important;
+    background: #fff5f8 !important;
   }
+
   .admin-sidebar {
     position: fixed !important;
     top: 0 !important;
@@ -9126,13 +9142,16 @@ img, video {
     z-index: 9999 !important;
     transform: translateX(-105%) !important;
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.25) !important;
-    padding: 18px 14px !important;
+    box-shadow: 6px 0 30px rgba(0, 0, 0, 0.28) !important;
+    padding: 18px 14px 40px !important;
     background: #ffffff !important;
+    overflow-y: auto !important;
   }
+
   .admin-sidebar.mobile-open {
     transform: translateX(0) !important;
   }
+
   .admin-sidebar.collapsed,
   .admin-shell.sidebar-collapsed .admin-sidebar {
     width: 300px !important;
@@ -9141,61 +9160,84 @@ img, video {
     flex: none !important;
     padding: 18px 14px !important;
   }
+
   .admin-sidebar-header {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     margin-bottom: 16px !important;
+    padding-bottom: 12px !important;
+    border-bottom: 1.5px solid #fce7f3 !important;
   }
+
   .admin-sidebar-header-btns {
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
   }
+
   .admin-sidebar-close-btn {
     background: #ffe4e6 !important;
     color: #e11d48 !important;
     border: none !important;
-    border-radius: 8px !important;
-    width: 34px !important;
-    height: 34px !important;
+    border-radius: 10px !important;
+    width: 36px !important;
+    height: 36px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 16px !important;
-    font-weight: 700 !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
     cursor: pointer !important;
   }
+
+  /* --- 2. ADMIN CONTENT & TOPBAR --- */
   .admin-content {
     width: 100% !important;
     max-width: 100vw !important;
     min-width: 100% !important;
-    padding: 12px 10px 60px !important;
+    padding: 12px 10px 80px !important;
     margin: 0 !important;
+    box-sizing: border-box !important;
   }
+
   .admin-sidebar.collapsed + .admin-content,
   .admin-shell.sidebar-collapsed .admin-content {
     width: 100% !important;
     max-width: 100vw !important;
   }
+
+  .admin-content-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
   .admin-topbar {
     padding: 12px 14px !important;
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 10px !important;
     margin-bottom: 14px !important;
+    border-radius: 14px !important;
   }
+
   .admin-topbar-title {
     width: 100% !important;
   }
+
   .admin-topbar-title h1 {
-    font-size: 17px !important;
-    line-height: 1.3 !important;
+    font-size: 16.5px !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
   }
+
   .admin-topbar-title p {
     font-size: 12px !important;
     margin-top: 4px !important;
+    color: #8d6271 !important;
   }
+
   .admin-topbar-actions {
     width: 100% !important;
     display: flex !important;
@@ -9204,14 +9246,18 @@ img, video {
     gap: 8px !important;
     margin-top: 4px !important;
   }
+
   .admin-clock-chip {
     font-size: 11.5px !important;
     padding: 5px 10px !important;
   }
+
   .admin-refresh-btn {
     font-size: 12.5px !important;
-    padding: 6px 12px !important;
+    padding: 6px 14px !important;
+    border-radius: 10px !important;
   }
+
   .admin-menu-toggle-btn {
     display: inline-flex !important;
     align-items: center !important;
@@ -9226,46 +9272,236 @@ img, video {
     cursor: pointer !important;
     box-shadow: 0 2px 8px rgba(225, 29, 72, 0.25) !important;
   }
+
+  /* --- 3. STAT & KPI CARDS (2 CỘT GỌN GÀNG) --- */
   .admin-kpi-grid,
-  .kpi-grid {
+  .kpi-grid,
+  .stat-grid {
+    display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;
     margin-bottom: 14px !important;
   }
+
   .admin-kpi-card {
-    padding: 12px 10px !important;
+    padding: 10px 10px !important;
+    border-radius: 12px !important;
   }
-  .admin-kpi-card .kpi-val {
+
+  .admin-kpi-card .kpi-top {
+    gap: 6px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .admin-kpi-card .kpi-icon {
+    width: 32px !important;
+    height: 32px !important;
     font-size: 16px !important;
   }
+
+  .admin-kpi-card .kpi-trend {
+    font-size: 10.5px !important;
+    padding: 2px 6px !important;
+  }
+
+  .admin-kpi-card .kpi-title {
+    font-size: 11.5px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .admin-kpi-card .kpi-val {
+    font-size: 15px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* --- 4. ADMIN CARDS & TOOLBARS (XUẤT EXCEL, SEARCH, FILTER) --- */
   .admin-card {
     padding: 14px 12px !important;
     margin-bottom: 14px !important;
     border-radius: 14px !important;
   }
+
   .admin-card-header {
+    display: flex !important;
     flex-direction: column !important;
-    align-items: flex-start !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .admin-card-header h2 {
+    font-size: 16px !important;
+    line-height: 1.3 !important;
+  }
+
+  .admin-card-header p {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Toolbar: Xuất Excel + Tìm Kiếm + Dropdown xếp dọc 100% bề ngang */
+  .admin-card-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .admin-card-actions .admin-btn-outline,
+  .admin-card-actions .admin-btn-primary,
+  .admin-card-actions .admin-search-input,
+  .admin-card-actions .admin-select-input,
+  .admin-search-input,
+  .admin-select-input,
+  .admin-btn-outline,
+  .admin-btn-primary {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 42px !important;
+    font-size: 13.5px !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  .admin-search-input {
+    text-align: left !important;
+    padding-left: 14px !important;
+  }
+
+  /* --- 5. BỘ LỌC CHIPS / PILLS (CUỘN NGANG MƯỢT MÀ KHÔNG BỊ TRÀN) --- */
+  .profit-filter-bar,
+  .order-filter-bar,
+  .import-filter-bar {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 8px 10px !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+    border-radius: 12px !important;
+    scrollbar-width: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .profit-filter-bar::-webkit-scrollbar,
+  .order-filter-bar::-webkit-scrollbar,
+  .import-filter-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .profit-filter-pill,
+  .order-filter-pill {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    border-radius: 16px !important;
+  }
+
+  /* --- 6. FORM THÊM / SỬA SẢN PHẨM & DỮ LIỆU --- */
+  .admin-form-grid,
+  .admin-grid-2,
+  .admin-grid-3,
+  .admin-grid-4,
+  .form-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
+
+  .admin-input,
+  .admin-textarea,
+  .admin-select,
+  .form-control {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 14px !important;
+    min-height: 42px !important;
+  }
+
+  /* --- 7. BẢNG DỮ LIỆU (VUỐT NGANG MƯỢT MÀ TRÊN ĐIỆN THOẠI) --- */
   .admin-table-wrap {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
+    border-radius: 12px !important;
+    border: 1.5px solid #fce7f3 !important;
+    background: #ffffff !important;
+    margin-top: 8px !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
   }
-  .admin-table-wrap table {
-    min-width: 650px !important;
+
+  .admin-table {
+    min-width: 680px !important;
+    width: 100% !important;
+    border-collapse: separate !important;
   }
-  .admin-modal-box {
-    width: 95vw !important;
-    max-width: 95vw !important;
+
+  .admin-table th {
+    font-size: 12px !important;
+    padding: 10px 12px !important;
+    white-space: nowrap !important;
+  }
+
+  .admin-table td {
+    padding: 10px 12px !important;
+    font-size: 13.5px !important;
+  }
+
+  /* --- 8. MODAL HỘP THOẠI (SỬA GIÁ, CHI TIẾT ĐƠN HÀNG, LẬP PHIẾU NHẬP) --- */
+  .admin-modal-backdrop,
+  .modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.65) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 10000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 12px !important;
+  }
+
+  .admin-modal-box,
+  .modal-box {
+    width: 100% !important;
+    max-width: 96vw !important;
     max-height: 90vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
     padding: 16px 14px !important;
-    margin: 10px auto !important;
+    margin: auto !important;
+    border-radius: 18px !important;
     box-sizing: border-box !important;
+    background: #ffffff !important;
+  }
+
+  .modal-actions,
+  .admin-modal-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-top: 14px !important;
+  }
+
+  .modal-actions button,
+  .admin-modal-actions button {
+    width: 100% !important;
+    min-height: 44px !important;
+    font-size: 14px !important;
   }
 }
+
 
 
 
