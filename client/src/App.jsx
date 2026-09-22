@@ -22,6 +22,7 @@ import MainNavigation from "./components/MainNavigation.jsx";
 import CategoryView from "./components/CategoryView.jsx";
 import ProductDetailView from "./components/ProductDetailView.jsx";
 import EcommerceFooter from "./components/EcommerceFooter.jsx";
+import MobileHomePage from "./components/MobileHomePage.jsx";
 
 const apiUrl = (() => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
@@ -2072,7 +2073,7 @@ function App() {
       </div>
 
       <header className="site-header">
-        <div className="header-main">
+        <div className="header-main desktop-only">
           <a
             className="brand"
             href="/"
@@ -2265,6 +2266,137 @@ function App() {
           </div>
         </div>
 
+        {/* DEDICATED SHOPEE-STYLE MOBILE HEADER */}
+        <div className="mobile-header-bar mobile-only">
+          <a
+            className="mobile-header-brand"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateHome();
+            }}
+          >
+            <span className="mobile-brand-icon">🧶</span>
+            <span className="mobile-brand-text">Sene</span>
+          </a>
+
+          <div className="mobile-header-search-wrap">
+            <form
+              className="mobile-header-search-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearchFocused(false);
+                document.querySelector("#mobile-all-products")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              <span className="mobile-search-icon">🔍</span>
+              <input
+                type="text"
+                className="mobile-search-input"
+                placeholder="Tìm len, kim móc, kit DIY..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                autoComplete="off"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="mobile-search-clear-btn"
+                  onClick={() => setSearchQuery("")}
+                >
+                  ×
+                </button>
+              )}
+            </form>
+
+            {searchFocused && (
+              <div className="search-autocomplete-dropdown mobile-search-dropdown" onMouseDown={(e) => e.preventDefault()}>
+                {searchQuery.trim() ? (
+                  <>
+                    <div className="search-dropdown-header">
+                      <span>Gợi ý ({liveSearchResults.length})</span>
+                      <button type="button" className="mobile-search-close-x" onClick={() => setSearchFocused(false)}>✕</button>
+                    </div>
+                    {liveSearchResults.length > 0 ? (
+                      <div className="search-dropdown-list">
+                        {liveSearchResults.slice(0, 5).map((prod) => (
+                          <div
+                            key={`m-search-${prod._id}`}
+                            className="search-dropdown-item"
+                            onClick={() => {
+                              setSearchFocused(false);
+                              openProductDetail(prod);
+                            }}
+                          >
+                            <img src={prod.images?.[0]} alt={prod.name} className="search-item-thumb" />
+                            <div className="search-item-info">
+                              <span className="search-item-name">{prod.name}</span>
+                              <strong className="search-item-price">{formatPrice(prod.price)}</strong>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="search-dropdown-empty">
+                        <p>Không tìm thấy sản phẩm cho "{searchQuery}"</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="search-dropdown-hot">
+                    <div className="search-dropdown-header">
+                      <span>🔥 Từ khóa phổ biến</span>
+                      <button type="button" className="mobile-search-close-x" onClick={() => setSearchFocused(false)}>✕</button>
+                    </div>
+                    <div className="search-hot-tags">
+                      {HOT_SEARCH_KEYWORDS.map((kw) => (
+                        <button
+                          key={kw}
+                          type="button"
+                          className="search-hot-tag"
+                          onClick={() => {
+                            setSearchQuery(kw);
+                            setSearchFocused(false);
+                            document.querySelector("#mobile-all-products")?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                        >
+                          {kw}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="mobile-header-actions">
+            <button
+              type="button"
+              className="mobile-hdr-btn"
+              onClick={() => setWishlistOpen(true)}
+              title="Yêu thích"
+            >
+              <span className="mobile-hdr-icon">♡</span>
+              {wishlist.length > 0 && (
+                <span className="mobile-hdr-badge">{wishlist.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className="mobile-hdr-btn"
+              onClick={() => setCartOpen(true)}
+              title="Giỏ hàng"
+            >
+              <span className="mobile-hdr-icon">🛒</span>
+              {cartCount > 0 && (
+                <span className="mobile-hdr-badge">{cartCount}</span>
+              )}
+            </button>
+          </div>
+        </div>
+
         <MainNavigation
           activeCategorySlug={currentRoute.type === "category" ? currentRoute.slug : ""}
           onSelectCategory={(slug, sub) => navigateCategory(slug, sub)}
@@ -2309,11 +2441,12 @@ function App() {
         />
       )}
 
-      {/* VIEW 3: HOMEPAGE (13 SALES FUNNEL SECTIONS) */}
+      {/* VIEW 3: HOMEPAGE */}
       {currentRoute.type === "home" && (
         <>
-
-      <section className="hero-banner">
+          {/* DESKTOP SECTIONS (>= 769px) */}
+          <div className="desktop-home-sections desktop-only">
+            <section className="hero-banner">
         <div className="banner-copy">
           <div className="banner-badge-top">
             <span className="banner-badge-sparkle">🌸</span>
@@ -3338,7 +3471,28 @@ function App() {
           ))}
         </div>
       </section>
+    </div>
 
+          {/* DEDICATED SHOPEE-INSPIRED MOBILE HOMEPAGE (<= 768px) */}
+          <div className="mobile-home-sections mobile-only">
+            <MobileHomePage
+              products={products}
+              onOpenProductDetail={openProductDetail}
+              onAddToCart={(prod, qty) => addToCart(prod, qty || 1)}
+              onBuyNow={buyNow}
+              isWishlisted={(id) => wishlist.includes(id)}
+              onToggleWishlist={toggleWishlist}
+              onNavigateCategory={navigateCategory}
+              onOpenCustomOrder={() => {
+                setCustomOrderSuccess(null);
+                setCustomOrderModalOpen(true);
+              }}
+              STORE_VOUCHERS={STORE_VOUCHERS}
+              onClaimVoucher={handleClaimVoucher}
+              copiedVoucherCode={copiedVoucherCode}
+              formatPrice={formatPrice}
+            />
+          </div>
         </>
       )}
 

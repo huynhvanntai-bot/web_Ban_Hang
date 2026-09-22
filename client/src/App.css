@@ -17506,28 +17506,30 @@ html, body {
   font-size: 28px !important;
 }
 
-.flash-sale-grid {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
-  gap: 24px !important;
-}
+@media (min-width: 769px) {
+  .flash-sale-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+    gap: 24px !important;
+  }
 
-.flash-card {
-  border-radius: 18px !important;
-}
+  .flash-card {
+    border-radius: 18px !important;
+  }
 
-.flash-card-info h3 {
-  font-size: 15px !important;
-}
+  .flash-card-info h3 {
+    font-size: 15px !important;
+  }
 
-.flash-card-prices strong {
-  font-size: 18px !important;
-}
+  .flash-card-prices strong {
+    font-size: 18px !important;
+  }
 
-.flash-buy-btn {
-  height: 38px !important;
-  font-size: 13px !important;
-  border-radius: 10px !important;
+  .flash-buy-btn {
+    height: 38px !important;
+    font-size: 13px !important;
+    border-radius: 10px !important;
+  }
 }
 
 /* 6. Video Showcase (Review Thực Tế) */
@@ -18035,14 +18037,16 @@ html, body {
   /* LƯỚI SẢN PHẨM 2 CỘT MỌI SECTION TRÊN TRANG CHỦ */
   .product-grid,
   .products-grid,
+  .flash-sale-grid,
   .flash-sales-grid,
+  .mobile-products-grid,
   .featured-palette-grid,
   .diy-kits-grid,
   .popular-grid {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 10px !important;
-    padding: 0 10px !important;
+    gap: 8px !important;
+    padding: 0 8px !important;
     box-sizing: border-box !important;
     width: 100% !important;
   }
