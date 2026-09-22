@@ -122,129 +122,171 @@ export default function MainNavigation({
   ];
 
   return (
-    <nav className="site-main-nav-container" aria-label="Danh mục thương mại">
-      {/* 10 CORE CATEGORIES BAR - SINGLE UNIFIED ROW ON DESKTOP */}
-      <div className="nav-primary-menu">
-        <div className="nav-items-track">
+    <>
+      {/* 1. DESKTOP NAVIGATION CONTAINER (>= 769px) */}
+      <nav className="site-main-nav-container desktop-nav-only" aria-label="Danh mục thương mại">
+        <div className="nav-primary-menu">
+          <div className="nav-items-track">
+            {mainNavItems.map((item) => {
+              const isActive =
+                activeCategorySlug === item.slug ||
+                (item.slug === "phu-kien-handmade" && activeCategorySlug === "phu-kien") ||
+                (item.slug === "san-pham-ban-chay" && activeCategorySlug === "ban-chay");
+              const hasSub = item.subcategories && item.subcategories.length > 0;
+              const isMenuOpen = hoveredCat === item.slug;
+
+              return (
+                <div
+                  key={item.slug}
+                  className={`nav-category-item ${isActive ? "active" : ""} ${item.highlight ? "nav-highlight" : ""} ${hasSub ? "has-dropdown" : ""}`}
+                  onMouseEnter={() => hasSub && setHoveredCat(item.slug)}
+                  onMouseLeave={() => setHoveredCat(null)}
+                >
+                  <a
+                    href={`/danh-muc/${item.slug}`}
+                    className="nav-category-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setHoveredCat(null);
+                      onSelectCategory(item.slug);
+                    }}
+                    title={item.name}
+                  >
+                    <span className="nav-cat-icon">{item.icon}</span>
+                    <span className="nav-cat-text">{item.name}</span>
+                    {hasSub && <span className="nav-cat-arrow">▾</span>}
+                  </a>
+
+                  {/* TREE-STYLE COMPACT SUBCATEGORY DROPDOWN */}
+                  {hasSub && isMenuOpen && (
+                    <div className="nav-sub-dropdown" role="menu">
+                      <div className="sub-dropdown-header">
+                        <strong className="sub-header-title">{item.name}</strong>
+                      </div>
+                      <ul className="sub-dropdown-list">
+                        {item.subcategories.map((sub) => (
+                          <li key={sub.slug} className="sub-dropdown-item">
+                            <a
+                              href={`/danh-muc/${item.slug}?sub=${sub.slug}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setHoveredCat(null);
+                                onSelectCategory(item.slug, sub.slug);
+                              }}
+                            >
+                              <span className="tree-branch">├</span>
+                              <span className="sub-item-text">{sub.name}</span>
+                            </a>
+                          </li>
+                        ))}
+                        <li className="sub-dropdown-item view-all-item">
+                          <a
+                            href={`/danh-muc/${item.slug}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setHoveredCat(null);
+                              onSelectCategory(item.slug);
+                            }}
+                          >
+                            <span className="tree-branch">└</span>
+                            <span className="sub-item-text view-all-text">Xem tất cả →</span>
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* MENU PHỤ: TIỆN ÍCH & CẨM NANG */}
+            <div
+              className="nav-category-item nav-utility-dropdown-item"
+              onMouseEnter={() => setHoveredCat("tien-ich")}
+              onMouseLeave={() => setHoveredCat(null)}
+            >
+              <button
+                type="button"
+                className="nav-category-link nav-utility-trigger"
+                onClick={() => setHoveredCat(hoveredCat === "tien-ich" ? null : "tien-ich")}
+              >
+                <span className="nav-cat-icon">💡</span>
+                <span className="nav-cat-text">Tiện ích</span>
+                <span className="nav-cat-arrow">▾</span>
+              </button>
+
+              {hoveredCat === "tien-ich" && (
+                <div className="nav-sub-dropdown nav-utility-sub-dropdown" role="menu">
+                  <div className="sub-dropdown-header">
+                    <strong className="sub-header-title">Tiện ích & Cẩm nang</strong>
+                  </div>
+                  <ul className="sub-dropdown-list">
+                    {utilitySubItems.map((u, idx) => {
+                      const isLast = idx === utilitySubItems.length - 1;
+                      return (
+                        <li key={u.id} className="sub-dropdown-item">
+                          <a
+                            href={`#${u.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setHoveredCat(null);
+                              u.action();
+                            }}
+                          >
+                            <span className="tree-branch">{isLast ? "└" : "├"}</span>
+                            <span className="utility-menu-icon">{u.icon}</span>
+                            <span className="sub-item-text">{u.name}</span>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* 2. DEDICATED MOBILE CATEGORY STRIP (<= 768px) - HORIZONTALLY SCROLLABLE CHIPS */}
+      <div className="mobile-category-strip mobile-only" aria-label="Danh mục sản phẩm di động">
+        <div className="mobile-category-track">
           {mainNavItems.map((item) => {
             const isActive =
               activeCategorySlug === item.slug ||
               (item.slug === "phu-kien-handmade" && activeCategorySlug === "phu-kien") ||
               (item.slug === "san-pham-ban-chay" && activeCategorySlug === "ban-chay");
-            const hasSub = item.subcategories && item.subcategories.length > 0;
-            const isMenuOpen = hoveredCat === item.slug;
 
             return (
-              <div
-                key={item.slug}
-                className={`nav-category-item ${isActive ? "active" : ""} ${item.highlight ? "nav-highlight" : ""} ${hasSub ? "has-dropdown" : ""}`}
-                onMouseEnter={() => hasSub && setHoveredCat(item.slug)}
-                onMouseLeave={() => setHoveredCat(null)}
+              <button
+                key={`mob-cat-${item.slug}`}
+                type="button"
+                className={`mobile-cat-chip ${isActive ? "active" : ""} ${item.highlight ? "chip-highlight" : ""}`}
+                onClick={() => onSelectCategory(item.slug)}
               >
-                <a
-                  href={`/danh-muc/${item.slug}`}
-                  className="nav-category-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setHoveredCat(null);
-                    onSelectCategory(item.slug);
-                  }}
-                  title={item.name}
-                >
-                  <span className="nav-cat-icon">{item.icon}</span>
-                  <span className="nav-cat-text">{item.name}</span>
-                  {hasSub && <span className="nav-cat-arrow">▾</span>}
-                </a>
-
-                {/* TREE-STYLE COMPACT SUBCATEGORY DROPDOWN */}
-                {hasSub && isMenuOpen && (
-                  <div className="nav-sub-dropdown" role="menu">
-                    <div className="sub-dropdown-header">
-                      <strong className="sub-header-title">{item.name}</strong>
-                    </div>
-                    <ul className="sub-dropdown-list">
-                      {item.subcategories.map((sub) => (
-                        <li key={sub.slug} className="sub-dropdown-item">
-                          <a
-                            href={`/danh-muc/${item.slug}?sub=${sub.slug}`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setHoveredCat(null);
-                              onSelectCategory(item.slug, sub.slug);
-                            }}
-                          >
-                            <span className="tree-branch">├</span>
-                            <span className="sub-item-text">{sub.name}</span>
-                          </a>
-                        </li>
-                      ))}
-                      <li className="sub-dropdown-item view-all-item">
-                        <a
-                          href={`/danh-muc/${item.slug}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setHoveredCat(null);
-                            onSelectCategory(item.slug);
-                          }}
-                        >
-                          <span className="tree-branch">└</span>
-                          <span className="sub-item-text view-all-text">Xem tất cả →</span>
-                        </a>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </div>
+                <span className="chip-icon">{item.icon}</span>
+                <span className="chip-text">{item.name}</span>
+              </button>
             );
           })}
-
-          {/* MENU PHỤ: TIỆN ÍCH & CẨM NANG */}
-          <div
-            className="nav-category-item nav-utility-dropdown-item"
-            onMouseEnter={() => setHoveredCat("tien-ich")}
-            onMouseLeave={() => setHoveredCat(null)}
+          <button
+            type="button"
+            className="mobile-cat-chip chip-utility"
+            onClick={onOpenCustomOrder}
           >
-            <button
-              type="button"
-              className="nav-category-link nav-utility-trigger"
-              onClick={() => setHoveredCat(hoveredCat === "tien-ich" ? null : "tien-ich")}
-            >
-              <span className="nav-cat-icon">💡</span>
-              <span className="nav-cat-text">Tiện ích</span>
-              <span className="nav-cat-arrow">▾</span>
-            </button>
-
-            {hoveredCat === "tien-ich" && (
-              <div className="nav-sub-dropdown nav-utility-sub-dropdown" role="menu">
-                <div className="sub-dropdown-header">
-                  <strong className="sub-header-title">Tiện ích & Cẩm nang</strong>
-                </div>
-                <ul className="sub-dropdown-list">
-                  {utilitySubItems.map((u, idx) => {
-                    const isLast = idx === utilitySubItems.length - 1;
-                    return (
-                      <li key={u.id} className="sub-dropdown-item">
-                        <a
-                          href={`#${u.id}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setHoveredCat(null);
-                            u.action();
-                          }}
-                        >
-                          <span className="tree-branch">{isLast ? "└" : "├"}</span>
-                          <span className="utility-menu-icon">{u.icon}</span>
-                          <span className="sub-item-text">{u.name}</span>
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </div>
+            <span className="chip-icon">✂️</span>
+            <span className="chip-text">Đặt móc mẫu</span>
+          </button>
+          <button
+            type="button"
+            className="mobile-cat-chip chip-utility"
+            onClick={() => onScrollToSection("yarn-palette")}
+          >
+            <span className="chip-icon">🎨</span>
+            <span className="chip-text">Bảng màu</span>
+          </button>
         </div>
       </div>
-    </nav>
+    </>
   );
 }

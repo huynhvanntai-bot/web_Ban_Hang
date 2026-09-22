@@ -1888,19 +1888,563 @@
   }
 }
 
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
+  .desktop-nav-only,
+  .desktop-only,
+  .desktop-sidebar-only {
+    display: none !important;
+  }
+
+  /* 1. MOBILE CATEGORY HORIZONTAL STRIP */
+  .mobile-category-strip {
+    background: #ffffff !important;
+    border-bottom: 1.5px solid #fce7f3 !important;
+    padding: 8px 12px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    position: sticky !important;
+    top: 44px !important;
+    z-index: 1400 !important;
+    box-shadow: 0 2px 10px rgba(244, 114, 182, 0.08) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-category-strip::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .mobile-category-track {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: max-content !important;
+  }
+
+  .mobile-cat-chip {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 6px 12px !important;
+    background: #fff5f8 !important;
+    border: 1px solid #fbcfe8 !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #831843 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    transition: all 0.15s ease !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03) !important;
+    text-decoration: none !important;
+  }
+
+  .mobile-cat-chip:active,
+  .mobile-cat-chip.active {
+    background: #db2777 !important;
+    color: #ffffff !important;
+    border-color: #db2777 !important;
+    box-shadow: 0 2px 8px rgba(219, 39, 119, 0.35) !important;
+  }
+
+  .mobile-cat-chip.chip-highlight {
+    background: #fee2e2 !important;
+    border-color: #fca5a5 !important;
+    color: #b91c1c !important;
+  }
+
+  .mobile-cat-chip.chip-highlight.active {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+  }
+
+  .mobile-cat-chip.chip-utility {
+    background: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+    color: #15803d !important;
+  }
+
+  /* 2. PRODUCT CARDS & 2-COLUMN GRID ON MOBILE */
   .category-products-grid,
-  .related-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+  .ecommerce-products-grid,
+  .products-grid,
+  .related-grid,
+  .product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    padding: 0 10px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
   }
-  .footer-grid {
-    grid-template-columns: 1fr;
+
+  .standard-product-card {
+    border-radius: 14px !important;
+    box-shadow: 0 2px 8px rgba(74, 29, 46, 0.07) !important;
+    background: #ffffff !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    border: 1px solid #fce7f3 !important;
   }
+
+  .card-media-wrapper {
+    aspect-ratio: 1 / 1 !important;
+  }
+
+  .card-badges {
+    top: 6px !important;
+    left: 6px !important;
+    gap: 3px !important;
+  }
+
+  .card-badge {
+    font-size: 9.5px !important;
+    padding: 2px 6px !important;
+    border-radius: 6px !important;
+  }
+
+  .card-wish-btn {
+    top: 6px !important;
+    right: 6px !important;
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 14px !important;
+  }
+
+  .card-content {
+    padding: 8px !important;
+  }
+
+  .card-top-row {
+    margin-bottom: 4px !important;
+  }
+
+  .card-cat-name {
+    font-size: 9px !important;
+  }
+
+  .card-swatch-dot {
+    width: 8px !important;
+    height: 8px !important;
+  }
+
+  .card-title {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    height: 33px !important;
+    margin-bottom: 4px !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  .card-rating-row {
+    font-size: 10px !important;
+    margin-bottom: 6px !important;
+    gap: 3px !important;
+  }
+
+  .card-price-row {
+    margin-bottom: 6px !important;
+  }
+
+  .price-box {
+    gap: 4px !important;
+  }
+
+  .current-price {
+    font-size: 14px !important;
+  }
+
+  .old-price {
+    font-size: 10.5px !important;
+  }
+
+  .card-actions-row {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    gap: 5px !important;
+    margin-top: auto !important;
+  }
+
+  .card-btn-buynow {
+    padding: 6px 8px !important;
+    font-size: 11.5px !important;
+    border-radius: 8px !important;
+  }
+
+  .card-btn-addcart {
+    padding: 6px 10px !important;
+    font-size: 11.5px !important;
+    border-radius: 8px !important;
+  }
+
+  /* 3. CATEGORY VIEW MOBILE LAYOUT */
+  .category-page-wrapper {
+    padding: 8px 10px 40px !important;
+  }
+
+  .category-hero-banner {
+    padding: 24px 16px !important;
+    border-radius: 16px !important;
+    margin-bottom: 14px !important;
+    min-height: 130px !important;
+  }
+
+  .cat-banner-title {
+    font-size: 20px !important;
+  }
+
+  .cat-banner-desc {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    max-width: 100% !important;
+    margin-bottom: 8px !important;
+  }
+
+  .cat-banner-stats {
+    gap: 8px !important;
+    font-size: 10.5px !important;
+  }
+
+  .category-layout-container {
+    display: block !important;
+  }
+
+  .category-mobile-filter-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    background: #ffffff !important;
+    border: 1px solid #fce7f3 !important;
+    border-radius: 12px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+  }
+
+  .mobile-filter-trigger-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: #fff0f5 !important;
+    border: 1px solid #fbcfe8 !important;
+    color: #db2777 !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    padding: 7px 14px !important;
+    border-radius: 999px !important;
+    cursor: pointer !important;
+  }
+
+  .mobile-filter-trigger-btn.has-active {
+    background: #db2777 !important;
+    color: #ffffff !important;
+    border-color: #db2777 !important;
+  }
+
+  .mobile-sort-select-wrap {
+    flex: 1 !important;
+    max-width: 180px !important;
+  }
+
+  .mobile-sort-select {
+    width: 100% !important;
+    padding: 6px 10px !important;
+    background: #faf7f9 !important;
+    border: 1px solid #e5c5d5 !important;
+    border-radius: 999px !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    color: #4a1d2e !important;
+    outline: none !important;
+  }
+
+  /* MOBILE FILTER BOTTOM SHEET / DRAWER */
+  .mobile-filter-drawer-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    backdrop-filter: blur(2px) !important;
+  }
+
+  .mobile-filter-drawer {
+    width: 100% !important;
+    max-height: 80vh !important;
+    background: #ffffff !important;
+    border-radius: 20px 20px 0 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    animation: slideUpDrawer 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  @keyframes slideUpDrawer {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .drawer-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 14px 18px !important;
+    border-bottom: 1px solid #fce7f3 !important;
+  }
+
+  .drawer-title {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    color: #4a1d2e !important;
+  }
+
+  .drawer-close-btn {
+    background: #f1f5f9 !important;
+    border: none !important;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 50% !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    color: #64748b !important;
+    cursor: pointer !important;
+  }
+
+  .drawer-body {
+    padding: 16px 18px !important;
+    overflow-y: auto !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  .drawer-section-title {
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    color: #db2777 !important;
+    margin: 0 0 8px 0 !important;
+  }
+
+  .drawer-chips-wrap {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .drawer-chip {
+    padding: 6px 12px !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    background: #fdf2f8 !important;
+    border: 1px solid #fbcfe8 !important;
+    color: #831843 !important;
+    cursor: pointer !important;
+  }
+
+  .drawer-chip.active {
+    background: #db2777 !important;
+    color: #ffffff !important;
+    border-color: #db2777 !important;
+  }
+
+  .drawer-toggle-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #4a1d2e !important;
+  }
+
+  .drawer-toggle-checkbox {
+    width: 20px !important;
+    height: 20px !important;
+    accent-color: #db2777 !important;
+  }
+
+  .drawer-footer {
+    display: grid !important;
+    grid-template-columns: 1fr 2fr !important;
+    gap: 10px !important;
+    padding: 12px 18px !important;
+    border-top: 1px solid #fce7f3 !important;
+    background: #ffffff !important;
+  }
+
+  .drawer-reset-btn {
+    padding: 10px !important;
+    border-radius: 10px !important;
+    background: #f1f5f9 !important;
+    border: none !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+  }
+
+  .drawer-apply-btn {
+    padding: 10px !important;
+    border-radius: 10px !important;
+    background: linear-gradient(135deg, #f472b6, #db2777) !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 13.5px !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 12px rgba(219, 39, 119, 0.3) !important;
+  }
+
+  /* 4. PRODUCT DETAIL VIEW MOBILE */
+  .product-detail-view-container {
+    padding: 8px 10px 100px !important;
+  }
+
+  .detail-breadcrumbs {
+    margin-bottom: 8px !important;
+  }
+
+  .detail-mobile-back-btn {
+    background: #ffffff !important;
+    border: 1px solid #fbcfe8 !important;
+    color: #db2777 !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    padding: 5px 12px !important;
+    border-radius: 999px !important;
+    cursor: pointer !important;
+  }
+
+  .product-detail-hero {
+    grid-template-columns: 1fr !important;
+    padding: 12px !important;
+    gap: 14px !important;
+    border-radius: 16px !important;
+  }
+
+  .main-display-image {
+    aspect-ratio: 1 / 1 !important;
+    border-radius: 12px !important;
+  }
+
+  .gallery-thumb-strip {
+    gap: 6px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 4px !important;
+  }
+
+  .thumb-btn {
+    width: 54px !important;
+    height: 54px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .detail-title {
+    font-size: 18px !important;
+    line-height: 1.35 !important;
+  }
+
+  .detail-price-main .current-price-huge {
+    font-size: 22px !important;
+  }
+
   .detail-actions-group {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
   }
-  .detail-assurance-box {
-    grid-template-columns: 1fr;
+
+  .btn-add-to-cart,
+  .btn-buy-now-flash {
+    height: 44px !important;
+    font-size: 13.5px !important;
+    border-radius: 12px !important;
+  }
+
+  /* MOBILE STICKY BUY BAR (FIXED ABOVE BOTTOM NAV) */
+  .mobile-sticky-buy-bar {
+    position: fixed !important;
+    bottom: 60px !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 2400 !important;
+    background: #ffffff !important;
+    border-top: 1px solid #fce7f3 !important;
+    padding: 8px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    box-shadow: 0 -4px 16px rgba(74, 29, 46, 0.08) !important;
+    box-sizing: border-box !important;
+  }
+
+  .sticky-price-box {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .sticky-price-label {
+    font-size: 10px !important;
+    color: #9d6981 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+  }
+
+  .sticky-price-val {
+    font-size: 17px !important;
+    font-weight: 900 !important;
+    color: #db2777 !important;
+  }
+
+  .sticky-actions-box {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .sticky-add-cart-btn {
+    background: #fff0f5 !important;
+    border: 1.5px solid #fbcfe8 !important;
+    color: #db2777 !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+  }
+
+  .sticky-buy-now-btn {
+    background: linear-gradient(135deg, #f472b6, #db2777) !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    padding: 8px 16px !important;
+    border-radius: 10px !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    box-shadow: 0 3px 10px rgba(219, 39, 119, 0.3) !important;
+  }
+
+  /* 5. FOOTER & MISC ON MOBILE */
+  .footer-grid {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
   }
 }

@@ -91,6 +91,13 @@ export default function CategoryView({
   const [customFilterVal, setCustomFilterVal] = useState("");
   const [inStockOnly, setInStockOnly] = useState(false);
   const [sortBy, setSortBy] = useState("default");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+
+  const activeFilterCount =
+    (selectedSubcat ? 1 : 0) +
+    (priceRange !== "all" ? 1 : 0) +
+    (customFilterVal ? 1 : 0) +
+    (inStockOnly ? 1 : 0);
 
   // Retrieve category filter configurations safely
   const filterConfigRaw = CATEGORY_FILTER_CONFIGS[cleanSlug] || null;
@@ -300,10 +307,37 @@ export default function CategoryView({
         </div>
       </section>
 
+      {/* MOBILE QUICK FILTER & SORT BAR (<= 1024px) */}
+      <div className="category-mobile-filter-bar mobile-only">
+        <button
+          type="button"
+          className={`mobile-filter-trigger-btn ${hasActiveFilters ? "has-active" : ""}`}
+          onClick={() => setMobileFilterOpen(true)}
+        >
+          <span className="filter-icon">⚡</span>
+          <span>Bộ lọc {hasActiveFilters ? `(${activeFilterCount})` : ""}</span>
+        </button>
+
+        <div className="mobile-sort-select-wrap">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="mobile-sort-select"
+            aria-label="Sắp xếp sản phẩm"
+          >
+            <option value="default">Sắp xếp: Mặc định</option>
+            <option value="price-asc">Giá: Thấp đến cao</option>
+            <option value="price-desc">Giá: Cao đến thấp</option>
+            <option value="bestseller">Bán chạy nhất</option>
+            <option value="rating">Đánh giá cao nhất</option>
+          </select>
+        </div>
+      </div>
+
       {/* MAIN TWO-COLUMN LAYOUT */}
       <div className="category-layout-container">
-        {/* SIDEBAR FILTERS */}
-        <aside className="category-sidebar" aria-label="Bộ lọc sản phẩm">
+        {/* SIDEBAR FILTERS (DESKTOP ONLY) */}
+        <aside className="category-sidebar desktop-sidebar-only" aria-label="Bộ lọc sản phẩm">
           <div className="sidebar-header">
             <span className="sidebar-title">
               <span className="sidebar-icon">⚙️</span> Bộ Lọc Tìm Kiếm
@@ -588,6 +622,118 @@ export default function CategoryView({
           </article>
         </main>
       </div>
+
+      {/* MOBILE FILTER BOTTOM SHEET / DRAWER */}
+      {mobileFilterOpen && (
+        <div
+          className="mobile-filter-drawer-backdrop"
+          onClick={() => setMobileFilterOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Bộ lọc sản phẩm di động"
+        >
+          <div className="mobile-filter-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-header">
+              <span className="drawer-title">
+                <span className="drawer-icon">⚡</span> Bộ Lọc Sản Phẩm
+              </span>
+              <button
+                type="button"
+                className="drawer-close-btn"
+                onClick={() => setMobileFilterOpen(false)}
+                aria-label="Đóng bộ lọc"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="drawer-body">
+              {/* SUBCATEGORIES */}
+              {categoryMeta.subcategories && categoryMeta.subcategories.length > 0 && (
+                <div className="drawer-filter-section">
+                  <h4 className="drawer-section-title">Nhóm sản phẩm</h4>
+                  <div className="drawer-chips-wrap">
+                    <button
+                      type="button"
+                      className={`drawer-chip ${!selectedSubcat ? "active" : ""}`}
+                      onClick={() => setSelectedSubcat("")}
+                    >
+                      Tất cả nhóm
+                    </button>
+                    {categoryMeta.subcategories.map((sub) => (
+                      <button
+                        key={sub.slug}
+                        type="button"
+                        className={`drawer-chip ${selectedSubcat === sub.slug ? "active" : ""}`}
+                        onClick={() =>
+                          setSelectedSubcat(selectedSubcat === sub.slug ? "" : sub.slug)
+                        }
+                      >
+                        {sub.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* PRICE RANGES */}
+              <div className="drawer-filter-section">
+                <h4 className="drawer-section-title">Mức giá</h4>
+                <div className="drawer-chips-wrap">
+                  {[
+                    { id: "all", label: "Tất cả mức giá" },
+                    { id: "<50k", label: "Dưới 50.000₫" },
+                    { id: "50k-150k", label: "50k - 150k" },
+                    { id: "150k-300k", label: "150k - 300k" },
+                    { id: ">300k", label: "Trên 300k" },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`drawer-chip ${priceRange === p.id ? "active" : ""}`}
+                      onClick={() => setPriceRange(p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* IN STOCK ONLY TOGGLE */}
+              <div className="drawer-filter-section">
+                <label className="drawer-toggle-row">
+                  <span>Chỉ hiện sản phẩm còn hàng</span>
+                  <input
+                    type="checkbox"
+                    checked={inStockOnly}
+                    onChange={(e) => setInStockOnly(e.target.checked)}
+                    className="drawer-toggle-checkbox"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="drawer-footer">
+              <button
+                type="button"
+                className="drawer-reset-btn"
+                onClick={() => {
+                  resetFilters();
+                }}
+              >
+                Xóa bộ lọc
+              </button>
+              <button
+                type="button"
+                className="drawer-apply-btn"
+                onClick={() => setMobileFilterOpen(false)}
+              >
+                Xem {filteredProducts.length} sản phẩm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -17925,53 +17925,337 @@ html, body {
   }
 }
 
-/* Mobile (<= 768px) */
+/* Mobile (<= 768px) - TOÀN DIỆN RESPONSIVE MOBILE CHUYÊN NGHIỆP */
 @media (max-width: 768px) {
-  .product-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 10px !important;
+  /* CHỐNG TRÀN TOÀN TRANG */
+  html, body, #root, .storefront {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
+
+  /* KHOẢNG TRỐNG AN TOÀN CHO THANH ĐIỀU HƯỚNG ĐÁY */
+  .storefront {
+    padding-bottom: 76px !important;
+  }
+
+  /* HERO BANNER 1 CỘT CHUẨN MOBILE */
   .hero-banner {
     grid-template-columns: 1fr !important;
-    padding: 22px 16px !important;
-    border-radius: 18px !important;
-    gap: 20px !important;
+    padding: 20px 14px !important;
+    border-radius: 16px !important;
+    gap: 16px !important;
+    margin: 10px 10px 20px !important;
+    width: auto !important;
+    box-sizing: border-box !important;
   }
+
+  .banner-copy h1 {
+    font-size: 23px !important;
+    line-height: 1.28 !important;
+    margin: 8px 0 !important;
+  }
+
+  .banner-copy p {
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+    margin-bottom: 14px !important;
+  }
+
+  .banner-badge-top {
+    font-size: 10.5px !important;
+    padding: 3px 8px !important;
+  }
+
+  .banner-cta-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .banner-button {
+    width: 100% !important;
+    height: 42px !important;
+    justify-content: center !important;
+    font-size: 13px !important;
+    text-align: center !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .banner-trust-badges {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    font-size: 11px !important;
+    margin-top: 14px !important;
+  }
+
+  .hero-showcase {
+    width: 100% !important;
+    margin-top: 6px !important;
+  }
+
+  .hero-card-featured {
+    border-radius: 14px !important;
+  }
+
   .hero-card-img {
     aspect-ratio: 16 / 10 !important;
     height: auto !important;
+    border-radius: 12px !important;
   }
+
   .hero-sub-cards {
     grid-template-columns: 1fr !important;
+    gap: 8px !important;
   }
+
+  .hero-artisan-seal {
+    width: 58px !important;
+    height: 58px !important;
+    top: 10px !important;
+    right: 10px !important;
+  }
+
+  .seal-pct {
+    font-size: 13px !important;
+  }
+
+  .seal-sub {
+    font-size: 7px !important;
+  }
+
+  .seal-heart {
+    font-size: 7px !important;
+  }
+
+  /* LƯỚI SẢN PHẨM 2 CỘT MỌI SECTION TRÊN TRANG CHỦ */
+  .product-grid,
+  .products-grid,
+  .flash-sales-grid,
+  .featured-palette-grid,
+  .diy-kits-grid,
+  .popular-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    padding: 0 10px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .section-heading {
+    padding: 0 12px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .section-heading h2 {
+    font-size: 20px !important;
+  }
+
+  .section-heading p {
+    font-size: 12px !important;
+  }
+
   .beginner-steps-grid {
     grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 0 10px !important;
   }
+
   .beginner-combo-banner {
     flex-direction: column !important;
     text-align: left !important;
-    gap: 18px !important;
+    gap: 16px !important;
+    padding: 16px !important;
+    margin: 16px 10px !important;
+    border-radius: 14px !important;
   }
+
   .combo-banner-right {
     text-align: left !important;
     width: 100% !important;
   }
+
+  .combo-banner-right .banner-button {
+    width: 100% !important;
+  }
+
   .categories-grid {
     grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 0 10px !important;
   }
+
   .service-row {
     grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    padding: 0 10px !important;
   }
+
   .yarn-calc-grid {
     grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 0 10px !important;
   }
+
   .reviews-grid {
     grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 0 10px !important;
   }
+
   .guides-grid {
     grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 0 10px !important;
   }
+
+  /* GIỎ HÀNG MOBILE */
+  .cart-drawer {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    border-radius: 0 !important;
+  }
+
+  .cart-item {
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+
+  .cart-item-img {
+    width: 60px !important;
+    height: 60px !important;
+  }
+
+  .cart-item-title {
+    font-size: 13px !important;
+  }
+
+  /* POPUP ĐƠN HÀNG NHỎ GỌN & AN TOÀN */
+  .live-order-toast {
+    position: fixed !important;
+    bottom: 74px !important;
+    left: 12px !important;
+    right: 12px !important;
+    max-width: 360px !important;
+    margin: 0 auto !important;
+    padding: 10px 14px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 24px rgba(74, 29, 46, 0.18) !important;
+    z-index: 2300 !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  .live-order-title {
+    font-size: 12.5px !important;
+  }
+
+  .live-order-desc {
+    font-size: 11px !important;
+  }
+
+  /* NÚT TƯ VẤN / CHAT MOBILE */
+  .floating-fab-container {
+    position: fixed !important;
+    bottom: 74px !important;
+    right: 14px !important;
+    z-index: 2300 !important;
+  }
+
+  .floating-advisory-btn,
+  .fab-main-btn {
+    width: 46px !important;
+    height: 46px !important;
+    border-radius: 50% !important;
+    box-shadow: 0 4px 14px rgba(219, 39, 119, 0.4) !important;
+  }
+
+  .fab-main-text {
+    display: none !important;
+  }
+
+  /* THANH ĐIỀU HƯỚNG ĐÁY CHUYÊN NGHIỆP */
+  .mobile-bottom-nav {
+    display: flex !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 60px !important;
+    background: #ffffff !important;
+    border-top: 1.5px solid #fce7f3 !important;
+    box-shadow: 0 -3px 12px rgba(74, 29, 46, 0.08) !important;
+    z-index: 2500 !important;
+    align-items: center !important;
+    justify-content: space-around !important;
+    padding: 0 4px !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-nav-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    background: none !important;
+    border: none !important;
+    font-family: inherit !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    cursor: pointer !important;
+    padding: 6px 4px !important;
+    flex: 1 !important;
+    text-decoration: none !important;
+    transition: all 0.15s ease !important;
+    position: relative !important;
+  }
+
+  .mobile-nav-item:active,
+  .mobile-nav-item.active {
+    color: #db2777 !important;
+  }
+
+  .mobile-nav-icon {
+    font-size: 19px !important;
+    line-height: 1 !important;
+  }
+
+  .mobile-nav-icon-wrap {
+    position: relative !important;
+    display: inline-flex !important;
+  }
+
+  .mobile-nav-badge {
+    background: #e11d48 !important;
+    color: #ffffff !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    border-radius: 999px !important;
+    padding: 1px 5px !important;
+    position: absolute !important;
+    top: -4px !important;
+    right: -8px !important;
+    line-height: 1.2 !important;
+  }
+
+  .mobile-nav-highlight {
+    color: #db2777 !important;
+  }
+
+  .mobile-nav-highlight .mobile-nav-icon {
+    transform: scale(1.1) !important;
+  }
+
   .footer-top {
     grid-template-columns: 1fr !important;
+    gap: 24px !important;
+    padding: 24px 14px !important;
   }
 }

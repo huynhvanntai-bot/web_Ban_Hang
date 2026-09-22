@@ -49,15 +49,27 @@ export default function ProductDetailView({
 
   return (
     <div className="product-detail-view-container">
-      {/* BREADCRUMBS */}
+      {/* BREADCRUMBS & MOBILE BACK */}
       <nav className="detail-breadcrumbs" aria-label="Breadcrumbs">
         <div className="breadcrumb-inner">
+          <button
+            type="button"
+            className="detail-mobile-back-btn mobile-only"
+            onClick={(e) => {
+              e.preventDefault();
+              if (product.category?.slug) onNavigateCategory(product.category.slug);
+              else onNavigateHome();
+            }}
+          >
+            ← Quay lại
+          </button>
           <a
             href="/"
             onClick={(e) => {
               e.preventDefault();
               onNavigateHome();
             }}
+            className="desktop-only"
           >
             Trang chủ
           </a>
@@ -584,6 +596,32 @@ export default function ProductDetailView({
           </div>
         </section>
       )}
+
+      {/* MOBILE STICKY PURCHASE BAR (<= 768px) - FIXED ABOVE BOTTOM NAV */}
+      <div className="mobile-sticky-buy-bar mobile-only">
+        <div className="sticky-price-box">
+          <small className="sticky-price-label">Giá ưu đãi</small>
+          <strong className="sticky-price-val">{formatPrice(currentPrice)}</strong>
+        </div>
+        <div className="sticky-actions-box">
+          <button
+            type="button"
+            className="sticky-add-cart-btn"
+            onClick={() => onAddToCart(product, quantity)}
+            aria-label="Thêm vào giỏ"
+            title="Thêm vào giỏ"
+          >
+            🛒 +Giỏ
+          </button>
+          <button
+            type="button"
+            className="sticky-buy-now-btn"
+            onClick={() => onBuyNow(product, quantity)}
+          >
+            ⚡ Mua ngay
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

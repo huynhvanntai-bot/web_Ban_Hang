@@ -2108,7 +2108,7 @@ function App() {
                   setTimeout(() => setSearchFocused(false), 260);
                 }}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Tìm len milk cotton, nhung đũa, kim móc, kit tự làm, hoa len..."
+                placeholder="Tìm len, kim móc, kit DIY..."
                 autoComplete="off"
               />
               {searchQuery && (
