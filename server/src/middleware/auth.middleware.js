@@ -37,10 +37,17 @@ async function optionalProtect(req, res, next) {
 }
 
 function authorizeAdmin(req, res, next) {
-  if (req.user?.role !== "admin") {
-    return res.status(403).json({ message: "Bạn không có quyền admin" });
+  if (!["admin", "superadmin", "staff"].includes(req.user?.role)) {
+    return res.status(403).json({ message: "Bạn không có quyền truy cập trang quản trị" });
   }
   next();
 }
 
-module.exports = { protect, optionalProtect, authorizeAdmin };
+function authorizeSuperAdmin(req, res, next) {
+  if (!["admin", "superadmin"].includes(req.user?.role)) {
+    return res.status(403).json({ message: "Chỉ Quản trị viên cấp cao mới có quyền thực hiện" });
+  }
+  next();
+}
+
+module.exports = { protect, optionalProtect, authorizeAdmin, authorizeSuperAdmin };

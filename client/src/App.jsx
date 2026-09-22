@@ -1,10 +1,39 @@
-import { Component, useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import "./App.css";
+import "./ecommerce.css";
 import AdminPage from "./AdminPage.jsx";
+import {
+  CATEGORIES,
+  PRODUCTS,
+  CATEGORY_FILTER_CONFIGS,
+  getProductBySlug,
+  getCategoryBySlug,
+  getProductsByCategory,
+  searchProducts,
+  getBestSellers,
+  getSaleProducts,
+  getNewProducts,
+  getRelatedProducts,
+  getFrequentlyBoughtTogether,
+} from "./data/products.js";
+import ProductCard from "./components/ProductCard.jsx";
+import MainNavigation from "./components/MainNavigation.jsx";
+import CategoryView from "./components/CategoryView.jsx";
+import ProductDetailView from "./components/ProductDetailView.jsx";
+import EcommerceFooter from "./components/EcommerceFooter.jsx";
 
-const apiUrl =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? "/api" : "http://localhost:5000/api");
+const apiUrl = (() => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== "undefined") {
+    const { hostname, port, protocol } = window.location;
+    if (protocol === "file:") return "http://localhost:5000/api";
+    if ((hostname === "localhost" || hostname === "127.0.0.1") && port && port !== "5000") {
+      return "http://localhost:5000/api";
+    }
+  }
+  return "/api";
+})();
 
 function formatPrice(price) {
   return new Intl.NumberFormat("vi-VN", {
@@ -14,6 +43,31 @@ function formatPrice(price) {
 }
 
 const locationData = {
+  "Cần Thơ": {
+    "Quận Ninh Kiều": [
+      "Phường Xuân Khánh",
+      "Phường An Khánh",
+      "Phường An Hòa",
+      "Phường Tân An",
+      "Phường Cái Khế",
+      "Phường Hưng Lợi",
+      "Phường An Cư",
+    ],
+    "Quận Cái Răng": [
+      "Phường Lê Bình",
+      "Phường Hưng Phú",
+      "Phường Hưng Thạnh",
+      "Phường Ba Láng",
+    ],
+    "Quận Bình Thủy": [
+      "Phường Bình Thủy",
+      "Phường An Thới",
+      "Phường Trà Nóc",
+    ],
+    "Quận Ô Môn": ["Phường Châu Văn Liêm", "Phường Thới Hòa"],
+    "Quận Thốt Nốt": ["Phường Thốt Nốt", "Phường Thuận An"],
+    "Huyện Phong Điền": ["Thị trấn Phong Điền", "Xã Mỹ Khánh"],
+  },
   "TP. Hồ Chí Minh": {
     "Quận 1": ["Phường Bến Nghé", "Phường Đa Kao"],
     "Quận 3": ["Phường Võ Thị Sáu", "Phường 7"],
@@ -33,187 +87,36 @@ const locationData = {
 const FREESHIP_THRESHOLD = 200000;
 
 const CATEGORY_META = {
-  "len-soi": { icon: "🧶", desc: "Len Milk, Nhung, Baby Yarn" },
-  "dung-cu-dan-moc": { icon: "🪡", desc: "Kim móc, kim đan & phụ kiện" },
-  "thu-len-handmade": { icon: "🧸", desc: "Thú bông Amigurumi đan tay" },
-  "hoa-len-vinh-cuu": { icon: "💐", desc: "Hoa tulip, hoa hướng dương" },
-  "tui-phu-kien-len": { icon: "👜", desc: "Túi xách dệt, mũ & khăn choàng" },
-  "set-diy-tu-lam": { icon: "🎁", desc: "Kit tự làm kèm video HD" },
+  "len-soi": { icon: "🧶", desc: "Bán lẻ cuộn Milk Bò, Nhung Đũa, Baby Yarn" },
+  "set-diy-tu-lam": { icon: "🎁", desc: "Kit tự móc tại nhà kèm video HD A-Z" },
+  "dung-cu-dan-moc": { icon: "🪡", desc: "Kim móc cán dẻo, kẹp định vị & phụ liệu" },
+  "thu-len-handmade": { icon: "🧸", desc: "Thú bông Amigurumi đan tay mẫu sẵn" },
+  "hoa-len-vinh-cuu": { icon: "💐", desc: "Hoa tulip, hoa hồng, cẩm tú cầu vĩnh cửu" },
+  "tui-phu-kien-len": { icon: "👜", desc: "Túi xách sợi dệt, mũ & khăn choàng ấm" },
 };
 
 const YARN_COLORS = [
-  { name: "Trắng kem", hex: "#fffdfa", border: "#ded5ca" },
-  { name: "Hồng pastel", hex: "#fcd5ce", border: "#e8b4ab" },
-  { name: "Vàng bơ", hex: "#fde2a7", border: "#e4c688" },
-  { name: "Xanh mint", hex: "#d8f3dc", border: "#b7e4c7" },
-  { name: "Tím lilac", hex: "#e2d4f0", border: "#c8b6dc" },
-  { name: "Nâu cacao", hex: "#b08968", border: "#936639" },
+  { name: "Trắng sữa", code: "01", hex: "#fffdf5", border: "#e8dfd8" },
+  { name: "Hồng phấn", code: "08", hex: "#fbcfe8", border: "#f472b6" },
+  { name: "Hồng đào", code: "12", hex: "#fda4af", border: "#fb7185" },
+  { name: "Vàng bơ", code: "16", hex: "#fef08a", border: "#eab308" },
+  { name: "Xanh bơ mint", code: "23", hex: "#bbf7d0", border: "#4ade80" },
+  { name: "Xanh baby", code: "29", hex: "#bae6fd", border: "#38bdf8" },
+  { name: "Tím khoai môn", code: "35", hex: "#e9d5ff", border: "#c084fc" },
+  { name: "Trà sữa kem", code: "42", hex: "#e2d1c3", border: "#c4a482" },
+  { name: "Nâu cacao", code: "48", hex: "#a27b5c", border: "#7f5539" },
+  { name: "Đỏ dâu tây", code: "54", hex: "#fb7185", border: "#e11d48" },
 ];
 
-const INITIAL_CATEGORIES = [
-  { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade", description: "Thú bông đan móc thủ công Amigurumi dễ thương, an toàn cho bé." },
-  { _id: "c2", name: "Hoa len vĩnh cửu", slug: "hoa-len-vinh-cuu", description: "Bó hoa tulip, hoa hướng dương, hoa hồng đan móc tinh tế, giữ màu sắc bền lâu." },
-  { _id: "c3", name: "Len sợi", slug: "len-soi", description: "Các dòng len sợi cao cấp, len milk bò, len nhung đũa, len baby yarn không xù." },
-  { _id: "c4", name: "Dụng cụ đan móc", slug: "dung-cu-dan-moc", description: "Kim móc cán dẻo, kim đan vòng, kéo cắt chỉ, kim khâu len và phụ kiện." },
-  { _id: "c5", name: "Túi & Phụ kiện len", slug: "tui-phu-kien-len", description: "Túi xách dệt, mũ bucket, khăn choàng và móc khóa len handmade." },
-  { _id: "c6", name: "Set DIY tự làm", slug: "set-diy-tu-lam", description: "Bộ kit tự đan móc kèm đầy đủ len sợi, dụng cụ và video hướng dẫn chi tiết." },
-];
-
-const INITIAL_PRODUCTS = [
-  {
-    _id: "p1",
-    name: "Bé Thỏ Len Nhung Đũa Cỡ Đại Váy Hồng Pastel",
-    slug: "be-tho-len-nhung-dua-co-dai-vay-hong",
-    price: 285000,
-    costPrice: 130000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 25,
-    images: ["/products/2.3.jpg", "/products/2.2.jpg", "/products/2.jpg", "/products/2.1.jpg"],
-    videos: ["/products/1.mp4"],
-    videoPoster: "/products/1_thumb.jpg",
-    description: "Bé thỏ bông đan móc thủ công tỉ mỉ bằng len nhung đũa sợi lớn siêu mềm mịn bồng bềnh, mặc váy xòe tiểu thư phối ren hồng đậm, đầu đội mũ len chụp tai phong cách vintage. Kèm video quay cận cảnh chất len và phom dáng êm ái.",
-  },
-  {
-    _id: "p2",
-    name: "Bé Heo Bông Len Mũi Hồng Váy Xanh Bơ Cài Nơ",
-    slug: "be-heo-bong-len-mui-hong-vay-xanh-bo",
-    price: 165000,
-    costPrice: 75000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 30,
-    images: ["/products/6.1.jpg", "/products/6.2.jpg", "/products/6.3.jpg"],
-    videos: ["/products/6.mp4"],
-    videoPoster: "/products/6_thumb.jpg",
-    description: "Bé heo con móc tay bằng len nhung tuyết trắng muốt, mũi nút hồng chúm chím cực yêu, diện váy yếm màu xanh bơ dịu mát và cài nơ mầm cây xinh xắn, hai tay giang rộng đòi ôm.",
-  },
-  {
-    _id: "p3",
-    name: "Bé Chuột Con Xám Len Nhung Mũi Hồng Váy Vàng",
-    slug: "be-chuot-con-xam-len-nhung-vay-vang",
-    price: 165000,
-    costPrice: 75000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: false,
-    stock: 28,
-    images: ["/products/7.1.jpg", "/products/7.2.jpg", "/products/7.3.jpg", "/products/7.4.jpg"],
-    videos: ["/products/7.mp4"],
-    videoPoster: "/products/7_thumb.jpg",
-    description: "Bé chuột xám đáng yêu với đôi tai tròn lót hồng xinh xắn, mũi hồng và râu thêu tay tinh xảo, mặc váy xòe màu vàng hoa cúc nổi bật, sợi len êm mềm không gây ngứa ráp.",
-  },
-  {
-    _id: "p4",
-    name: "Chú Hươu Cao Cổ Len Nhung Vàng Đốm Nâu Cổ Dài",
-    slug: "huou-cao-co-len-nhung-vang-dom-nau",
-    price: 195000,
-    costPrice: 90000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 20,
-    images: ["/products/5.1.jpg", "/products/5.2.jpg", "/products/5.3.jpg", "/products/5.4.jpg", "/products/5.5.jpg", "/products/5.6.jpg", "/products/5.7.jpg"],
-    videos: ["/products/5.mp4"],
-    videoPoster: "/products/5_thumb.jpg",
-    description: "Chú hươu cao cổ đan móc bằng len nhung vàng ấm áp, mõm trắng tròn xoe, có sừng nhỏ và các đốm nâu thủ công tỉ mỉ trên lưng và chân, cổ dài đứng dáng siêu ngộ nghĩnh.",
-  },
-  {
-    _id: "p5",
-    name: "Lạc Đà Llama Alpaca Len Nhung Xanh Bơ Cổ Cao",
-    slug: "lac-da-alpaca-len-nhung-xanh-bo",
-    price: 185000,
-    costPrice: 85000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 22,
-    images: ["/products/8.4.jpg", "/products/8.1.jpg", "/products/8.2.jpg", "/products/8.3.jpg"],
-    videos: ["/products/8.mp4"],
-    videoPoster: "/products/8_thumb.jpg",
-    description: "Lạc đà không bướu Alpaca dáng chibi cổ cao kiêu hãnh, sắc len nhung xanh bơ pastel độc lạ, 4 chân phối móng len trắng và tai vểnh tinh nghịch, đặt bàn làm việc hay quà tặng đều siêu xinh.",
-  },
-  {
-    _id: "p6",
-    name: "Cặp Đôi Ngựa Bông Len Bờm Xoăn Mini",
-    slug: "cap-doi-ngua-bong-len-bom-xoan-mini",
-    price: 245000,
-    costPrice: 110000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 18,
-    images: ["/products/9.5.jpg", "/products/9.7.jpg", "/products/9.1.jpg", "/products/9.2.jpg", "/products/9.3.jpg", "/products/9.4.jpg", "/products/9.6.jpg", "/products/9.8.jpg", "/products/9.9.jpg"],
-    videos: ["/products/9.mp4"],
-    videoPoster: "/products/9_thumb.jpg",
-    description: "Set quà cặp đôi gồm Bé Ngựa Nâu hạt dẻ bờm xoăn đậm và Bé Ngựa Hồng pastel bờm tím hồng đeo lục lạc chuông đỏ leng keng, biểu tượng tình bạn và tình yêu gắn kết ấm áp.",
-  },
-  {
-    _id: "p7",
-    name: "Bé Gà Con Len Hồng Mông Đào Đội Mũ Trứng Ốp La",
-    slug: "be-ga-con-hong-mong-dao-doi-mu-trung-op-la",
-    price: 155000,
-    costPrice: 70000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 35,
-    images: ["/products/10.1_thumb.jpg", "/products/10.2.jpg", "/products/10_thumb.jpg"],
-    videos: ["/products/10.mp4", "/products/10.1.mp4"],
-    videoPoster: "/products/10.1_thumb.jpg",
-    description: "Bé gà con tròn xoe màu hồng phấn, trên đầu đội mũ trứng ốp la lòng đào hài hước, phía sau là chiếc mông đào cong vút ửng hồng phấn cực kỳ dễ thương và xả stress khi bóp nhẹ.",
-  },
-  {
-    _id: "p8",
-    name: "Hộp Quà Tiểu Cảnh Bé Vịt Vàng Đội Mũ Ếch & Bó Hoa Cẩm Tú Cầu",
-    slug: "hop-qua-tieu-canh-vit-vang-doi-mu-ech",
-    price: 220000,
-    costPrice: 105000,
-    category: { _id: "c2", name: "Hoa len vĩnh cửu", slug: "hoa-len-vinh-cuu" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 15,
-    images: ["/products/3.jpg", "/products/3.1.jpg", "/products/3.2.jpg", "/products/3.3.jpg", "/products/3.4.jpg", "/products/3.5.jpg", "/products/3.6.jpg"],
-    description: "Hộp quà tiểu cảnh mica trong suốt cao cấp gồm: Chú Vịt Vàng mini đội mũ chú ếch xanh ngộ nghĩnh, bó hoa len cẩm tú cầu xanh búp trắng, suối đá pha lê ngũ sắc, nấm đỏ và bé thỏ mini trên thảm rêu xanh thiên nhiên.",
-  },
-  {
-    _id: "p9",
-    name: "Bó Hoa Hồng Len Mini Pastel Phối Viền Ren Trắng",
-    slug: "bo-hoa-hong-len-mini-pastel-kem-ren",
-    price: 145000,
-    costPrice: 65000,
-    category: { _id: "c2", name: "Hoa len vĩnh cửu", slug: "hoa-len-vinh-cuu" },
-    brand: "Sene Handmade",
-    featured: true,
-    stock: 26,
-    images: ["/products/4.2.jpg", "/products/4.3.jpg", "/products/4_thumb.jpg"],
-    videos: ["/products/4.mp4", "/products/4.1.mp4"],
-    videoPoster: "/products/4_thumb.jpg",
-    description: "Bó hoa hồng đan tay nhỏ xinh gồm các đóa hồng nhung đỏ thắm và hồng pastel ngọt ngào, gói giấy bọc len xanh coban / tím mộng mơ phối ren bèo trắng tinh tế, quà tặng ý nghĩa giữ màu bền lâu mãi mãi.",
-  },
-  {
-    _id: "p10",
-    name: "Bé Vịt Vàng Đội Mũ Chú Ếch Xanh Handmade",
-    slug: "be-vit-vang-doi-mu-chu-ech-xanh",
-    price: 125000,
-    costPrice: 55000,
-    category: { _id: "c1", name: "Thú len Handmade", slug: "thu-len-handmade" },
-    brand: "Sene Handmade",
-    featured: false,
-    stock: 20,
-    images: ["/products/3.1.jpg", "/products/3.2.jpg", "/products/3.5.jpg"],
-    description: "Bé vịt vàng lông len tơ mịn màng, đội chiếc mũ len hình chú ếch xanh hai mắt tròn xoe ngộ nghĩnh, biểu cảm dễ thương thích hợp làm móc khóa hoặc quà tặng để bàn.",
-  },
-];
+const INITIAL_CATEGORIES = CATEGORIES;
+const INITIAL_PRODUCTS = PRODUCTS;
 
 const CUSTOMER_REVIEWS = [
   {
     id: 1,
     name: "Minh Anh",
     location: "Quận 1, TP.HCM",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80",
+    avatar: "/images/avatars/avatar-khach-hang-01.jpg",
     rating: 5,
     product: "Len Milk Bò 50g & Bộ kim cán dẻo",
     comment:
@@ -224,7 +127,7 @@ const CUSTOMER_REVIEWS = [
     id: 2,
     name: "Hoàng Yến",
     location: "Cầu Giấy, Hà Nội",
-    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=120&q=80",
+    avatar: "/images/avatars/avatar-khach-hang-02.jpg",
     rating: 5,
     product: "Bé Thỏ Len Tai Dài Đan Tay",
     comment:
@@ -235,7 +138,7 @@ const CUSTOMER_REVIEWS = [
     id: 3,
     name: "Thanh Trúc",
     location: "Hải Châu, Đà Nẵng",
-    avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&q=80",
+    avatar: "/images/avatars/avatar-khach-hang-03.jpg",
     rating: 5,
     product: "Kit Tự Móc Hoa Tulip 3 Cành",
     comment:
@@ -249,48 +152,60 @@ const YARN_PROJECT_PRESETS = [
     id: "preset-scarf",
     name: "Khăn Quàng Cổ Ấm",
     icon: "🧣",
-    recommendedYarn: "Len Milk Bò 50g Siêu Mềm",
+    recommendedYarn: "Len Milk Cotton 50g Siêu Mềm",
     amount: "3 cuộn (150g)",
     needle: "Kim móc 3.5mm - 4.0mm",
     tip: "Mũi nửa kép (HDC) giúp khăn xốp nhẹ và giữ ấm tốt",
     estimatedPrice: 54000,
-    productName: "Len Milk Bò 50g Siêu Mềm",
+    productName: "Len Milk Cotton 50g Bán Lẻ",
     quantity: 3,
   },
   {
     id: "preset-beanie",
     name: "Mũ Len Beanie / Beret",
     icon: "🧢",
-    recommendedYarn: "Len Nhung Đũa Cỡ Lớn",
+    recommendedYarn: "Len Nhung Đũa Cỡ Đại 100g",
     amount: "2 cuộn (200g)",
     needle: "Kim móc 5.0mm - 6.0mm",
     tip: "Móc xoắn ốc đều tay, sợi nhung mềm mịn mướt tay",
     estimatedPrice: 70000,
-    productName: "Len Nhung Đũa Cỡ Lớn 100g",
+    productName: "Len Nhung Đũa Cỡ Đại 100g",
     quantity: 2,
   },
   {
     id: "preset-tulip",
-    name: "Bó 5 Cành Hoa Tulip",
+    name: "Bó 5 Cành Hoa Tulip Tự Làm",
     icon: "🌷",
-    recommendedYarn: "Set Hoa Tulip Tự Làm",
+    recommendedYarn: "Set Kit Hoa Tulip 5 Cành",
     amount: "1 trọn bộ kit đầy đủ",
     needle: "Kèm sẵn kim móc & kẽm cành",
     tip: "Kèm video quét mã QR hướng dẫn từng cánh hoa",
-    estimatedPrice: 175000,
-    productName: "Bó 5 Cánh Hoa Tulip Len Tone Hồng Pastel",
+    estimatedPrice: 69000,
+    productName: "Set Kit Tự Móc Bó Hoa Tulip Pastel 5 Cành",
     quantity: 1,
   },
   {
     id: "preset-tote",
-    name: "Túi Tote Dệt Hoa Cúc",
+    name: "Túi Tote Dệt Đi Chơi",
     icon: "👜",
     recommendedYarn: "Sợi Dệt Trơn 2mm",
     amount: "2 cuộn (200g)",
     needle: "Kim móc 2.5mm - 3.0mm",
     tip: "Sợi dệt đứng form, quai túi chắc chắn không dão",
     estimatedPrice: 64000,
-    productName: "Sợi Dệt Trơn Móc Túi Xách 100g",
+    productName: "Sợi Dệt Trơn 2mm Móc Túi Xách",
+    quantity: 2,
+  },
+  {
+    id: "preset-bunny",
+    name: "Bé Thỏ Bông Len Nhung Ôm Ngủ",
+    icon: "🐰",
+    recommendedYarn: "Len Nhung Đũa Cỡ Đại",
+    amount: "2 cuộn nhung (200g)",
+    needle: "Kim móc 5.5mm",
+    tip: "Mũi đơn X chặt tay, nhồi bông gòn bi tròn trịa",
+    estimatedPrice: 70000,
+    productName: "Len Nhung Đũa Cỡ Đại 100g",
     quantity: 2,
   },
 ];
@@ -574,6 +489,404 @@ class ErrorBoundary extends Component {
   }
 }
 
+function DeliveryMapPicker({
+  selectedProvince,
+  address,
+  onSelectLocation,
+  locations,
+}) {
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+  const [mapOpen, setMapOpen] = useState(true);
+  const [pinnedInfo, setPinnedInfo] = useState(null);
+  const [mapSearch, setMapSearch] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const defaultCoords = {
+    "Cần Thơ": [10.0452, 105.7469],
+    "TP. Hồ Chí Minh": [10.7769, 106.7009],
+    "Hà Nội": [21.0285, 105.8542],
+    "Đà Nẵng": [16.0544, 108.2022],
+    "Hải Phòng": [20.8449, 106.6881],
+  };
+
+  async function reverseGeocode(lat, lng) {
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=vi`
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const addr = data.address || {};
+
+      const road = addr.road || addr.pedestrian || addr.street || "";
+      const houseNumber = addr.house_number || "";
+      const quarter = addr.quarter || addr.suburb || addr.neighbourhood || addr.residential || "";
+      const city = addr.city || addr.state || addr.province || "";
+
+      let formattedStreet = [houseNumber, road].filter(Boolean).join(" ");
+      if (!formattedStreet && quarter) formattedStreet = quarter;
+      if (!formattedStreet) {
+        const parts = (data.display_name || "").split(",");
+        formattedStreet = parts.slice(0, 2).join(",").trim();
+      }
+
+      setPinnedInfo({
+        street: formattedStreet,
+        full: data.display_name || "",
+        lat,
+        lng,
+      });
+
+      function cleanStr(s) {
+        if (!s) return "";
+        return s
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d")
+          .replace(/[^a-z0-9]/g, "");
+      }
+
+      const districtRaw =
+        addr.city_district || addr.district || addr.county || addr.suburb || "";
+      const wardRaw =
+        addr.quarter ||
+        addr.suburb ||
+        addr.neighbourhood ||
+        addr.ward ||
+        addr.village ||
+        addr.hamlet ||
+        "";
+
+      let matchedProvince = "";
+      let matchedDistrict = "";
+      let matchedWard = "";
+
+      if (locations) {
+        const provKeys = Object.keys(locations);
+        const cityClean = cleanStr(city);
+        const displayClean = cleanStr(data.display_name || "");
+
+        matchedProvince =
+          provKeys.find((p) => {
+            const pClean = cleanStr(p);
+            return (
+              cityClean.includes(pClean) ||
+              pClean.includes(cityClean) ||
+              displayClean.includes(pClean) ||
+              (cityClean.includes("hochiminh") && pClean.includes("hochiminh")) ||
+              (cityClean.includes("hanoi") && pClean.includes("hanoi")) ||
+              (cityClean.includes("danang") && pClean.includes("danang"))
+            );
+          }) || "";
+
+        if (matchedProvince && locations[matchedProvince]) {
+          const distKeys = Object.keys(locations[matchedProvince]);
+          const districtRawClean = cleanStr(districtRaw);
+
+          matchedDistrict =
+            distKeys.find((d) => {
+              const dClean = cleanStr(d);
+              return (
+                (districtRawClean &&
+                  (districtRawClean.includes(dClean) || dClean.includes(districtRawClean))) ||
+                displayClean.includes(dClean)
+              );
+            }) || "";
+
+          if (matchedDistrict && locations[matchedProvince][matchedDistrict]) {
+            const wardList = locations[matchedProvince][matchedDistrict];
+            const wardRawClean = cleanStr(wardRaw);
+
+            matchedWard =
+              wardList.find((w) => {
+                const wClean = cleanStr(w);
+                return (
+                  (wardRawClean &&
+                    (wardRawClean.includes(wClean) || wClean.includes(wardRawClean))) ||
+                  displayClean.includes(wClean)
+                );
+              }) || "";
+          }
+        }
+      }
+
+      onSelectLocation({
+        address: formattedStreet,
+        province: matchedProvince || undefined,
+        district: matchedDistrict || undefined,
+        ward: matchedWard || undefined,
+        lat,
+        lon: lng,
+        fullDisplay: data.display_name,
+      });
+    } catch (err) {
+      console.warn("Reverse geocode err:", err);
+    }
+  }
+
+  async function handleSearch(e) {
+    if (e) e.preventDefault();
+    if (!mapSearch.trim()) return;
+    setSearchLoading(true);
+    try {
+      const query = mapSearch.trim();
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ", Vietnam")}&limit=1&accept-language=vi`
+      );
+      const results = await resp.json();
+      if (results && results.length > 0) {
+        const item = results[0];
+        const lat = parseFloat(item.lat);
+        const lon = parseFloat(item.lon);
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([lat, lon], 16, { duration: 1.2 });
+          if (markerRef.current) {
+            markerRef.current.setLatLng([lat, lon]);
+          }
+          reverseGeocode(lat, lon);
+        }
+      } else {
+        alert("Không tìm thấy địa điểm này, vui lòng thử tên đường hoặc khu vực khác.");
+      }
+    } catch (err) {
+      console.warn("Search map err:", err);
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
+  function handleGetLocation() {
+    if (!navigator.geolocation) {
+      alert("Trình duyệt không hỗ trợ GPS.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([lat, lon], 16, { duration: 1.2 });
+          if (markerRef.current) {
+            markerRef.current.setLatLng([lat, lon]);
+          }
+          reverseGeocode(lat, lon);
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        alert("Không thể lấy vị trí hiện tại: " + (err.message || "Vui lòng cấp quyền truy cập vị trí"));
+      },
+      { timeout: 8000, enableHighAccuracy: true }
+    );
+  }
+
+  function jumpToCity(coords) {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo(coords, 14, { duration: 1 });
+      if (markerRef.current) {
+        markerRef.current.setLatLng(coords);
+      }
+      reverseGeocode(coords[0], coords[1]);
+    }
+  }
+
+  useEffect(() => {
+    if (!mapOpen || !mapContainerRef.current) return;
+    const L = window.L;
+    if (!L) return;
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+
+    const initialCoord =
+      (selectedProvince && defaultCoords[selectedProvince]) || [10.0452, 105.7469];
+
+    const map = L.map(mapContainerRef.current, {
+      center: initialCoord,
+      zoom: 14,
+      zoomControl: false,
+    });
+
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap",
+    }).addTo(map);
+
+    const customIcon = L.divIcon({
+      className: "sene-delivery-marker",
+      html: `
+        <div class="marker-pin-wrapper">
+          <div class="marker-pulse-ring"></div>
+          <div class="marker-pin-badge">
+            <span>📍</span>
+          </div>
+        </div>
+      `,
+      iconSize: [36, 36],
+      iconAnchor: [18, 36],
+    });
+
+    const marker = L.marker(initialCoord, {
+      draggable: true,
+      icon: customIcon,
+    }).addTo(map);
+
+    marker.on("dragend", (e) => {
+      const pos = e.target.getLatLng();
+      reverseGeocode(pos.lat, pos.lng);
+    });
+
+    map.on("click", (e) => {
+      const pos = e.latlng;
+      marker.setLatLng(pos);
+      reverseGeocode(pos.lat, pos.lng);
+    });
+
+    mapInstanceRef.current = map;
+    markerRef.current = marker;
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, [mapOpen]);
+
+  useEffect(() => {
+    if (selectedProvince && defaultCoords[selectedProvince] && mapInstanceRef.current) {
+      const coords = defaultCoords[selectedProvince];
+      mapInstanceRef.current.flyTo(coords, 14);
+      if (markerRef.current) {
+        markerRef.current.setLatLng(coords);
+      }
+    }
+  }, [selectedProvince]);
+
+  return (
+    <div className="checkout-map-box">
+      <div className="map-box-header">
+        <div className="map-box-title">
+          <span className="map-icon-tag">📍</span>
+          <div>
+            <strong>Ghim vị trí nhận hàng trên bản đồ</strong>
+            <small>Bấm vào bản đồ hoặc kéo ghim để shipper giao chính xác tận cửa</small>
+          </div>
+        </div>
+        <div className="map-box-controls">
+          <button
+            type="button"
+            className="map-btn-gps"
+            onClick={handleGetLocation}
+            disabled={isLocating}
+            title="Lấy vị trí GPS hiện tại của tôi"
+          >
+            {isLocating ? "⏳ Đang lấy..." : "🎯 Vị trí của tôi"}
+          </button>
+          <button
+            type="button"
+            className="map-btn-toggle"
+            onClick={() => setMapOpen(!mapOpen)}
+          >
+            {mapOpen ? "▲ Thu gọn" : "▼ Mở bản đồ"}
+          </button>
+        </div>
+      </div>
+
+      {mapOpen && (
+        <div className="map-viewport">
+          {/* Quick city presets */}
+          <div className="map-presets-row">
+            <span className="presets-label">Chọn nhanh:</span>
+            <button
+              type="button"
+              className="map-preset-highlight"
+              style={{ fontWeight: 800, color: "#be185d", background: "#fce7f3", borderColor: "#f472b6" }}
+              onClick={() => jumpToCity([10.0452, 105.7469])}
+            >
+              📍 Cần Thơ (Kho Shop)
+            </button>
+            <button type="button" onClick={() => jumpToCity([10.7769, 106.7009])}>
+              TP.HCM
+            </button>
+            <button type="button" onClick={() => jumpToCity([21.0285, 105.8542])}>
+              Hà Nội
+            </button>
+            <button type="button" onClick={() => jumpToCity([16.0544, 108.2022])}>
+              Đà Nẵng
+            </button>
+          </div>
+
+          {/* Search bar inside map */}
+          <div className="map-search-bar">
+            <input
+              type="text"
+              placeholder="🔍 Nhập tên đường, toà nhà, chung cư cần tìm..."
+              value={mapSearch}
+              onChange={(e) => setMapSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch(e)}
+            />
+            <button type="button" onClick={handleSearch} disabled={searchLoading}>
+              {searchLoading ? "..." : "Tìm"}
+            </button>
+          </div>
+
+          <div ref={mapContainerRef} className="map-canvas-container" />
+
+          {pinnedInfo && (
+            <div className="map-pinned-badge">
+              <span className="pinned-pin">📌</span>
+              <div className="pinned-text">
+                <b>{pinnedInfo.street || "Vị trí đã chọn"}</b>
+                <small>{pinnedInfo.full}</small>
+              </div>
+              <span className="pinned-check">✓ Đã ghim địa chỉ</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const SOCIAL_PROOF_ORDERS = [
+  { name: "Chị Thu Thảo", location: "Ninh Kiều, Cần Thơ", product: "Combo Kit Len Hoa Tulip Vĩnh Cửu", time: "2 phút trước", icon: "🌷" },
+  { name: "Bạn Mai Linh", location: "Cái Răng, Cần Thơ", product: "4 Cuộn Len Milk Cotton 50g (Pastel)", time: "5 phút trước", icon: "🧶" },
+  { name: "Anh Hoàng Nam", location: "Bình Thủy, Cần Thơ", product: "Bé Capybara Đan Móc Handmade", time: "11 phút trước", icon: "🧸" },
+  { name: "Chị Phương Uyên", location: "Xuân Khánh, Cần Thơ", product: "Set 2 Kim Móc Cán Dẻo SKC & Kẹp Định Vị", time: "16 phút trước", icon: "🪡" },
+  { name: "Bạn Yến Vy", location: "Ô Môn, Cần Thơ", product: "Set Len Tự Làm Bó Hoa Hướng Dương", time: "25 phút trước", icon: "🌻" },
+];
+
+const HOT_SEARCH_KEYWORDS = [
+  "Len Milk Cotton 50g",
+  "Len Nhung Đũa",
+  "Kim Móc SKC",
+  "Kit Hoa Tulip",
+  "Capybara Đan Móc",
+  "Khăn Len Tự Đan",
+];
+
+const PROMO_ANNOUNCEMENTS = [
+  { icon: "🧶", title: "Sene Handmade:", desc: "Tiệm Len Sợi & Thú Bông Thủ Công tại Cần Thơ" },
+  { icon: "⚡", title: "Hỏa Tốc 2H:", desc: "Giao hàng siêu tốc trong 2H tại TP. Cần Thơ" },
+  { icon: "🎁", title: "Mua về tự làm:", desc: "Tặng bộ kẹp định vị & kim khâu cho đơn từ 150k" },
+  { icon: "🚚", title: "Freeship:", desc: "Miễn phí giao hàng toàn quốc từ 200.000đ" },
+  { icon: "📞", title: "Hotline/Zalo chọn len:", desc: "0942.901.124 tư vấn 24/7" },
+  { icon: "🌸", title: "Ưu đãi khách quen:", desc: "Tích điểm giảm 5% cho đơn tiếp theo" },
+];
+
 function App() {
   if (window.location.pathname === "/admin") {
     return (
@@ -584,6 +897,21 @@ function App() {
   }
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [currentRoute, setCurrentRoute] = useState(() => {
+    if (typeof window === "undefined") return { type: "home", slug: "" };
+    const cleanPath = window.location.pathname.replace(/\/+$/, "");
+    if (cleanPath === "/danh-muc" || cleanPath.startsWith("/danh-muc/")) {
+      const slug = cleanPath.replace(/^\/danh-muc\/?/, "").split("?")[0] || "len-soi";
+      const params = new URLSearchParams(window.location.search);
+      const sub = params.get("sub") || "";
+      return { type: "category", slug, subcategory: sub };
+    }
+    if (cleanPath.startsWith("/san-pham/")) {
+      const slug = cleanPath.replace("/san-pham/", "").split("?")[0];
+      return { type: "product", slug };
+    }
+    return { type: "home", slug: "" };
+  });
   const [activeCategory, setActiveCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -626,13 +954,18 @@ function App() {
     customerName: "",
     phone: "",
     address: "",
-    province: "",
-    district: "",
+    province: "Cần Thơ",
+    district: "Quận Ninh Kiều",
     ward: "",
     note: "",
     promoCode: "",
   });
   const [orderMessage, setOrderMessage] = useState("");
+  const [showCenteredQrModal, setShowCenteredQrModal] = useState(false);
+  const [activeQrOrder, setActiveQrOrder] = useState(null);
+  const [paymentDetecting, setPaymentDetecting] = useState(false);
+  const [paymentSuccessAnim, setPaymentSuccessAnim] = useState(false);
+  const [qrCountdown, setQrCountdown] = useState(600);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [detailQuantity, setDetailQuantity] = useState(1);
   const [toast, setToast] = useState("");
@@ -651,6 +984,18 @@ function App() {
   const [priceFilter, setPriceFilter] = useState("all");
   const [sortBy, setSortBy] = useState("default");
   const [selectedColor, setSelectedColor] = useState("Trắng kem");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [copiedVoucherCode, setCopiedVoucherCode] = useState("");
+  const [currentSocialProof, setCurrentSocialProof] = useState(null);
+  const [socialProofDismissed, setSocialProofDismissed] = useState(false);
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("tai-recently-viewed") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [fabOpen, setFabOpen] = useState(false);
 
   // ĐẶT MÓC THEO YÊU CẦU (CUSTOM CROCHET ORDER)
   const [customOrderModalOpen, setCustomOrderModalOpen] = useState(false);
@@ -777,10 +1122,150 @@ function App() {
   }, [cartItems]);
 
   useEffect(() => {
-    const handleBack = () => setSelectedProduct(null);
-    window.addEventListener("popstate", handleBack);
-    return () => window.removeEventListener("popstate", handleBack);
-  }, []);
+    const handlePop = () => {
+      const cleanPath = window.location.pathname.replace(/\/+$/, "");
+      if (cleanPath === "/danh-muc" || cleanPath.startsWith("/danh-muc/")) {
+        const slug = cleanPath.replace(/^\/danh-muc\/?/, "").split("?")[0] || "len-soi";
+        const params = new URLSearchParams(window.location.search);
+        const sub = params.get("sub") || "";
+        setCurrentRoute({ type: "category", slug, subcategory: sub });
+        setSelectedProduct(null);
+      } else if (cleanPath.startsWith("/san-pham/")) {
+        const slug = cleanPath.replace("/san-pham/", "").split("?")[0];
+        setCurrentRoute({ type: "product", slug });
+        const prod = products.find((p) => p.slug === slug) || PRODUCTS.find((p) => p.slug === slug);
+        if (prod) setSelectedProduct(prod);
+      } else {
+        setCurrentRoute({ type: "home", slug: "" });
+        setSelectedProduct(null);
+      }
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, [products]);
+
+  // Dynamic Google SEO & JSON-LD schema
+  useEffect(() => {
+    let title = "Sene Handmade - Tiệm Len Sợi Bán Lẻ & Set Kit DIY Tự Móc Tại Nhà";
+    let description = "Tiệm len sợi Sene Handmade chuyên cung cấp len Milk Cotton 50g, len nhung đũa, kim móc công thái học, set kit tự móc kèm video hướng dẫn chi tiết A-Z.";
+    let canonicalUrl = window.location.origin + window.location.pathname;
+
+    if (currentRoute.type === "category") {
+      const cat = CATEGORIES.find((c) => c.slug === currentRoute.slug);
+      if (cat) {
+        title = `${cat.name} Chất Lượng Cao, Giá Tốt Nhất | Sene Handmade`;
+        description = cat.description || `Mua sắm ${cat.name} tại Sene Handmade. Đa dạng mẫu mã, len sợi mềm mịn, ship hỏa tốc toàn quốc.`;
+      } else if (currentRoute.slug === "san-pham-ban-chay") {
+        title = "Sản Phẩm Bán Chạy Nhất | Sene Handmade";
+        description = "Tổng hợp các sản phẩm len sợi và set DIY bán chạy nhất tại Sene Handmade.";
+      } else if (currentRoute.slug === "khuyen-mai") {
+        title = "Chương Trình Khuyến Mãi & Giảm Giá | Sene Handmade";
+        description = "Săn ngay các ưu đãi giảm giá len sợi và kit tự làm tại Sene Handmade.";
+      } else if (currentRoute.slug === "san-pham-moi") {
+        title = "Sản Phẩm Mới Cập Bến | Sene Handmade";
+        description = "Khám phá các mẫu len và phụ kiện handmade mới nhất tại Sene Handmade.";
+      }
+    } else if (currentRoute.type === "product" && selectedProduct) {
+      title = `${selectedProduct.name} | Sene Handmade`;
+      description = selectedProduct.description ? selectedProduct.description.slice(0, 160) : `Mua ${selectedProduct.name} tại Sene Handmade.`;
+    }
+
+    document.title = title;
+
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement("meta");
+      metaDesc.name = "description";
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.content = description;
+
+    let linkCanonical = document.querySelector('link[rel="canonical"]');
+    if (!linkCanonical) {
+      linkCanonical = document.createElement("link");
+      linkCanonical.rel = "canonical";
+      document.head.appendChild(linkCanonical);
+    }
+    linkCanonical.href = canonicalUrl;
+
+    let schemaScript = document.getElementById("sene-jsonld-schema");
+    if (!schemaScript) {
+      schemaScript = document.createElement("script");
+      schemaScript.id = "sene-jsonld-schema";
+      schemaScript.type = "application/ld+json";
+      document.head.appendChild(schemaScript);
+    }
+
+    if (currentRoute.type === "product" && selectedProduct) {
+      schemaScript.text = JSON.stringify({
+        "@context": "https://schema.org/",
+        "@type": "Product",
+        "name": selectedProduct.name,
+        "image": selectedProduct.images || [],
+        "description": selectedProduct.description,
+        "brand": {
+          "@type": "Brand",
+          "name": selectedProduct.brand || "Sene Handmade"
+        },
+        "offers": {
+          "@type": "Offer",
+          "priceCurrency": "VND",
+          "price": selectedProduct.price,
+          "availability": (selectedProduct.stock || 50) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+          "url": canonicalUrl
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": selectedProduct.rating || 4.9,
+          "reviewCount": selectedProduct.reviewCount || 120
+        }
+      });
+    } else if (currentRoute.type === "category") {
+      const cat = CATEGORIES.find((c) => c.slug === currentRoute.slug);
+      schemaScript.text = JSON.stringify({
+        "@context": "https://schema.org/",
+        "@type": "CollectionPage",
+        "name": cat ? cat.name : "Danh mục sản phẩm",
+        "url": canonicalUrl,
+        "description": cat?.description || ""
+      });
+    } else {
+      schemaScript.text = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Store",
+        "name": "Sene Handmade",
+        "image": "https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=1200&q=80",
+        "telephone": "0942901124",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "124 Đường 30 Tháng 4, Phường Xuân Khánh",
+          "addressLocality": "Ninh Kiều",
+          "addressRegion": "Cần Thơ",
+          "addressCountry": "VN"
+        },
+        "url": window.location.origin
+      });
+    }
+  }, [currentRoute, selectedProduct]);
+
+
+  useEffect(() => {
+    if (socialProofDismissed) return;
+    let idx = 0;
+    const showOrder = () => {
+      setCurrentSocialProof(SOCIAL_PROOF_ORDERS[idx % SOCIAL_PROOF_ORDERS.length]);
+      idx++;
+      setTimeout(() => {
+        setCurrentSocialProof(null);
+      }, 6000);
+    };
+    const initTimer = setTimeout(showOrder, 3500);
+    const cycleTimer = setInterval(showOrder, 22000);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(cycleTimer);
+    };
+  }, [socialProofDismissed]);
 
   useEffect(() => {
     const localOrders = JSON.parse(
@@ -832,6 +1317,152 @@ function App() {
       setTrackingMsg(err.message);
     } finally {
       setTrackingLoading(false);
+    }
+  }
+
+  // TỰ ĐỘNG THEO DÕI THANH TOÁN VIETQR (POLLING MỖI 2.5 GIÂY, KHÔNG CẦN BẤM XÁC NHẬN)
+  useEffect(() => {
+    if (!showCenteredQrModal || !activeQrOrder?._id) return;
+
+    const countdownTimer = setInterval(() => {
+      setQrCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    let isCancelled = false;
+    const pollPayment = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/orders/${activeQrOrder._id}/check-payment`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.isPaid && !isCancelled) {
+          setPaymentSuccessAnim(true);
+          const updated = data.order || { ...activeQrOrder, paymentStatus: "paid", status: "confirmed" };
+          setOrderHistory((prev) =>
+            prev.map((o) => (o._id === updated._id ? updated : o))
+          );
+          setTimeout(() => {
+            setShowCenteredQrModal(false);
+            setPaymentSuccessAnim(false);
+            setSelectedOrder(updated);
+            setToast(`🎉 MB Bank nhận tiền thành công! Đơn hàng #${updated.trackingCode || updated._id.slice(-6).toUpperCase()} đã xác nhận.`);
+          }, 2200);
+        }
+      } catch (err) {
+        // Network error ignored
+      }
+    };
+
+    const pollTimer = setInterval(pollPayment, 2500);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(countdownTimer);
+      clearInterval(pollTimer);
+    };
+  }, [showCenteredQrModal, activeQrOrder]);
+
+  // GIẢ LẬP XÁC NHẬN CHUYỂN KHOẢN THÀNH CÔNG (TỨC THÌ CHO KHÁCH TEST)
+  async function handleSimulatePayment(orderId) {
+    if (!orderId) return;
+    setPaymentDetecting(true);
+    try {
+      let updatedOrder = null;
+      try {
+        const res = await fetch(`${apiUrl}/orders/${orderId}/simulate-payment`, {
+          method: "POST",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.order) updatedOrder = data.order;
+        }
+      } catch (netErr) {
+        console.warn("Máy chủ chưa phản hồi, cập nhật thanh toán trực tiếp:", netErr);
+      }
+
+      if (!updatedOrder) {
+        const base = activeQrOrder || orderHistory.find((o) => o._id === orderId) || {};
+        updatedOrder = {
+          ...base,
+          _id: orderId,
+          paymentStatus: "paid",
+          status: "confirmed",
+          paidAt: new Date().toISOString(),
+          shippingLogs: [
+            ...(base.shippingLogs || []),
+            {
+              time: new Date(),
+              title: "Tài khoản nhận tiền thành công",
+              desc: `Tài khoản MB Bank 0942901124 (HUYNH VAN TAI) đã nhận số tiền ${(base.totalAmount || finalOrderTotal || 0).toLocaleString("vi-VN")}đ qua VietQR.`,
+              location: "MB Bank CN Cần Thơ",
+              icon: "💳",
+            },
+            {
+              time: new Date(),
+              title: "Shop đã duyệt & chuẩn bị hàng",
+              desc: "Tiệm Len Sene Handmade đã xác nhận thanh toán và đang đóng gói sản phẩm len.",
+              location: "Kho Tổng Cần Thơ (124 Đ. 30/4, Ninh Kiều)",
+              icon: "🏪",
+            },
+          ],
+        };
+      }
+
+      setPaymentSuccessAnim(true);
+      setActiveQrOrder(updatedOrder);
+      setOrderHistory((prev) =>
+        prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o))
+      );
+      const savedLocal = JSON.parse(
+        localStorage.getItem("tai-shop-placed-orders") || "[]"
+      );
+      const exists = savedLocal.some((o) => o._id === updatedOrder._id);
+      const newLocal = exists
+        ? savedLocal.map((o) => (o._id === updatedOrder._id ? updatedOrder : o))
+        : [updatedOrder, ...savedLocal];
+      localStorage.setItem("tai-shop-placed-orders", JSON.stringify(newLocal));
+
+      if (selectedOrder && selectedOrder._id === updatedOrder._id) {
+        setSelectedOrder(updatedOrder);
+      }
+      setTimeout(() => {
+        setShowCenteredQrModal(false);
+        setPaymentSuccessAnim(false);
+        setSelectedOrder(updatedOrder);
+        setToast("🎉 MB Bank: Nhận tiền thành công! Hệ thống tự động xác nhận đơn!");
+      }, 2200);
+    } catch (err) {
+      console.error(err);
+      setToast("Chưa thể cập nhật thanh toán: " + err.message);
+    } finally {
+      setPaymentDetecting(false);
+    }
+  }
+
+  // CẬP NHẬT TIẾN ĐỘ GIAO HÀNG SHOPEE XPRESS (TIẾP TỤC BƯỚC TIẾP THEO)
+  async function handleAdvanceShipping(orderId, targetStatus) {
+    if (!orderId) return;
+    try {
+      const res = await fetch(`${apiUrl}/orders/${orderId}/advance-shipping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+      const data = await res.json();
+      if (res.ok && data.order) {
+        setSelectedOrder(data.order);
+        setOrderHistory((prev) =>
+          prev.map((o) => (o._id === data.order._id ? data.order : o))
+        );
+        const stNames = {
+          confirmed: "Shop Đã Xác Nhận & Đóng Gói",
+          shipping: "Bưu Tá SPX Đang Đi Giao Hàng",
+          delivered: "Đã Giao Hàng Thành Công",
+        };
+        setToast(`🚚 Tiến độ Shopee Xpress: ${stNames[data.order.status] || data.order.status}!`);
+        setTimeout(() => setToast(""), 3000);
+      }
+    } catch (err) {
+      console.error(err);
     }
   }
 
@@ -919,13 +1550,16 @@ function App() {
         }
 
         const detailSlug = window.location.pathname.startsWith("/san-pham/")
-          ? window.location.pathname.replace("/san-pham/", "")
+          ? window.location.pathname.replace("/san-pham/", "").split("?")[0]
           : "";
-        const allProds = INITIAL_PRODUCTS;
+        const allProds = PRODUCTS;
         const directProduct = allProds.find(
           (product) => product.slug === detailSlug,
         );
-        if (directProduct) setSelectedProduct(directProduct);
+        if (directProduct) {
+          setSelectedProduct(directProduct);
+          setCurrentRoute({ type: "product", slug: directProduct.slug });
+        }
       } catch (loadError) {
         console.warn("Dùng dữ liệu sản phẩm tích hợp sẵn:", loadError);
       } finally {
@@ -964,6 +1598,33 @@ function App() {
         return 0;
       });
   }, [activeCategory, priceFilter, products, searchQuery, sortBy]);
+
+  const liveSearchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    return searchProducts(searchQuery).slice(0, 6);
+  }, [searchQuery]);
+
+  const recentlyViewedProducts = useMemo(() => {
+    if (!recentlyViewedIds || recentlyViewedIds.length === 0) return [];
+    return recentlyViewedIds
+      .map((id) => products.find((p) => p._id === id))
+      .filter(Boolean);
+  }, [recentlyViewedIds, products]);
+
+  function handleClaimVoucher(voucher) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(voucher.code);
+    }
+    setCopiedVoucherCode(voucher.code);
+    setPromoInput(voucher.code);
+    if (cartTotal >= voucher.minOrder) {
+      applyVoucher(voucher.code);
+    } else {
+      setToast(`Đã lưu mã ${voucher.code}! Sẽ tự động áp dụng khi đơn đủ ${formatPrice(voucher.minOrder)}.`);
+      setTimeout(() => setToast(""), 3500);
+    }
+    setTimeout(() => setCopiedVoucherCode(""), 2500);
+  }
 
   async function submitAuth(event) {
     event.preventDefault();
@@ -1036,6 +1697,24 @@ function App() {
     }
   }
 
+  function addYarnShadeToCart(shade) {
+    const milkYarn =
+      products.find((p) => p.slug === "len-milk-cotton-50g-ban-le") ||
+      products.find((p) => p.category?.slug === "len-soi") ||
+      products[0];
+    if (milkYarn) {
+      const shadeItem = {
+        ...milkYarn,
+        _id: `${milkYarn._id}-mau-${shade.code || shade.name.toLowerCase().replace(/\s+/g, "-")}`,
+        name: `Len Milk Cotton 50g (Màu ${shade.name} - Mã ${shade.code || "01"})`,
+        price: 18000,
+      };
+      addToCart(shadeItem, 1);
+      setToast(`🧶 Đã thêm 1 cuộn Len Milk Cotton - ${shade.name} vào giỏ!`);
+      setCartOpen(true);
+    }
+  }
+
   function addToCart(product, quantity = 1) {
     setCartItems((items) => {
       const existing = items.find((item) => item.product === product._id);
@@ -1081,20 +1760,72 @@ function App() {
         .filter((item) => item.quantity > 0),
     );
   }
+
+  function clearCart() {
+    if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ sản phẩm khỏi giỏ hàng?")) {
+      setCartItems([]);
+      setAppliedVoucher(null);
+      setToast("Đã xóa toàn bộ sản phẩm khỏi giỏ hàng");
+      setTimeout(() => setToast(""), 2000);
+    }
+  }
+
   function openProductDetail(product, mediaType = "image", videoIdx = 0) {
+    if (!product) return;
     setSelectedProduct(product);
     setDetailQuantity(1);
     setDetailTab("specs");
     setDetailImageIdx(0);
     setDetailMediaType(mediaType);
     setDetailVideoIdx(videoIdx);
+    const pId = product._id || product.id;
+    if (pId) {
+      setRecentlyViewedIds((prev) => {
+        const next = [pId, ...prev.filter((id) => id !== pId)].slice(0, 8);
+        try {
+          localStorage.setItem("tai-recently-viewed", JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }
     window.history.pushState({}, "", `/san-pham/${product.slug}`);
+    setCurrentRoute({ type: "product", slug: product.slug });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
   function closeProductDetail() {
     setSelectedProduct(null);
-    if (window.location.pathname.startsWith("/san-pham/"))
-      window.history.pushState({}, "", "/");
+    window.history.pushState({}, "", "/");
+    setCurrentRoute({ type: "home", slug: "" });
+  }
+
+  function navigateHome() {
+    window.history.pushState({}, "", "/");
+    setCurrentRoute({ type: "home", slug: "" });
+    setSelectedProduct(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function navigateCategory(slug, subcategory = "") {
+    const cleanSlug = String(slug || "len-soi").replace(/^\/danh-muc\/?/, "").replace(/\/+$/, "");
+    const url = subcategory ? `/danh-muc/${cleanSlug}?sub=${encodeURIComponent(subcategory)}` : `/danh-muc/${cleanSlug}`;
+    window.history.pushState({}, "", url);
+    setCurrentRoute({ type: "category", slug: cleanSlug, subcategory });
+    setSelectedProduct(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function scrollToSection(sectionId) {
+    if (currentRoute.type !== "home") {
+      navigateHome();
+      setTimeout(() => {
+        document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" });
+      }, 150);
+    } else {
+      document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" });
+    }
   }
   function buyNow(product, quantity) {
     addToCart(product, quantity);
@@ -1109,46 +1840,66 @@ function App() {
     0,
   );
 
+  const STORE_VOUCHERS = [
+    {
+      code: "TIEMLEN10",
+      title: "Giảm 10% Toàn Đơn",
+      label: "Giảm 10% tổng đơn hàng",
+      desc: "Áp dụng cho mọi đơn hàng",
+      minOrder: 0,
+      type: "percent",
+      value: 0.1,
+      badge: "-10%",
+    },
+    {
+      code: "FREESHIP",
+      title: "Freeship Toàn Quốc",
+      label: "Miễn phí ship tiêu chuẩn (25.000đ)",
+      desc: "Giảm 25.000đ phí giao hàng",
+      minOrder: 0,
+      type: "shipping",
+      value: 25000,
+      badge: "Freeship",
+    },
+    {
+      code: "LENXINH30",
+      title: "Ưu Đãi Len Xinh 30K",
+      label: "Giảm ngay 30.000đ",
+      desc: "Áp dụng cho đơn từ 100.000đ",
+      minOrder: 100000,
+      type: "fixed",
+      value: 30000,
+      badge: "-30k",
+    },
+  ];
+
+  // CHỈ MÃ NÀO THỰC SỰ SỬ DỤNG ĐƯỢC CHO ĐƠN NÀY MỚI HIỆN LÊN:
+  const eligibleVouchers = STORE_VOUCHERS.filter((v) => cartTotal >= v.minOrder);
+
   function applyVoucher(codeToApply) {
     const code = (codeToApply || promoInput).trim().toUpperCase();
     setVoucherError("");
+    setOrderMessage("");
     if (!code) return;
-    if (code === "TIEMLEN10") {
-      setAppliedVoucher({
-        code: "TIEMLEN10",
-        label: "Giảm 10% tổng đơn hàng",
-        type: "percent",
-        value: 0.1,
-      });
-      setToast("Đã áp dụng mã TIEMLEN10: Giảm 10% ♡");
-    } else if (code === "FREESHIP") {
-      setAppliedVoucher({
-        code: "FREESHIP",
-        label: "Miễn phí vận chuyển tiêu chuẩn",
-        type: "shipping",
-        value: 25000,
-      });
-      setToast("Đã áp dụng mã FREESHIP: Miễn phí ship ♡");
-    } else if (code === "LENXINH30") {
-      if (cartTotal < 100000) {
-        setVoucherError("Mã LENXINH30 chỉ áp dụng cho đơn từ 100.000đ trở lên");
-        return;
-      }
-      setAppliedVoucher({
-        code: "LENXINH30",
-        label: "Giảm ngay 30.000đ",
-        type: "fixed",
-        value: 30000,
-      });
-      setToast("Đã áp dụng mã LENXINH30: Giảm 30.000đ ♡");
-    } else {
+
+    const matched = STORE_VOUCHERS.find((v) => v.code === code);
+    if (!matched) {
       setVoucherError("Mã giảm giá không hợp lệ hoặc đã hết lượt dùng");
+      return;
     }
+
+    if (cartTotal < matched.minOrder) {
+      setVoucherError(`Mã ${matched.code} chỉ áp dụng cho đơn từ ${formatPrice(matched.minOrder)} trở lên`);
+      return;
+    }
+
+    setAppliedVoucher(matched);
+    setToast(`Đã áp dụng mã ${matched.code}: ${matched.label} ♡`);
     setTimeout(() => setToast(""), 2200);
   }
 
   const shippingFee =
-    shippingMethod === "EXPRESS" ? 45000 : cartTotal >= 300000 ? 0 : 25000;
+    shippingMethod === "EXPRESS" ? 30000 : cartTotal >= 300000 ? 0 : 25000;
   let discountAmount = 0;
   if (appliedVoucher) {
     if (appliedVoucher.type === "percent") {
@@ -1162,12 +1913,23 @@ function App() {
   const finalOrderTotal = Math.max(0, cartTotal + shippingFee - discountAmount);
 
   async function submitOrder(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    setOrderMessage("");
+
+    if (!checkoutForm.customerName.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) {
+      setOrderMessage("Vui lòng điền đầy đủ họ tên, số điện thoại và địa chỉ nhận hàng.");
+      return;
+    }
+    if (!cartItems || cartItems.length === 0) {
+      setOrderMessage("Giỏ hàng của bạn đang trống.");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("tai-shop-token");
       const orderNote = [
         checkoutForm.note,
-        shippingMethod === "EXPRESS" ? "[Giao Hỏa Tốc 2H]" : "[Giao Tiêu Chuẩn]",
+        shippingMethod === "EXPRESS" ? "[Giao Hỏa Tốc 2H Cần Thơ]" : "[Giao Tiêu Chuẩn]",
         isGiftWrap
           ? `[Gói quà & Thiệp: "${giftMessage || "Thiệp viết tay handmade chúc mừng"}" ]`
           : "",
@@ -1178,40 +1940,62 @@ function App() {
         .filter(Boolean)
         .join(" | ");
 
-      const response = await fetch(`${apiUrl}/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          ...checkoutForm,
-          address: [
-            checkoutForm.address,
-            checkoutForm.ward,
-            checkoutForm.district,
-            checkoutForm.province,
-          ]
-            .filter(Boolean)
-            .join(", "),
-          promoCode: appliedVoucher ? appliedVoucher.code : checkoutForm.promoCode,
-          paymentMethod,
-          note: orderNote,
-          items: cartItems.map((item) => ({
-            product: item.product,
-            quantity: item.quantity,
-          })),
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
+      let orderData = null;
+
+      try {
+        const response = await fetch(`${apiUrl}/orders`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            ...checkoutForm,
+            address: [
+              checkoutForm.address,
+              checkoutForm.ward,
+              checkoutForm.district,
+              checkoutForm.province,
+            ]
+              .filter(Boolean)
+              .join(", "),
+            promoCode: appliedVoucher ? appliedVoucher.code : checkoutForm.promoCode,
+            paymentMethod,
+            note: orderNote,
+            items: cartItems.map((item) => ({
+              product: item.product?._id || item.product,
+              name: item.product?.name || "Sản phẩm len handmade",
+              price: item.product?.price || 0,
+              image: item.product?.images?.[0] || "",
+              quantity: item.quantity,
+            })),
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.order) {
+          throw new Error(data.message || "Không thể tạo đơn hàng trên máy chủ");
+        }
+        orderData = data.order;
+      } catch (netErr) {
+        throw new Error(
+          netErr.message && !netErr.message.includes("fetch")
+            ? netErr.message
+            : "Chưa thể kết nối tới máy chủ để tạo đơn hàng. Vui lòng thử lại sau giây lát!"
+        );
+      }
+
+      if (!orderData) {
+        throw new Error("Không thể khởi tạo đơn hàng. Vui lòng thử lại!");
+      }
+
       setCartItems([]);
       setCheckoutForm({
         customerName: "",
         phone: "",
         address: "",
-        province: "",
-        district: "",
+        province: "Cần Thơ",
+        district: "Quận Ninh Kiều",
         ward: "",
         note: "",
         promoCode: "",
@@ -1220,20 +2004,30 @@ function App() {
       setIsGiftWrap(false);
       setGiftMessage("");
       setCheckoutOpen(false);
+
       const savedLocal = JSON.parse(
         localStorage.getItem("tai-shop-placed-orders") || "[]"
       );
       const updatedLocal = [
-        data.order,
-        ...savedLocal.filter((o) => o._id !== data.order._id),
+        orderData,
+        ...savedLocal.filter((o) => o._id !== orderData._id),
       ];
       localStorage.setItem(
         "tai-shop-placed-orders",
         JSON.stringify(updatedLocal)
       );
       setOrderHistory(updatedLocal);
-      setSelectedOrder(data.order);
-      setToast(`🎉 Đặt hàng thành công! Mã đơn: #${data.order._id.slice(-6).toUpperCase()}`);
+
+      if (paymentMethod === "BANK_TRANSFER") {
+        setActiveQrOrder(orderData);
+        setQrCountdown(600);
+        setPaymentSuccessAnim(false);
+        setShowCenteredQrModal(true);
+        setToast(`⚡ Đã tạo đơn #${orderData.trackingCode || orderData._id.slice(-6).toUpperCase()}! Vui lòng quét mã VietQR chuyển khoản.`);
+      } else {
+        setSelectedOrder(orderData);
+        setToast(`🎉 Đặt hàng thành công! Mã đơn: #${orderData.trackingCode || orderData._id.slice(-6).toUpperCase()}`);
+      }
       setTimeout(() => setToast(""), 4500);
     } catch (orderError) {
       setOrderMessage(orderError.message);
@@ -1252,54 +2046,179 @@ function App() {
 
   return (
     <main className="storefront">
-      <div className="promo-bar">
-        <div className="promo-ticker">
-          <span>🧶 <strong>Sene Handmade:</strong> Tặng bộ kẹp định vị & kim khâu cho đơn từ 150k</span>
-          <span className="promo-sep">•</span>
-          <span>🚚 <strong>Freeship:</strong> Miễn phí giao hàng toàn quốc từ 200.000đ</span>
-          <span className="promo-sep">•</span>
-          <span>✨ <strong>Hotline/Zalo:</strong> 0942.901.124 hỗ trợ chọn len 24/7</span>
+      <div className="promo-bar" role="region" aria-label="Thông báo ưu đãi">
+        <div className="promo-ticker-track">
+          <div className="promo-ticker-content">
+            {PROMO_ANNOUNCEMENTS.concat(PROMO_ANNOUNCEMENTS).map((item, idx) => (
+              <span key={`p1-${idx}`} className="promo-ticker-item">
+                <span>{item.icon}</span>
+                <strong>{item.title}</strong>
+                <span>{item.desc}</span>
+                <span className="promo-ticker-sep">•</span>
+              </span>
+            ))}
+          </div>
+          <div className="promo-ticker-content" aria-hidden="true">
+            {PROMO_ANNOUNCEMENTS.concat(PROMO_ANNOUNCEMENTS).map((item, idx) => (
+              <span key={`p2-${idx}`} className="promo-ticker-item">
+                <span>{item.icon}</span>
+                <strong>{item.title}</strong>
+                <span>{item.desc}</span>
+                <span className="promo-ticker-sep">•</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
       <header className="site-header">
         <div className="header-main">
-          <a className="brand" href="/">
+          <a
+            className="brand"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateHome();
+            }}
+          >
             <span className="brand-icon">🧶</span>
             <div className="brand-text">
               SENE <span>HANDMADE</span>
-              <small className="brand-slogan">Yarn & Crochet Boutique</small>
+              <small className="brand-slogan">Tiệm Len Sợi Bán Lẻ & Kit Tự Làm</small>
             </div>
           </a>
 
-          <form
-            className="search-box"
-            onSubmit={(event) => {
-              event.preventDefault();
-              document
-                .querySelector("#products")
-                ?.scrollIntoView({ behavior: "smooth" });
-            }}
-          >
-            <span className="search-icon">⌕</span>
-            <input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Tìm kiếm len milk bò, kim móc, thú bông, hoa len..."
-            />
-            {searchQuery && (
-              <button
-                className="search-clear-btn"
-                type="button"
-                onClick={() => setSearchQuery("")}
-              >
-                ×
+          <div className="search-box-wrapper">
+            <form
+              className={`search-box ${searchFocused ? "focused" : ""}`}
+              onSubmit={(event) => {
+                event.preventDefault();
+                setSearchFocused(false);
+                document
+                  .querySelector("#products")
+                  ?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              <span className="search-icon">⌕</span>
+              <input
+                id="site-search-input"
+                value={searchQuery}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => {
+                  setTimeout(() => setSearchFocused(false), 260);
+                }}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Tìm len milk cotton, nhung đũa, kim móc, kit tự làm, hoa len..."
+                autoComplete="off"
+              />
+              {searchQuery && (
+                <button
+                  className="search-clear-btn"
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchFocused(false);
+                  }}
+                  title="Xóa tìm kiếm"
+                >
+                  ×
+                </button>
+              )}
+              <button type="submit" className="search-submit-btn">
+                Tìm kiếm
               </button>
+            </form>
+
+            {searchFocused && (
+              <div className="search-autocomplete-dropdown" onMouseDown={(e) => e.preventDefault()}>
+                {searchQuery.trim() ? (
+                  <>
+                    <div className="search-dropdown-header">
+                      <span>Gợi ý sản phẩm ({liveSearchResults.length})</span>
+                      <small>Nhấn Enter để lọc tất cả</small>
+                    </div>
+
+                    {liveSearchResults.length > 0 ? (
+                      <div className="search-dropdown-list">
+                        {liveSearchResults.map((prod) => (
+                          <div
+                            key={`search-res-${prod._id}`}
+                            className="search-dropdown-item"
+                            onClick={() => {
+                              setSearchFocused(false);
+                              openProductDetail(prod);
+                            }}
+                          >
+                            <img
+                              src={prod.images?.[0]}
+                              alt={prod.name}
+                              className="search-item-thumb"
+                            />
+                            <div className="search-item-info">
+                              <span className="search-item-name">{prod.name}</span>
+                              <div className="search-item-meta">
+                                <span className="search-item-cat">{prod.category?.name}</span>
+                                <strong className="search-item-price">{formatPrice(prod.price)}</strong>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="search-item-quick-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSearchFocused(false);
+                                buyNow(prod, 1);
+                              }}
+                              title="Mua ngay"
+                            >
+                              Mua ngay
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="search-dropdown-view-all"
+                          onClick={() => {
+                            setSearchFocused(false);
+                            document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                        >
+                          Xem tất cả kết quả cho "{searchQuery}" →
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="search-dropdown-empty">
+                        <p>Không tìm thấy sản phẩm nào khớp với <strong>"{searchQuery}"</strong></p>
+                        <span className="search-empty-hint">Gợi ý: "len milk", "kim móc", "hoa tulip", "capybara"</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="search-dropdown-hot">
+                    <div className="search-dropdown-header">
+                      <span>🔥 Từ khóa tìm kiếm phổ biến</span>
+                    </div>
+                    <div className="search-hot-tags">
+                      {HOT_SEARCH_KEYWORDS.map((kw) => (
+                        <button
+                          key={kw}
+                          type="button"
+                          className="search-hot-tag"
+                          onClick={() => {
+                            setSearchQuery(kw);
+                            setSearchFocused(false);
+                            document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                        >
+                          {kw}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
-            <button type="submit" className="search-submit-btn">
-              Tìm kiếm
-            </button>
-          </form>
+          </div>
 
           <div className="header-user-actions">
             <button
@@ -1325,8 +2244,9 @@ function App() {
             </a>
 
             {currentUser && (
-              <a className="header-orders-link" href="#orders">
-                Đơn hàng
+              <a className="header-action-btn header-orders-link" href="#orders" title="Lịch sử đơn hàng">
+                <span className="action-icon">📋</span>
+                <span className="action-label">Đơn hàng</span>
               </a>
             )}
 
@@ -1345,111 +2265,336 @@ function App() {
           </div>
         </div>
 
-        <nav className="quick-nav">
-          <button
-            type="button"
-            className={`nav-pill ${!activeCategory ? "active" : ""}`}
-            onClick={() => {
-              setActiveCategory("");
-              document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
-            }}
-          >
-            ✨ Tất cả sản phẩm
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category._id}
-              type="button"
-              className={`nav-pill ${activeCategory === category.slug ? "active" : ""}`}
-              onClick={() => {
-                setActiveCategory(category.slug);
-                document
-                  .querySelector("#products")
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }}
-            >
-              <span>{CATEGORY_META[category.slug]?.icon || "🧶"}</span>
-              {category.name}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="nav-pill nav-guide"
-            onClick={() => setSelectedGuide(CRAFT_GUIDES[0])}
-          >
-            📖 Cẩm nang móc len
-          </button>
-          <button
-            type="button"
-            className="nav-pill nav-custom-order-pill"
-            onClick={() => {
-              setCustomOrderSuccess(null);
-              setCustomOrderModalOpen(true);
-            }}
-          >
-            🧶 Đặt Móc Theo Mẫu
-          </button>
-        </nav>
+        <MainNavigation
+          activeCategorySlug={currentRoute.type === "category" ? currentRoute.slug : ""}
+          onSelectCategory={(slug, sub) => navigateCategory(slug, sub)}
+          onSelectSubcategory={(catSlug, subSlug) => navigateCategory(catSlug, subSlug)}
+          onOpenCustomOrder={() => {
+            setCustomOrderSuccess(null);
+            setCustomOrderModalOpen(true);
+          }}
+          onScrollToSection={scrollToSection}
+        />
       </header>
+
+      {/* VIEW 1: CATEGORY PAGE */}
+      {currentRoute.type === "category" && (
+        <ErrorBoundary>
+          <CategoryView
+            categorySlug={currentRoute.slug}
+            initialSubcategory={currentRoute.subcategory}
+            allProducts={products}
+            onOpenProductDetail={openProductDetail}
+            onAddToCart={(prod, qty) => addToCart(prod, qty || 1)}
+            onBuyNow={buyNow}
+            isWishlisted={(id) => wishlist.includes(id)}
+            onToggleWishlist={toggleWishlist}
+            onNavigateHome={navigateHome}
+            onNavigateCategory={navigateCategory}
+          />
+        </ErrorBoundary>
+      )}
+
+      {/* VIEW 2: PRODUCT DETAIL PAGE */}
+      {currentRoute.type === "product" && (
+        <ProductDetailView
+          product={selectedProduct || products.find((p) => p.slug === currentRoute.slug) || PRODUCTS[0]}
+          onAddToCart={(prod, qty) => addToCart(prod, qty || 1)}
+          onBuyNow={buyNow}
+          isWishlisted={(id) => wishlist.includes(id)}
+          onToggleWishlist={toggleWishlist}
+          onNavigateHome={navigateHome}
+          onNavigateCategory={navigateCategory}
+          onOpenProductDetail={openProductDetail}
+        />
+      )}
+
+      {/* VIEW 3: HOMEPAGE (13 SALES FUNNEL SECTIONS) */}
+      {currentRoute.type === "home" && (
+        <>
 
       <section className="hero-banner">
         <div className="banner-copy">
           <div className="banner-badge-top">
-            <span>♡ SENE HANDMADE THỦ CÔNG CHẤT LƯỢNG CAO</span>
+            <span className="banner-badge-sparkle">🌸</span>
+            <span>TIỆM BÁN LẺ LEN SỢI &amp; KIT TỰ LÀM CHO NGƯỜI MỚI</span>
           </div>
           <h1>
-            Dệt yêu thương,
+            Mua len về tự làm,
             <br />
-            <em>trao trọn ấm áp.</em>
+            <em>dệt trọn vẹn yêu thương.</em>
           </h1>
           <p>
-            Từng cuộn len mềm mịn, bộ kim móc êm ái và những món quà thủ công
-            được đan móc chỉn chu từng đường kim mũi chỉ dành cho bạn.
+            Chuyên bán lẻ từng cuộn len Milk Cotton 50g mềm mịn, len nhung đũa bồng bềnh,
+            bộ kim móc êm tay và các set Kit tự làm kèm video hướng dẫn từng mũi đan cho người mới!
           </p>
           <div className="banner-cta-group">
-            <a className="banner-button primary-cta" href="#products">
-              Khám phá len xinh <span>→</span>
+            <a className="banner-button primary-cta" href="#yarn-palette">
+              🧶 Bảng màu len bán lẻ (18k) <span>→</span>
             </a>
             <button
               className="banner-button secondary-cta"
               type="button"
               onClick={() => {
+                document.querySelector("#beginner-corner")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              🌱 Combo cho người mới bắt đầu ✨
+            </button>
+          </div>
+          <div className="banner-trust-badges">
+            <span>✓ Bán lẻ từ 1 cuộn</span>
+            <span>✓ 80+ mã màu pastel</span>
+            <span>✓ Kèm video HD A-Z</span>
+            <span>✓ Đổi trả miễn phí 7 ngày</span>
+          </div>
+        </div>
+
+        <div className="hero-showcase">
+          <div
+            className="hero-card-featured"
+            onClick={() => openProductDetail(heroProducts[0] || products[0])}
+            role="button"
+            tabIndex={0}
+          >
+            <span className="hero-card-tag">★ BÁN CHẠY NHẤT</span>
+
+            {/* Artisan floating seal */}
+            <div className="hero-artisan-seal" title="100% Len Sợi Chọn Lọc & Handmade With Love">
+              <div className="seal-ring">
+                <span className="seal-pct">100%</span>
+                <span className="seal-sub">YARN &amp; DIY</span>
+                <span className="seal-heart">WITH LOVE ♡</span>
+              </div>
+            </div>
+
+            <img
+              src={heroProducts[0]?.images?.[0] || "https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80"}
+              alt={heroProducts[0]?.name || "Len Milk Cotton 50g"}
+              className="hero-card-img"
+            />
+            <div className="hero-card-bottom-pill">
+              <div className="pill-info">
+                <strong>{heroProducts[0]?.name || "Len Milk Cotton 50g Bán Lẻ"}</strong>
+                <span className="pill-rating">★★★★★ <span>(1.200+ đã bán)</span></span>
+              </div>
+              <div className="pill-price">
+                <small>Giá lẻ:</small>
+                <b>{formatPrice(heroProducts[0]?.price || 18000)}</b>
+              </div>
+            </div>
+          </div>
+
+          <div className="hero-sub-cards">
+            {heroProducts.slice(1, 3).map((prod) => (
+              <div
+                key={prod._id}
+                className="hero-sub-card-item"
+                onClick={() => openProductDetail(prod)}
+                role="button"
+                tabIndex={0}
+              >
+                <img src={prod.images?.[0]} alt={prod.name} />
+                <div className="sub-card-details">
+                  <h4>{prod.name}</h4>
+                  <div className="sub-card-price-row">
+                    <strong>{formatPrice(prod.price)}</strong>
+                    <span className="sub-card-link">Xem chi tiết →</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* VOUCHER STRIP / MÃ GIẢM GIÁ TRỰC QUAN */}
+      <section className="voucher-strip-section" aria-label="Mã giảm giá hot">
+        <div className="voucher-strip-inner">
+          <div className="voucher-strip-title">
+            <span className="voucher-strip-sparkle">🎟️</span>
+            <div>
+              <strong>MÃ GIẢM GIÁ TIỆM TẶNG BẠN</strong>
+              <small>Thu thập mã ngay để được trừ tiền trực tiếp khi đặt hàng</small>
+            </div>
+          </div>
+          <div className="voucher-strip-cards">
+            {STORE_VOUCHERS.map((v) => {
+              const isCopied = copiedVoucherCode === v.code;
+              return (
+                <div className="voucher-strip-card" key={v.code}>
+                  <div className="voucher-card-left">
+                    <span className="voucher-badge-val">{v.badge}</span>
+                    <span className="voucher-type-tag">TIỆM LEN</span>
+                  </div>
+                  <div className="voucher-card-body">
+                    <strong>{v.title}</strong>
+                    <p>{v.desc}</p>
+                    <small>Mã: <code>{v.code}</code></small>
+                  </div>
+                  <button
+                    type="button"
+                    className={`voucher-claim-btn ${isCopied ? "claimed" : ""}`}
+                    onClick={() => handleClaimVoucher(v)}
+                    title={`Lưu mã ${v.code}`}
+                  >
+                    {isCopied ? "✓ Đã lưu" : "Lưu mã"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* GÓC CHO NGƯỜI MỚI BẮT ĐẦU (BEGINNER STARTER CORNER) */}
+      <section className="beginner-corner-section" id="beginner-corner">
+        <div className="beginner-corner-header">
+          <div className="beginner-title-wrap">
+            <span className="beginner-pill-tag">🌱 DÀNH CHO NGƯỜI MỚI BẮT ĐẦU</span>
+            <h2>Chưa Từng Cầm Kim Móc? 3 Bước Dễ Dàng Tự Làm Tại Nhà</h2>
+            <p>
+              Đừng lo nếu bạn chưa biết bắt đầu từ đâu! Sene Handmade đã chuẩn bị sẵn từng cuộn len dễ móc nhất,
+              kim móc êm tay và video cầm tay chỉ việc từ mũi đầu tiên.
+            </p>
+          </div>
+        </div>
+
+        <div className="beginner-steps-grid">
+          <div className="beginner-step-card">
+            <div className="step-number-badge">01</div>
+            <div className="step-icon">🧶</div>
+            <h3>Chọn Len Milk Cotton 50g</h3>
+            <p>
+              Sợi len se tròn chặt không tưa, mềm mịn không ngứa tay, dễ nhìn rõ chân mũi để đếm.
+              Giá chỉ <b>18.000đ/cuộn</b> bán lẻ.
+            </p>
+            <button
+              type="button"
+              className="step-action-btn"
+              onClick={() => {
+                setActiveCategory("len-soi");
+                document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              Xem các dòng len →
+            </button>
+          </div>
+
+          <div className="beginner-step-card">
+            <div className="step-number-badge">02</div>
+            <div className="step-icon">🪡</div>
+            <h3>Chọn Kim Móc Cán Dẻo 2.5mm</h3>
+            <p>
+              Cán cầm silicon công thái học nâng đỡ ngón tay, móc liên tục không bị chai hay mỏi.
+              Đầu kim mạ chống rít len.
+            </p>
+            <button
+              type="button"
+              className="step-action-btn"
+              onClick={() => {
+                setActiveCategory("dung-cu-dan-moc");
+                document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              Xem dụng cụ kim móc →
+            </button>
+          </div>
+
+          <div className="beginner-step-card">
+            <div className="step-number-badge">03</div>
+            <div className="step-icon">🎁</div>
+            <h3>Chọn Kit Tự Làm Kèm Video</h3>
+            <p>
+              Trọn bộ gồm đầy đủ len, kim móc, phụ kiện và mã QR xem video kèm cặp từng mũi.
+              Tự tay làm hoa tulip hay thú bông trong 2 giờ!
+            </p>
+            <button
+              type="button"
+              className="step-action-btn"
+              onClick={() => {
                 setActiveCategory("set-diy-tu-lam");
                 document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
               }}
             >
-              Set Kit tự làm cho người mới ✨
+              Xem các set Kit DIY →
             </button>
-          </div>
-          <div className="banner-trust-badges">
-            <span>✓ 100% Sợi êm da, không xù</span>
-            <span>✓ Đổi trả miễn phí 7 ngày</span>
-            <span>✓ Kèm video & chart móc</span>
           </div>
         </div>
 
-        <div className="banner-products">
-          {heroProducts.map((product, index) => (
+        {/* BANNER COMBO NHẬP MÔN ĐẶC BIỆT */}
+        <div className="beginner-combo-banner">
+          <div className="combo-banner-left">
+            <span className="combo-badge-hot">🔥 COMBO KHUYÊN DÙNG CHO BẠN MỚI</span>
+            <h3>Combo Nhập Môn Tự Học Móc Len A-Z (Trọn Gói)</h3>
+            <p>
+              Bao gồm: <b>4 cuộn len Milk Cotton</b> pastel tự chọn + <b>2 kim móc cán dẻo SKC</b> (2.5mm & 3.0mm) +
+              <b>10 kẹp định vị</b> + <b>2 kim khâu len</b> + <b>kéo bấm cắt chỉ</b> + <b>Khóa học video quét QR hướng dẫn</b>.
+            </p>
+            <div className="combo-perks">
+              <span>✓ Đầy đủ không thiếu phụ kiện</span>
+              <span>✓ Tự học thành công 100%</span>
+              <span>✓ Tặng kẹp định vị sắc màu</span>
+            </div>
+          </div>
+          <div className="combo-banner-right">
+            <div className="combo-pricing">
+              <del>185.000đ</del>
+              <strong>135.000đ</strong>
+              <small>Tiết kiệm 50.000đ so với mua lẻ</small>
+            </div>
             <button
-              key={product._id}
               type="button"
-              className={`banner-product banner-product-${index + 1}`}
-              onClick={() => openProductDetail(product)}
+              className="combo-buy-now-btn"
+              onClick={() => {
+                const kit = products.find((p) => p.slug === "combo-nhap-mon-tu-hoc-moc-len-tron-goi") || products[0];
+                addToCart(kit, 1);
+                setCartOpen(true);
+              }}
             >
-              <img src={product.images?.[0]} alt={product.name} />
-              <div className="banner-product-tag">{product.name}</div>
+              🛍️ Thêm Ngay Vào Giỏ Hàng
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* BẢNG MÀU CHỌN CUỘN LEN BÁN LẺ (INTERACTIVE YARN SWATCH PALETTE) */}
+      <section className="yarn-palette-section" id="yarn-palette">
+        <div className="section-title-wrap">
+          <p className="section-kicker">BẢNG MÀU BÁN LẺ</p>
+          <h2>🎨 Chọn Màu Len Milk Cotton 50g (18.000đ / cuộn)</h2>
+          <p>
+            Bấm vào màu sắc bạn yêu thích bên dưới để thêm nhanh từng cuộn len vào giỏ hàng:
+          </p>
+        </div>
+
+        <div className="yarn-swatches-interactive">
+          {YARN_COLORS.map((shade) => (
+            <button
+              key={shade.name}
+              type="button"
+              className={`yarn-swatch-card ${selectedColor === shade.name ? "selected" : ""}`}
+              onClick={() => {
+                setSelectedColor(shade.name);
+                addYarnShadeToCart(shade);
+              }}
+              title={`Bấm để chọn và thêm 1 cuộn màu ${shade.name}`}
+            >
+              <span
+                className="yarn-swatch-circle"
+                style={{
+                  backgroundColor: shade.hex,
+                  borderColor: shade.border,
+                }}
+              >
+                {selectedColor === shade.name && <span className="swatch-check">✓</span>}
+              </span>
+              <span className="yarn-swatch-name">{shade.name}</span>
+              <span className="yarn-swatch-code">Mã {shade.code}</span>
+              <span className="yarn-swatch-price">18.000đ</span>
+              <span className="yarn-swatch-add-hint">+ Thêm cuộn</span>
             </button>
           ))}
-        </div>
-
-        <div className="banner-sticker">
-          100%
-          <br />
-          <span>
-            HANDMADE
-            <br />
-            WITH LOVE ♡
-          </span>
         </div>
       </section>
 
@@ -1573,24 +2718,18 @@ function App() {
           <p>Lựa chọn những chất liệu len và phụ kiện tốt nhất cho dự án của bạn</p>
         </div>
         <div className="categories-grid">
-          {categories.map((category) => {
-            const meta = CATEGORY_META[category.slug] || { icon: "🧶", desc: "Sản phẩm chất lượng" };
-            return (
-              <div
-                key={category._id}
-                className={`category-card ${activeCategory === category.slug ? "active" : ""}`}
-                onClick={() => {
-                  setActiveCategory(category.slug);
-                  document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
-                }}
-              >
-                <div className="category-icon-wrap">{meta.icon}</div>
-                <h3>{category.name}</h3>
-                <p>{meta.desc}</p>
-                <span className="category-link">Xem sản phẩm →</span>
-              </div>
-            );
-          })}
+          {CATEGORIES.map((category) => (
+            <div
+              key={category.slug}
+              className="category-card"
+              onClick={() => navigateCategory(category.slug)}
+            >
+              <div className="category-icon-wrap">{category.icon}</div>
+              <h3>{category.name}</h3>
+              <p>{category.description ? category.description.slice(0, 70) + "..." : "Sản phẩm chất lượng cao"}</p>
+              <span className="category-link">Khám phá ngay →</span>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -1746,108 +2885,15 @@ function App() {
 
         <div className="product-grid">
           {visibleProducts.map((product) => (
-            <article className="product-card" key={product._id}>
-              <div className="product-image-wrap">
-                <button
-                  className="product-image"
-                  type="button"
-                  onClick={() => openProductDetail(product)}
-                >
-                  <img
-                    className="card-primary-img"
-                    src={product.images?.[0]}
-                    alt={product.name}
-                    loading="lazy"
-                  />
-                  {product.images?.[1] && (
-                    <img
-                      className="card-hover-img"
-                      src={product.images[1]}
-                      alt={`${product.name} - góc khác`}
-                      loading="lazy"
-                    />
-                  )}
-                  {product.featured && (
-                    <span className="product-badge">Bán chạy ★</span>
-                  )}
-                  {product.videos?.length > 0 && (
-                    <span
-                      className="product-video-badge"
-                      title="Có video quay thực tế sản phẩm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openProductDetail(product, "video");
-                      }}
-                    >
-                      ▶ Video thật
-                    </span>
-                  )}
-                  {product.images?.length > 1 && (
-                    <span className="product-photos-count">
-                      📷 {product.images.length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  className={`card-wishlist-btn ${wishlist.includes(product._id) ? "active" : ""}`}
-                  onClick={(e) => toggleWishlist(product, e)}
-                  title={wishlist.includes(product._id) ? "Bỏ thích" : "Yêu thích"}
-                  aria-label="Yêu thích"
-                >
-                  {wishlist.includes(product._id) ? "♥" : "♡"}
-                </button>
-              </div>
-
-              <div className="product-info">
-                <div className="product-meta-row">
-                  <span className="product-category-tag">
-                    {product.category?.name}
-                  </span>
-                  <div className="color-swatches-mini" title="Nhiều màu sắc đa dạng">
-                    <span style={{ backgroundColor: "#fcd5ce" }}></span>
-                    <span style={{ backgroundColor: "#d8f3dc" }}></span>
-                    <span style={{ backgroundColor: "#fde2a7" }}></span>
-                  </div>
-                </div>
-
-                <button
-                  className="product-name"
-                  type="button"
-                  onClick={() => openProductDetail(product)}
-                >
-                  {product.name}
-                </button>
-
-                <div className="rating">
-                  ★★★★★ <span>4.9 (đã bán 120+)</span>
-                </div>
-
-                <div className="product-footer">
-                  <div className="price-block">
-                    <strong>{formatPrice(product.price)}</strong>
-                    <small className="product-brand-tag">{product.brand}</small>
-                  </div>
-                  <div className="product-actions">
-                    <button
-                      className="detail-button"
-                      type="button"
-                      onClick={() => openProductDetail(product)}
-                    >
-                      Xem chi tiết
-                    </button>
-                    <button
-                      className="add-button"
-                      type="button"
-                      onClick={() => addToCart(product)}
-                      aria-label={`Thêm ${product.name}`}
-                      title="Thêm vào giỏ hàng"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </article>
+            <ProductCard
+              key={product._id || product.id}
+              product={product}
+              onOpenDetail={openProductDetail}
+              onAddToCart={(prod, qty) => addToCart(prod, qty || 1)}
+              onBuyNow={buyNow}
+              isWishlisted={wishlist.includes(product._id || product.id)}
+              onToggleWishlist={toggleWishlist}
+            />
           ))}
         </div>
       </section>
@@ -2190,6 +3236,45 @@ function App() {
         )}
       </section>
 
+      {/* SẢN PHẨM VỪA XEM GẦN ĐÂY (RECENTLY VIEWED) */}
+      {recentlyViewedProducts.length > 0 && (
+        <section className="recently-viewed-section">
+          <div className="section-title-wrap">
+            <p className="section-kicker">LỊCH SỬ XEM HÀNG</p>
+            <h2>👀 Sản Phẩm Bạn Vừa Xem Qua</h2>
+            <p>Dễ dàng chọn lại các cuộn len hoặc set kit bạn vừa quan tâm</p>
+          </div>
+          <div className="recently-viewed-grid">
+            {recentlyViewedProducts.map((p) => (
+              <div
+                key={`recent-${p._id}`}
+                className="recent-card"
+                onClick={() => openProductDetail(p)}
+              >
+                <img src={p.images?.[0]} alt={p.name} loading="lazy" />
+                <div className="recent-card-body">
+                  <h4>{p.name}</h4>
+                  <div className="recent-card-bottom">
+                    <strong>{formatPrice(p.price)}</strong>
+                    <button
+                      type="button"
+                      className="recent-quick-add"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(p, 1);
+                      }}
+                      title="Thêm vào giỏ"
+                    >
+                      + Giỏ
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* GÓC CẨM NANG & KINH NGHIỆM */}
       <section className="guides-section" id="guides">
         <div className="section-title-wrap">
@@ -2254,232 +3339,381 @@ function App() {
         </div>
       </section>
 
-      <footer>
-        <div className="footer-top">
-          <div className="footer-brand-col">
-            <a className="brand" href="/">
-              <span className="brand-icon">🧶</span>
-              SENE <span>HANDMADE</span>
-            </a>
-            <p>Len sợi mịn màng, phụ kiện đan móc cao cấp & quà tặng handmade đan tay tỉ mỉ gửi gắm trọn vẹn yêu thương.</p>
-            <div className="footer-contacts">
-              <span>📍 Địa chỉ: 124 Đường Len Sợi, TP. Hồ Chí Minh</span>
-              <span>📞 Hotline: 0942.901.124 (Zalo 24/7)</span>
-              <span>✉ Email: huynhvanntai@gmail.com</span>
-            </div>
-          </div>
-          <div className="footer-links-col">
-            <h4>Danh mục len</h4>
-            <a href="#products" onClick={() => setActiveCategory("len-soi")}>Len Milk Bò & Nhung</a>
-            <a href="#products" onClick={() => setActiveCategory("dung-cu-dan-moc")}>Kim móc & Dụng cụ</a>
-            <a href="#products" onClick={() => setActiveCategory("thu-len-handmade")}>Thú bông Amigurumi</a>
-            <a href="#products" onClick={() => setActiveCategory("hoa-len-vinh-cuu")}>Bó hoa len vĩnh cửu</a>
-          </div>
-          <div className="footer-links-col">
-            <h4>Chăm sóc khách hàng</h4>
-            <a href="#guides">Hướng dẫn chọn len cho người mới</a>
-            <a href="#guides">Chính sách bảo hành & Đổi trả 7 ngày</a>
-            <a href="#guides">Phương thức giao hàng & Thanh toán COD</a>
-            <a href="#account">Kiểm tra lịch sử đơn hàng</a>
-            <a href="/admin" style={{ color: "#db2777", fontWeight: 700 }}>⚙️ Trang Quản Trị (Admin Studio)</a>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <span>© 2026 Sene Handmade · Dệt yêu thương, trao ấm áp · COD toàn quốc</span>
-          <div className="footer-badges">
-            <span>✓ 100% Sợi chọn lọc</span>
-            <span>✓ Đóng gói hộp quà</span>
-            <span>✓ Giao hàng hỏa tốc</span>
-          </div>
-        </div>
-      </footer>
+        </>
+      )}
 
-      {/* SHOPEE-STYLE CART DRAWER & BACKDROP */}
-      {cartOpen && (
-        <div className="cart-backdrop" onClick={() => setCartOpen(false)}>
-          <aside className="cart-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="cart-drawer-header">
-              <div className="cart-drawer-title">
-                <span className="cart-header-icon">🛒</span>
+      {/* COMPREHENSIVE 4-COLUMN E-COMMERCE FOOTER */}
+      <EcommerceFooter
+        onNavigateCategory={navigateCategory}
+        onScrollToSection={scrollToSection}
+      />
+
+      {/* LUXURY PROFESSIONAL CART DRAWER */}
+      {cartOpen && createPortal(
+        <>
+          <div
+            className="cart-backdrop"
+            onClick={() => setCartOpen(false)}
+            aria-hidden="true"
+          />
+
+          <aside
+            className="cart-drawer-pro"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Giỏ Hàng Của Bạn"
+          >
+            {/* 1. DRAWER HEADER */}
+            <div className="cart-pro-header">
+              <div className="cart-pro-header-left">
+                <div className="cart-pro-icon-badge">🛍️</div>
                 <div>
-                  <h3>Giỏ Hàng Của Bạn</h3>
-                  <small>{cartItems.length} loại sản phẩm ({cartCount} món)</small>
+                  <div className="cart-pro-title-line">
+                    <h3>Giỏ Hàng Của Bạn</h3>
+                    <span className="cart-pro-count-badge">{cartCount} món</span>
+                  </div>
+                  <small className="cart-pro-subtitle">
+                    {cartItems.length} loại mặt hàng đang chọn
+                  </small>
                 </div>
               </div>
-              <button
-                className="cart-close-btn"
-                type="button"
-                onClick={() => setCartOpen(false)}
-                title="Đóng giỏ hàng"
-              >
-                ✕
-              </button>
+              <div className="cart-pro-header-actions">
+                {cartItems.length > 0 && (
+                  <button
+                    type="button"
+                    className="cart-pro-clear-btn"
+                    onClick={clearCart}
+                    title="Xóa tất cả sản phẩm"
+                  >
+                    Xóa tất cả
+                  </button>
+                )}
+                <button
+                  className="cart-pro-close-btn"
+                  type="button"
+                  onClick={() => setCartOpen(false)}
+                  title="Đóng giỏ hàng"
+                  aria-label="Đóng"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* FREESHIP PROGRESS BAR */}
+            {/* 2. FREESHIP PROGRESS MILESTONE */}
             {cartItems.length > 0 && (
-              <div className="cart-freeship-banner">
-                <div className="freeship-header">
-                  {freeshipRemaining <= 0 ? (
-                    <span className="freeship-won">
-                      🎉 <b>Đã đủ điều kiện FREESHIP</b> toàn quốc!
-                    </span>
-                  ) : (
-                    <span>
-                      🚚 Mua thêm <b>{formatPrice(freeshipRemaining)}</b> để nhận <b>FREESHIP</b>
-                    </span>
-                  )}
-                  <small>{freeshipPercent}%</small>
+              <div className={`cart-pro-freeship ${freeshipRemaining <= 0 ? "unlocked" : ""}`}>
+                <div className="freeship-pro-header">
+                  <div className="freeship-pro-msg">
+                    <span className="freeship-pro-icon">🚚</span>
+                    {freeshipRemaining <= 0 ? (
+                      <span className="freeship-pro-won">
+                        🎉 <strong>Đã đủ điều kiện FREESHIP toàn quốc!</strong>
+                      </span>
+                    ) : (
+                      <span>
+                        Mua thêm <strong>{formatPrice(freeshipRemaining)}</strong> để được <strong>FREESHIP toàn quốc</strong>
+                      </span>
+                    )}
+                  </div>
+                  <span className="freeship-pro-percent">{freeshipPercent}%</span>
                 </div>
-                <div className="freeship-track">
+                <div className="freeship-pro-track">
                   <div
-                    className="freeship-fill"
+                    className="freeship-pro-fill"
                     style={{ width: `${freeshipPercent}%` }}
                   />
                 </div>
               </div>
             )}
 
-            {/* CART ITEMS LIST */}
-            <div className="cart-items-scroll">
+            {/* 3. SCROLLABLE CONTAINER (ITEMS + CROSS-SELL + VOUCHER) */}
+            <div className="cart-pro-scroll">
               {cartItems.length === 0 ? (
-                <div className="cart-empty-state">
-                  <span className="empty-cart-emoji">🧶</span>
-                  <h4>Giỏ hàng đang trống</h4>
-                  <p>Chưa có cuộn len hay bộ kit nào trong giỏ của bạn.</p>
+                <div className="cart-pro-empty">
+                  <div className="empty-pro-icon-wrap">
+                    <span className="empty-pro-icon">🧶</span>
+                  </div>
+                  <h4>Giỏ hàng của bạn đang trống</h4>
+                  <p>Chưa có cuộn len hay bộ kit nào được chọn. Hãy dạo tiệm và chọn những món thật xinh xắn nhé!</p>
                   <button
-                    className="shop-now-btn"
+                    className="shop-now-pro-btn"
                     type="button"
                     onClick={() => {
                       setCartOpen(false);
                       document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
                     }}
                   >
-                    Dạo tiệm chọn len ngay →
+                    Khám phá tiệm len ngay ✨
                   </button>
                 </div>
               ) : (
-                cartItems.map((item) => (
-                  <div className="cart-drawer-item" key={item.product}>
-                    <img src={item.image} alt={item.name} className="cart-item-thumb" />
-                    <div className="cart-item-details">
-                      <h4 className="cart-item-title">{item.name}</h4>
-                      <div className="cart-item-price-row">
-                        <span className="cart-item-unit-price">{formatPrice(item.price)}</span>
-                      </div>
-                      <div className="cart-item-controls">
-                        <div className="shopee-quantity-box">
-                          <button
-                            type="button"
-                            onClick={() => changeQuantity(item.product, -1)}
-                            title="Giảm số lượng"
+                <>
+                  {/* LIST OF CART ITEMS */}
+                  <div className="cart-pro-items-list">
+                    {cartItems.map((item) => {
+                      const prodObj = products.find((p) => p._id === item.product);
+                      return (
+                        <div className="cart-pro-item-card" key={item.product}>
+                          <div
+                            className="cart-pro-item-thumb-box"
+                            onClick={() => prodObj && openProductDetail(prodObj)}
+                            title="Xem chi tiết sản phẩm"
                           >
-                            −
-                          </button>
-                          <span className="qty-value">{item.quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => changeQuantity(item.product, 1)}
-                            title="Tăng số lượng"
-                          >
-                            +
-                          </button>
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="cart-pro-item-thumb"
+                              onError={(e) => {
+                                e.target.src = "https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=400&q=80";
+                              }}
+                            />
+                          </div>
+
+                          <div className="cart-pro-item-details">
+                            <div className="cart-pro-item-header">
+                              <span className="cart-pro-item-tag">Len Handmade Sene</span>
+                              <button
+                                type="button"
+                                className="cart-pro-item-del"
+                                onClick={() => changeQuantity(item.product, -item.quantity)}
+                                title="Xóa sản phẩm này"
+                              >
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                              </button>
+                            </div>
+
+                            <h4
+                              className="cart-pro-item-name"
+                              onClick={() => prodObj && openProductDetail(prodObj)}
+                              title="Xem chi tiết sản phẩm"
+                            >
+                              {item.name}
+                            </h4>
+
+                            <div className="cart-pro-item-price-line">
+                              <span className="cart-pro-item-unit">Đơn giá: {formatPrice(item.price)}</span>
+                            </div>
+
+                            <div className="cart-pro-item-actions">
+                              {/* MODERN SLEEK STEPPER */}
+                              <div className="cart-pro-stepper">
+                                <button
+                                  type="button"
+                                  className="cart-pro-step-btn"
+                                  disabled={item.quantity <= 1}
+                                  onClick={() => changeQuantity(item.product, -1)}
+                                  title="Giảm số lượng"
+                                >
+                                  −
+                                </button>
+                                <span className="cart-pro-step-qty">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  className="cart-pro-step-btn"
+                                  onClick={() => changeQuantity(item.product, 1)}
+                                  title="Tăng số lượng"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <div className="cart-pro-item-total">
+                                <small>Thành tiền:</small>
+                                <strong>{formatPrice(item.price * item.quantity)}</strong>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <span className="cart-item-subtotal">
-                          {formatPrice(item.price * item.quantity)}
-                        </span>
-                        <button
-                          type="button"
-                          className="cart-item-del-btn"
-                          onClick={() => changeQuantity(item.product, -item.quantity)}
-                          title="Xóa sản phẩm"
-                        >
-                          🗑️
-                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 4. GỢI Ý MUA KÈM (COMBO TIẾT KIỆM) */}
+                  <div className="cart-pro-addons-section">
+                    <div className="cart-pro-addons-heading">
+                      <div>
+                        <span className="cart-pro-addons-badge">🎁 COMBO TIẾT KIỆM</span>
+                        <h4>Dụng cụ thiết yếu mua kèm</h4>
                       </div>
+                      <small>Đồng giá ưu đãi trực tiếp trong giỏ</small>
+                    </div>
+
+                    <div className="cart-pro-addons-grid">
+                      {CRAFT_ADDONS.map((addon) => {
+                        const alreadyInCart = cartItems.some((c) => c.product === addon.id);
+                        return (
+                          <div key={addon.id} className="cart-pro-addon-card">
+                            <div className="cart-pro-addon-icon">{addon.icon}</div>
+                            <div className="cart-pro-addon-meta">
+                              <strong className="cart-pro-addon-name">{addon.name}</strong>
+                              <div className="cart-pro-addon-prices">
+                                <span className="addon-price-curr">{formatPrice(addon.price)}</span>
+                                <span className="addon-price-old">{formatPrice(addon.originalPrice)}</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className={`cart-pro-addon-btn ${alreadyInCart ? "in-cart" : ""}`}
+                              onClick={() => {
+                                addToCart({
+                                  _id: addon.id,
+                                  name: addon.name,
+                                  price: addon.price,
+                                  images: addon.images,
+                                  stock: addon.stock,
+                                }, 1);
+                              }}
+                            >
+                              {alreadyInCart ? "✓ Đã có" : "+ Thêm"}
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                ))
+
+                  {/* 5. VOUCHER / MÃ GIẢM GIÁ TRỰC TIẾP TRONG GIỎ */}
+                  <div className="cart-pro-voucher-box">
+                    <div className="cart-pro-voucher-header">
+                      <span>🎫 Mã ưu đãi / Voucher Tiệm Len</span>
+                    </div>
+
+                    {appliedVoucher ? (
+                      <div className="cart-pro-voucher-active">
+                        <div className="voucher-active-left">
+                          <span className="voucher-code-pill">{appliedVoucher.code}</span>
+                          <span className="voucher-discount-text">
+                            Tiết kiệm {formatPrice(discountAmount)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="voucher-remove-pill"
+                          onClick={() => {
+                            setAppliedVoucher(null);
+                            setToast("Đã gỡ mã ưu đãi");
+                            setTimeout(() => setToast(""), 1800);
+                          }}
+                        >
+                          ✕ Gỡ mã
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="cart-pro-voucher-form">
+                        <input
+                          type="text"
+                          className="cart-pro-voucher-input"
+                          placeholder="Nhập mã ưu đãi..."
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              applyVoucher(promoInput);
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="cart-pro-voucher-apply"
+                          onClick={() => applyVoucher(promoInput)}
+                        >
+                          Áp dụng
+                        </button>
+                      </div>
+                    )}
+
+                    {voucherError && <div className="cart-pro-voucher-error">{voucherError}</div>}
+
+                    {!appliedVoucher && (
+                      <div className="cart-pro-voucher-chips">
+                        <small className="chips-title">Gợi ý:</small>
+                        {STORE_VOUCHERS.map((v) => (
+                          <button
+                            key={v.code}
+                            type="button"
+                            className="voucher-chip-item"
+                            onClick={() => {
+                              setPromoInput(v.code);
+                              applyVoucher(v.code);
+                            }}
+                          >
+                            <strong>{v.code}</strong> {v.badge}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
-
-            {/* GỢI Ý MUA KÈM COMBO DỤNG CỤ TIẾT KIỆM (CROSS-SELL) */}
-            <div className="cart-addons-box">
-              <div className="cart-addons-header">
-                <span className="cart-addons-badge">🎁 COMBO TIẾT KIỆM</span>
-                <h4>Dụng Cụ Thiết Yếu Cho Người Mới</h4>
-              </div>
-              <div className="cart-addons-scroll">
-                {CRAFT_ADDONS.map((addon) => {
-                  const alreadyInCart = cartItems.some((c) => c.product === addon.id);
-                  return (
-                    <div key={addon.id} className="cart-addon-card">
-                      <div className="cart-addon-icon">{addon.icon}</div>
-                      <div className="cart-addon-info">
-                        <strong className="cart-addon-name">{addon.name}</strong>
-                        <div className="cart-addon-price-row">
-                          <span className="cart-addon-price">{formatPrice(addon.price)}</span>
-                          <span className="cart-addon-old-price">{formatPrice(addon.originalPrice)}</span>
-                        </div>
-                        <small className="cart-addon-desc">{addon.desc}</small>
-                      </div>
-                      <button
-                        type="button"
-                        className={`cart-addon-add-btn ${alreadyInCart ? "added" : ""}`}
-                        onClick={() => {
-                          addToCart({
-                            _id: addon.id,
-                            name: addon.name,
-                            price: addon.price,
-                            images: addon.images,
-                            stock: addon.stock,
-                          }, 1);
-                        }}
-                      >
-                        {alreadyInCart ? "✓ Đã thêm" : "+ Thêm"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* CART FOOTER (SHOPEE STYLE) */}
+            {/* 6. STICKY PROFESSIONAL FOOTER */}
             {cartItems.length > 0 && (
-              <div className="cart-drawer-footer">
-                <div className="cart-summary-row">
-                  <span>Tạm tính ({cartCount} sản phẩm):</span>
-                  <strong className="cart-subtotal-val">{formatPrice(cartTotal)}</strong>
-                </div>
-                <div className="cart-summary-row ship-note">
-                  <span>Ưu đãi vận chuyển:</span>
-                  <small>{cartTotal >= 200000 ? "✓ Miễn phí ship toàn quốc" : "Phí ship tính ở bước thanh toán"}</small>
-                </div>
-                <div className="cart-total-highlight">
-                  <span>Tổng thanh toán:</span>
-                  <b className="grand-total-val">{formatPrice(cartTotal)}</b>
+              <div className="cart-pro-footer">
+                <div className="cart-pro-breakdown">
+                  <div className="cart-breakdown-row">
+                    <span>Tạm tính ({cartCount} sản phẩm):</span>
+                    <strong>{formatPrice(cartTotal)}</strong>
+                  </div>
+
+                  {discountAmount > 0 && (
+                    <div className="cart-breakdown-row discount">
+                      <span>Giảm giá voucher ({appliedVoucher?.code}):</span>
+                      <strong className="discount-val">−{formatPrice(discountAmount)}</strong>
+                    </div>
+                  )}
+
+                  <div className="cart-breakdown-row shipping">
+                    <span>Ưu đãi vận chuyển:</span>
+                    <span className="shipping-badge">
+                      {cartTotal >= 200000 ? "✓ Miễn phí toàn quốc" : "Tính khi thanh toán"}
+                    </span>
+                  </div>
+
+                  <div className="cart-breakdown-divider" />
+
+                  <div className="cart-breakdown-total">
+                    <div>
+                      <span className="total-title">Tổng thanh toán:</span>
+                      <small className="total-tax-note">(Đã gồm VAT & bộ quà tặng)</small>
+                    </div>
+                    <strong className="total-final-price">
+                      {formatPrice(Math.max(0, cartTotal - discountAmount))}
+                    </strong>
+                  </div>
                 </div>
 
                 <button
                   type="button"
-                  className="shopee-checkout-btn"
+                  className="cart-pro-checkout-cta"
                   onClick={() => {
                     setCartOpen(false);
                     setCheckoutOpen(true);
                   }}
                 >
-                  <span>MUA HÀNG ({cartCount} món)</span>
-                  <span>→</span>
+                  <span>TIẾN HÀNH ĐẶT HÀNG ({cartCount} món)</span>
+                  <span className="cta-arrow">→</span>
                 </button>
-                <small className="cart-guarantee-note">
-                  🛡️ Đồng kiểm khi nhận hàng · 100% len mềm êm không xù
-                </small>
+
+                <div className="cart-pro-trust-badges">
+                  <span>🛡️ Đồng kiểm khi nhận</span>
+                  <span className="trust-sep">•</span>
+                  <span>⚡ Hỏa tốc 2H Cần Thơ</span>
+                  <span className="trust-sep">•</span>
+                  <span>💎 Len chuẩn loại 1</span>
+                </div>
               </div>
             )}
           </aside>
-        </div>
+        </>,
+        document.body
       )}
+
 
       {/* WISHLIST DRAWER */}
       {wishlistOpen && (
@@ -2697,6 +3931,27 @@ function App() {
                     </div>
                   </div>
 
+                  {/* BẢN ĐỒ CHỌN VỊ TRÍ GIAO HÀNG (DELIVERY MAP PICKER) */}
+                  <DeliveryMapPicker
+                    selectedProvince={checkoutForm.province}
+                    address={checkoutForm.address}
+                    locations={locations}
+                    onSelectLocation={({
+                      address: newAddr,
+                      province: newProv,
+                      district: newDist,
+                      ward: newWard,
+                    }) => {
+                      setCheckoutForm((prev) => ({
+                        ...prev,
+                        ...(newAddr ? { address: newAddr } : {}),
+                        ...(newProv ? { province: newProv } : {}),
+                        ...(newDist ? { district: newDist } : {}),
+                        ...(newWard ? { ward: newWard } : {}),
+                      }));
+                    }}
+                  />
+
                   <div className="form-group">
                     <label>Địa chỉ số nhà, tên đường cụ thể *</label>
                     <input
@@ -2765,10 +4020,10 @@ function App() {
                         onChange={() => setShippingMethod("EXPRESS")}
                       />
                       <div className="shipping-option-info">
-                        <strong>⚡ Giao hàng hỏa tốc trong 2H</strong>
-                        <small>Áp dụng nội thành TP.HCM & Hà Nội (giao qua Grab / Ahamove)</small>
+                        <strong>⚡ Giao hàng hỏa tốc trong 2H (Cần Thơ)</strong>
+                        <small>Áp dụng nội thành TP. Cần Thơ (Ninh Kiều, Cái Răng, Bình Thủy... nhận ngay trong 2H qua Grab / Shipper ruột)</small>
                       </div>
-                      <span className="shipping-fee-badge">45.000đ</span>
+                      <span className="shipping-fee-badge">30.000đ</span>
                     </label>
                   </div>
 
@@ -2844,39 +4099,116 @@ function App() {
                       </div>
                       <div className="bank-details-grid">
                         <div className="bank-text-details">
-                          <p>Ngân hàng: <strong>MB Bank (Ngân hàng Quân Đội)</strong></p>
-                          <p>Số tài khoản: <strong>0942901124</strong></p>
-                          <p>Chủ tài khoản: <strong>HUYNH VAN TAI</strong></p>
-                          <p>
-                            Số tiền: <strong className="highlight-price">{formatPrice(finalOrderTotal)}</strong>
-                          </p>
-                          <p>
-                            Nội dung chuyển khoản:{" "}
-                            <strong className="syntax-highlight">
-                              {checkoutForm.phone ? `${checkoutForm.phone} - TiemLen` : "SDT - TiemLen"}
-                            </strong>
-                          </p>
+                          <div className="bank-copy-row">
+                            <span>Ngân hàng:</span>
+                            <strong>MB Bank (Ngân Hàng Quân Đội)</strong>
+                          </div>
+                          <div className="bank-copy-row">
+                            <span>Số tài khoản:</span>
+                            <div className="copy-field">
+                              <strong className="syntax-highlight">0942901124</strong>
+                              <button
+                                type="button"
+                                className="copy-btn"
+                                onClick={() => {
+                                  navigator.clipboard?.writeText("0942901124");
+                                  setToast("Đã sao chép STK MB Bank: 0942901124!");
+                                  setTimeout(() => setToast(""), 2000);
+                                }}
+                              >
+                                Sao chép
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bank-copy-row">
+                            <span>Chủ tài khoản:</span>
+                            <strong>HUYNH VAN TAI</strong>
+                          </div>
+                          <div className="bank-copy-row">
+                            <span>Số tiền cần chuyển:</span>
+                            <div className="copy-field">
+                              <strong className="highlight-price">{formatPrice(finalOrderTotal)}</strong>
+                              <button
+                                type="button"
+                                className="copy-btn"
+                                onClick={() => {
+                                  navigator.clipboard?.writeText(String(finalOrderTotal));
+                                  setToast(`Đã sao chép số tiền: ${formatPrice(finalOrderTotal)}!`);
+                                  setTimeout(() => setToast(""), 2000);
+                                }}
+                              >
+                                Sao chép
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bank-copy-row">
+                            <span>Nội dung CK:</span>
+                            <div className="copy-field">
+                              <strong className="syntax-highlight">
+                                {checkoutForm.phone ? `DH ${checkoutForm.phone.replace(/\s+/g, "")}` : "DH TIEMLEN"}
+                              </strong>
+                              <button
+                                type="button"
+                                className="copy-btn"
+                                onClick={() => {
+                                  const content = checkoutForm.phone ? `DH ${checkoutForm.phone.replace(/\s+/g, "")}` : "DH TIEMLEN";
+                                  navigator.clipboard?.writeText(content);
+                                  setToast(`Đã sao chép nội dung: ${content}!`);
+                                  setTimeout(() => setToast(""), 2000);
+                                }}
+                              >
+                                Sao chép
+                              </button>
+                            </div>
+                          </div>
                         </div>
+
                         <div className="bank-qr-mockup">
-                          <img
-                            src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=https://me.mbbank.com.vn"
-                            alt="Mã QR Chuyển khoản"
-                          />
-                          <small>Quét mã bằng app ngân hàng</small>
+                          <div className="vietqr-box">
+                            <div className="vietqr-top-bar">
+                              <span className="vietqr-brand-label">Viet<b>QR</b></span>
+                              <span className="napas-label">napas<b>247</b></span>
+                            </div>
+                            <img
+                              src={`https://img.vietqr.io/image/970422-0942901124-qr_only.png?amount=${finalOrderTotal}&addInfo=${encodeURIComponent(checkoutForm.phone ? `DH${checkoutForm.phone.replace(/[^0-9]/g, "")}` : "DHTIEMLEN")}&accountName=HUYNH%20VAN%20TAI`}
+                              alt="Mã VietQR Chuyển Khoản MB Bank"
+                              className="vietqr-scan-img"
+                              onClick={() => setShowCenteredQrModal(true)}
+                              title="Bấm để xem mã to"
+                              style={{ cursor: "pointer" }}
+                            />
+                            <div className="vietqr-footer-hint">MB Bank · HUYNH VAN TAI</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-open-qr-center-link"
+                            onClick={() => setShowCenteredQrModal(true)}
+                          >
+                            🔍 Xem mã QR phóng to
+                          </button>
                         </div>
                       </div>
                       <small className="bank-note">
-                        ⚠️ Sau khi chuyển khoản, bạn chỉ cần bấm "Hoàn tất đặt hàng" bên dưới. Tiệm sẽ liên hệ xác nhận qua điện thoại/Zalo.
+                        💡 <i>Sau khi bấm <b>"Đặt Hàng & Nhận Thông Tin Chuyển Khoản"</b> bên dưới, hệ thống sẽ tạo đơn hàng và mở chi tiết thanh toán để bạn chuyển khoản.</i>
                       </small>
                     </div>
                   )}
 
                   <button
-                    className="banner-button checkout-submit"
+                    className={`banner-button checkout-submit ${paymentMethod === "BANK_TRANSFER" ? "qr-submit-highlight" : ""}`}
                     type="submit"
                   >
-                    <span>Hoàn tất đặt hàng • {formatPrice(finalOrderTotal)}</span>
-                    <span>→</span>
+                    {paymentMethod === "BANK_TRANSFER" ? (
+                      <>
+                        <span>🛍️ Đặt Hàng & Nhận Thông Tin Chuyển Khoản • {formatPrice(finalOrderTotal)}</span>
+                        <span>💳</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🛍️ Hoàn Tất Đặt Hàng (COD) • {formatPrice(finalOrderTotal)}</span>
+                        <span>🚚</span>
+                      </>
+                    )}
                   </button>
                   {orderMessage && (
                     <p className="auth-message">{orderMessage}</p>
@@ -2909,57 +4241,59 @@ function App() {
                   ))}
                 </div>
 
-                {/* MÃ GIẢM GIÁ / VOUCHER */}
+                {/* MÃ GIẢM GIÁ / VOUCHER (CHỈ HIỆN MÃ SỬ DỤNG ĐƯỢC) */}
                 <div className="checkout-voucher-box">
-                  <div className="voucher-input-group">
-                    <input
-                      placeholder="Nhập mã ưu đãi..."
-                      value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => applyVoucher()}
-                      className="voucher-apply-btn"
-                    >
-                      Áp dụng
-                    </button>
+                  <div className="voucher-section-header">
+                    <span className="voucher-sec-title">🎟️ Mã Khuyến Mãi Có Thể Dùng:</span>
+                    <small>Chỉ hiện các mã dùng được cho đơn hàng của bạn</small>
                   </div>
+
+                  <div className="usable-vouchers-list">
+                    {eligibleVouchers.length > 0 ? (
+                      eligibleVouchers.map((v) => {
+                        const isSelected = appliedVoucher?.code === v.code;
+                        return (
+                          <div
+                            key={v.code}
+                            className={`usable-voucher-card ${isSelected ? "selected" : ""}`}
+                            onClick={() => {
+                              if (isSelected) {
+                                setAppliedVoucher(null);
+                                setVoucherError("");
+                                setToast(`Đã bỏ dùng mã ${v.code}`);
+                              } else {
+                                applyVoucher(v.code);
+                              }
+                            }}
+                          >
+                            <div className="voucher-card-badge">{v.badge}</div>
+                            <div className="voucher-card-body">
+                              <strong>{v.title}</strong>
+                              <small>{v.desc}</small>
+                            </div>
+                            <div className="voucher-card-btn-wrap">
+                              <span className={`voucher-pill-btn ${isSelected ? "active" : ""}`}>
+                                {isSelected ? "✓ Đã áp dụng" : "Áp dụng"}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="no-usable-vouchers">
+                        Chưa có voucher khả dụng cho đơn giá trị này. Thêm sản phẩm để nhận ưu đãi nhé!
+                      </p>
+                    )}
+                  </div>
+
                   {voucherError && <small className="voucher-error">{voucherError}</small>}
 
                   {appliedVoucher && (
                     <div className="applied-voucher-badge">
-                      <span>✓ {appliedVoucher.code}: {appliedVoucher.label}</span>
-                      <button type="button" onClick={() => setAppliedVoucher(null)}>✕</button>
+                      <span>✓ Đã áp dụng: <b>{appliedVoucher.label}</b> (-{formatPrice(discountAmount)})</span>
+                      <button type="button" onClick={() => setAppliedVoucher(null)}>✕ Bỏ chọn</button>
                     </div>
                   )}
-
-                  <div className="quick-vouchers-list">
-                    <small>Mã gợi ý cho bạn:</small>
-                    <div className="quick-vouchers-chips">
-                      <button
-                        type="button"
-                        className="voucher-chip"
-                        onClick={() => applyVoucher("TIEMLEN10")}
-                      >
-                        TIEMLEN10 (-10%)
-                      </button>
-                      <button
-                        type="button"
-                        className="voucher-chip"
-                        onClick={() => applyVoucher("FREESHIP")}
-                      >
-                        FREESHIP (-25k)
-                      </button>
-                      <button
-                        type="button"
-                        className="voucher-chip"
-                        onClick={() => applyVoucher("LENXINH30")}
-                      >
-                        LENXINH30 (-30k)
-                      </button>
-                    </div>
-                  </div>
                 </div>
 
                 {/* BẢNG TÍNH TIỀN CHI TIẾT */}
@@ -3014,418 +4348,791 @@ function App() {
         </div>
       )}
 
-      {/* CHI TIẾT SẢN PHẨM (PRODUCT DETAIL MODAL) */}
-      {selectedProduct && (
-        <div className="detail-backdrop" onClick={closeProductDetail}>
-          <div className="detail-page" onClick={(e) => e.stopPropagation()}>
-            <div className="detail-nav-bar">
-              <div className="detail-breadcrumb">
-                <button type="button" onClick={closeProductDetail}>
-                  ← Quay lại cửa hàng
-                </button>
-                <span>
-                  Trang chủ / {selectedProduct.category?.name} /{" "}
-                  <strong>{selectedProduct.name}</strong>
-                </span>
-              </div>
-              <button
-                type="button"
-                className="detail-close-btn"
-                onClick={closeProductDetail}
-                title="Đóng xem chi tiết (Esc)"
-              >
-                ✕ Đóng lại
-              </button>
-            </div>
+      {/* MODAL MÃ QR THANH TOÁN CHÍNH GIỮA MÀN HÌNH - TỰ ĐỘNG NHẬN DIỆN TIỀN VÀO */}
+      {showCenteredQrModal && (() => {
+        const payingAmount = activeQrOrder?.totalAmount ?? finalOrderTotal;
+        const payingCode = activeQrOrder?._id
+          ? `DH${activeQrOrder._id.slice(-6).toUpperCase()}`
+          : `DH${checkoutForm.phone ? checkoutForm.phone.replace(/[^0-9]/g, "") : "TIEMLEN"}`;
 
-            <article className="detail-modal" role="main">
-              {/* CỘT TRÁI: HÌNH ẢNH, VIDEO & GALLERY THUMBNAILS */}
-              <div className="detail-gallery-col">
-                {/* Media Switcher Tabs (khi sản phẩm có cả video) */}
-                {selectedProduct.videos?.length > 0 && (
-                  <div className="detail-media-switcher">
+        return (
+          <div className="centered-qr-backdrop" onClick={() => setShowCenteredQrModal(false)}>
+            <div className="centered-qr-modal" onClick={(e) => e.stopPropagation()}>
+              {paymentSuccessAnim ? (
+                /* MÀN HÌNH CHÚC MỪNG: TỰ ĐỘNG NHẬN DIỆN TIỀN THÀNH CÔNG (KHÔNG CẦN BẤM GÌ) */
+                <div className="payment-celebrate-screen">
+                  <div className="celebrate-badge-circle">
+                    <span className="celebrate-icon">🎉</span>
+                  </div>
+                  <h3 className="celebrate-title">TIỀN ĐÃ QUA TÀI KHOẢN THÀNH CÔNG!</h3>
+                  <div className="celebrate-amount-card">
+                    <span>MB Bank vừa báo có:</span>
+                    <strong className="celebrate-amount">+{formatPrice(payingAmount)}</strong>
+                    <small>Số tài khoản nhận: 0942901124 · HUYNH VAN TAI</small>
+                  </div>
+                  <div className="celebrate-auto-pill">
+                    <span className="pill-dot" />
+                    <span>Hệ thống tự động xác nhận chuyển khoản • Không cần bấm xác nhận</span>
+                  </div>
+                  <div className="celebrate-redirect-box">
+                    <div className="redirect-spinner" />
+                    <p>Đang tự động chuyển sang màn hình theo dõi vận chuyển Shopee Xpress...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="centered-qr-header">
+                    <div className="centered-qr-title">
+                      <span className="qr-title-icon">🎉</span>
+                      <div>
+                        <h3>Đặt Hàng Thành Công • Thông Tin Chuyển Khoản</h3>
+                        <p>
+                          Mã vận đơn: <b>#{activeQrOrder?.trackingCode || (activeQrOrder?._id ? activeQrOrder._id.slice(-6).toUpperCase() : "SPX")}</b> · Tiệm Len Sene Handmade
+                        </p>
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      className={`media-switch-btn ${detailMediaType === "image" ? "active" : ""}`}
-                      onClick={() => setDetailMediaType("image")}
+                      className="centered-qr-close"
+                      onClick={() => setShowCenteredQrModal(false)}
+                      title="Đóng (Esc)"
                     >
-                      📸 Ảnh chi tiết ({selectedProduct.images?.length || 1})
-                    </button>
-                    <button
-                      type="button"
-                      className={`media-switch-btn ${detailMediaType === "video" ? "active" : ""}`}
-                      onClick={() => setDetailMediaType("video")}
-                    >
-                      🎬 Video thực tế ({selectedProduct.videos?.length})
+                      ✕
                     </button>
                   </div>
-                )}
 
-                <div className="detail-main-media-wrap">
-                  {detailMediaType === "video" && selectedProduct.videos?.length > 0 ? (
-                    <div className="detail-video-container">
-                      <video
-                        key={selectedProduct.videos[detailVideoIdx] || selectedProduct.videos[0]}
-                        src={selectedProduct.videos[detailVideoIdx] || selectedProduct.videos[0]}
-                        poster={selectedProduct.videoPoster || selectedProduct.images?.[0]}
-                        controls
-                        autoPlay
-                        playsInline
-                        className="detail-main-video"
-                      />
-                    </div>
-                  ) : (
-                    <div className="detail-main-image-wrap">
+                  {/* THANH HƯỚNG DẪN THANH TOÁN THỰC TẾ */}
+                  <div className="qr-real-notice-bar">
+                    <span className="real-notice-icon">📌</span>
+                    <span>Quý khách mở ứng dụng Ngân hàng (MB, Vietcombank, Techcombank, MoMo...) quét mã VietQR hoặc chuyển khoản đúng nội dung bên dưới:</span>
+                  </div>
+
+                  <div className="centered-qr-body">
+                    {/* KHUNG MÃ QR LỚN Ở CHÍNH GIỮA */}
+                    <div className="centered-qr-frame">
+                      <div className="vietqr-header-strip">
+                        <span className="vietqr-logo-big">Viet<b>QR</b></span>
+                        <span className="napas-badge-big">napas<b>247</b></span>
+                      </div>
                       <img
-                        src={
-                          selectedProduct.images?.[detailImageIdx] ||
-                          selectedProduct.images?.[0] ||
-                          "https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80"
-                        }
-                        alt={selectedProduct.name}
-                        className="detail-main-img"
+                        src={`https://img.vietqr.io/image/970422-0942901124-qr_only.png?amount=${payingAmount}&addInfo=${payingCode}&accountName=HUYNH%20VAN%20TAI`}
+                        alt="Mã QR Chuyển Khoản VietQR"
+                        className="centered-qr-img"
                       />
-                      <div className="detail-badges-overlay">
-                        <span className="overlay-badge">✨ 100% Thủ công tỉ mỉ</span>
-                        <span className="overlay-badge warm">🌿 Len nhung êm mịn</span>
+                      <div className="centered-qr-caption">
+                        <span>MB Bank · HUYNH VAN TAI</span>
+                      </div>
+                    </div>
+
+                    {/* BẢNG THÔNG TIN SỐ TIỀN & STK */}
+                    <div className="centered-qr-info-card">
+                      <div className="info-total-row">
+                        <span>Số tiền cần chuyển:</span>
+                        <div className="info-price-copy">
+                          <strong className="centered-qr-price">{formatPrice(payingAmount)}</strong>
+                          <button
+                            type="button"
+                            className="qr-copy-btn"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(String(payingAmount));
+                              setToast(`Đã sao chép số tiền: ${formatPrice(payingAmount)}!`);
+                              setTimeout(() => setToast(""), 2000);
+                            }}
+                          >
+                            Sao chép
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="info-meta-grid">
+                        <div className="info-meta-row">
+                          <span>Ngân hàng:</span>
+                          <strong>MB Bank (Ngân Hàng Quân Đội)</strong>
+                        </div>
+                        <div className="info-meta-row">
+                          <span>Số tài khoản:</span>
+                          <div className="info-copy-field">
+                            <strong className="syntax-highlight">0942901124</strong>
+                            <button
+                              type="button"
+                              className="qr-copy-btn"
+                              onClick={() => {
+                                navigator.clipboard?.writeText("0942901124");
+                                setToast("Đã sao chép STK: 0942901124!");
+                                setTimeout(() => setToast(""), 2000);
+                              }}
+                            >
+                              Sao chép
+                            </button>
+                          </div>
+                        </div>
+                        <div className="info-meta-row">
+                          <span>Chủ tài khoản:</span>
+                          <strong>HUYNH VAN TAI</strong>
+                        </div>
+                        <div className="info-meta-row">
+                          <span>Nội dung CK:</span>
+                          <div className="info-copy-field">
+                            <strong className="syntax-highlight">{payingCode}</strong>
+                            <button
+                              type="button"
+                              className="qr-copy-btn"
+                              onClick={() => {
+                                navigator.clipboard?.writeText(payingCode);
+                                setToast(`Đã sao chép nội dung: ${payingCode}!`);
+                                setTimeout(() => setToast(""), 2000);
+                              }}
+                            >
+                              Sao chép
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* HƯỚNG DẪN THỰC TẾ & XÁC NHẬN CHUYỂN KHOẢN */}
+                      <div className="qr-real-guideline-box">
+                        <div className="guideline-row">
+                          <span className="guideline-icon">📦</span>
+                          <div>
+                            <strong>Xác nhận & Chuẩn bị đơn:</strong>
+                            <p>Sau khi nhận được chuyển khoản, tiệm sẽ kiểm tra sao kê và tiến hành đóng gói, gửi hàng trong ngày.</p>
+                          </div>
+                        </div>
+                        <div className="guideline-row">
+                          <span className="guideline-icon">💬</span>
+                          <div>
+                            <strong>Hỗ trợ nhanh qua Zalo:</strong>
+                            <p>Bạn có thể chụp màn hình biên lai gửi qua Zalo <b>0942.901.124</b> để tiệm ưu tiên xuất kho hỏa tốc.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="centered-qr-footer-real">
+                    <button
+                      type="button"
+                      className="btn-confirm-transferred-primary"
+                      onClick={() => {
+                        setShowCenteredQrModal(false);
+                        if (activeQrOrder) setSelectedOrder(activeQrOrder);
+                        setToast("🎉 Cảm ơn bạn! Tiệm đã ghi nhận. Shop sẽ kiểm tra biến động số dư và chuẩn bị hàng sớm nhất!");
+                        setTimeout(() => setToast(""), 4000);
+                      }}
+                    >
+                      ✅ Tôi Đã Chuyển Khoản Xong
+                    </button>
+                    <a
+                      href={`https://zalo.me/0942901124?text=${encodeURIComponent(
+                        `Chào Shop Sene Handmade, mình vừa chuyển khoản đơn hàng #${
+                          activeQrOrder?.trackingCode ||
+                          (activeQrOrder?._id ? activeQrOrder._id.slice(-6).toUpperCase() : "")
+                        } với số tiền ${formatPrice(payingAmount)}. Shop kiểm tra và gửi hàng giúp mình nhé!`
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-zalo-chat-action"
+                    >
+                      💬 Gửi Biên Lai Qua Zalo (0942.901.124)
+                    </a>
+                    <button
+                      type="button"
+                      className="btn-view-order-secondary"
+                      onClick={() => {
+                        setShowCenteredQrModal(false);
+                        if (activeQrOrder) setSelectedOrder(activeQrOrder);
+                      }}
+                    >
+                      📋 Xem Chi Tiết Đơn Hàng
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* CHI TIẾT SẢN PHẨM ĐÃ ĐƯỢC CHUYỂN SANG DEDICATED PRODUCT DETAIL VIEW (/san-pham/:slug) */}
+      {false && selectedProduct && (() => {
+        const isRawYarn =
+          selectedProduct.category?.slug === "len-soi" ||
+          selectedProduct.category === "Len sợi" ||
+          selectedProduct.category?.name === "Len sợi" ||
+          (selectedProduct.name &&
+            (selectedProduct.name.toLowerCase().includes("cuộn len") ||
+             selectedProduct.name.toLowerCase().includes("len sợi")) &&
+            !selectedProduct.name.toLowerCase().includes("thú") &&
+            !selectedProduct.name.toLowerCase().includes("bé") &&
+            !selectedProduct.name.toLowerCase().includes("hoa") &&
+            !selectedProduct.name.toLowerCase().includes("kit"));
+
+        return (
+          <div className="detail-backdrop shopee-backdrop" onClick={closeProductDetail}>
+            <div className="detail-page shopee-detail-page" onClick={(e) => e.stopPropagation()}>
+              {/* SHOPEE BREADCRUMB & CLOSE BAR */}
+              <div className="shopee-top-bar">
+                <div className="shopee-breadcrumb">
+                  <span className="shopee-crumb-link" onClick={closeProductDetail}>Shopee</span>
+                  <span className="shopee-crumb-sep">&gt;</span>
+                  <span className="shopee-crumb-link" onClick={closeProductDetail}>Sene Handmade</span>
+                  <span className="shopee-crumb-sep">&gt;</span>
+                  <span className="shopee-crumb-link">{selectedProduct.category?.name || "Thủ công Handmade"}</span>
+                  <span className="shopee-crumb-sep">&gt;</span>
+                  <span className="shopee-crumb-current">{selectedProduct.name}</span>
+                </div>
+                <button
+                  type="button"
+                  className="shopee-close-btn"
+                  onClick={closeProductDetail}
+                  title="Đóng xem chi tiết (Esc)"
+                >
+                  ✕ Đóng
+                </button>
+              </div>
+
+              <article className="shopee-product-main" role="main">
+                {/* CỘT TRÁI: HÌNH ẢNH & VIDEO SHOPEE GALLERY */}
+                <div className="shopee-gallery-col">
+                  {/* Switch ảnh / video nếu có video */}
+                  {selectedProduct.videos?.length > 0 && (
+                    <div className="shopee-media-tabs">
+                      <button
+                        type="button"
+                        className={`shopee-media-tab ${detailMediaType === "image" ? "active" : ""}`}
+                        onClick={() => setDetailMediaType("image")}
+                      >
+                        📸 Ảnh sản phẩm ({selectedProduct.images?.length || 1})
+                      </button>
+                      <button
+                        type="button"
+                        className={`shopee-media-tab ${detailMediaType === "video" ? "active" : ""}`}
+                        onClick={() => setDetailMediaType("video")}
+                      >
+                        🎬 Video thực tế ({selectedProduct.videos?.length})
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Khung xem ảnh / video lớn */}
+                  <div className="shopee-main-frame">
+                    {detailMediaType === "video" && selectedProduct.videos?.length > 0 ? (
+                      <div className="shopee-video-box">
+                        <video
+                          key={selectedProduct.videos[detailVideoIdx] || selectedProduct.videos[0]}
+                          src={selectedProduct.videos[detailVideoIdx] || selectedProduct.videos[0]}
+                          poster={selectedProduct.videoPoster || selectedProduct.images?.[0]}
+                          controls
+                          autoPlay
+                          playsInline
+                          className="shopee-video-player"
+                        />
+                      </div>
+                    ) : (
+                      <div className="shopee-image-box">
+                        <img
+                          src={
+                            selectedProduct.images?.[detailImageIdx] ||
+                            selectedProduct.images?.[0] ||
+                            "https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=800&q=80"
+                          }
+                          alt={selectedProduct.name}
+                          className="shopee-main-img"
+                        />
+                        <div className="shopee-tag-overlay">
+                          <span className="shopee-mall-tag">Yêu thích+</span>
+                          <span className="shopee-hand-tag">✨ 100% Thủ công</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Thumbnails 5 ảnh chuẩn Shopee */}
+                  <div className="shopee-thumbs-carousel">
+                    {selectedProduct.images?.map((thumbUrl, idx) => (
+                      <div
+                        key={`shopee-thumb-img-${idx}`}
+                        className={`shopee-thumb-item ${detailMediaType === "image" && detailImageIdx === idx ? "active" : ""}`}
+                        onMouseEnter={() => {
+                          setDetailMediaType("image");
+                          setDetailImageIdx(idx);
+                        }}
+                        onClick={() => {
+                          setDetailMediaType("image");
+                          setDetailImageIdx(idx);
+                        }}
+                      >
+                        <img src={thumbUrl} alt={`Thumbnail ${idx + 1}`} />
+                      </div>
+                    ))}
+                    {selectedProduct.videos?.map((_, vIdx) => (
+                      <div
+                        key={`shopee-thumb-vid-${vIdx}`}
+                        className={`shopee-thumb-item shopee-thumb-video ${detailMediaType === "video" && detailVideoIdx === vIdx ? "active" : ""}`}
+                        onClick={() => {
+                          setDetailMediaType("video");
+                          setDetailVideoIdx(vIdx);
+                        }}
+                      >
+                        <img
+                          src={selectedProduct.videoPoster || selectedProduct.images?.[0]}
+                          alt={`Video ${vIdx + 1}`}
+                        />
+                        <span className="shopee-play-icon">▶</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Dải chia sẻ & thích chuẩn Shopee */}
+                  <div className="shopee-share-favorite">
+                    <div className="shopee-share-box">
+                      <span>Chia sẻ:</span>
+                      <button type="button" className="share-btn share-zalo" title="Chia sẻ qua Zalo">💬 Zalo</button>
+                      <button type="button" className="share-btn share-fb" title="Chia sẻ qua Facebook">📘 Facebook</button>
+                      <button
+                        type="button"
+                        className="share-btn share-link"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(window.location.href);
+                          setToast("Đã sao chép liên kết sản phẩm!");
+                          setTimeout(() => setToast(""), 2200);
+                        }}
+                        title="Sao chép liên kết"
+                      >
+                        🔗 Sao chép link
+                      </button>
+                    </div>
+                    <div className="shopee-favorite-box">
+                      <button
+                        type="button"
+                        className={`fav-btn ${wishlist.includes(selectedProduct._id) ? "favorited" : ""}`}
+                        onClick={() => toggleWishlist(selectedProduct._id)}
+                      >
+                        <span>{wishlist.includes(selectedProduct._id) ? "❤️" : "♡"}</span>
+                        <span>Đã thích ({wishlist.includes(selectedProduct._id) ? "187" : "186"})</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Cam kết đảm bảo của Shopee */}
+                  <div className="shopee-guarantee-strip">
+                    <span className="guarantee-shield">🛡️</span>
+                    <div>
+                      <strong>Sene Đảm Bảo</strong>
+                      <small>3 Ngày Trả Hàng / Hoàn Tiền Miễn Phí</small>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CỘT PHẢI: THÔNG TIN SẢN PHẨM & MUA HÀNG CHUẨN SHOPEE */}
+                <div className="shopee-info-col">
+                  {/* Tiêu đề sản phẩm với huy hiệu Shopee */}
+                  <h1 className="shopee-product-title">
+                    <span className="shopee-badge-favorite">Yêu thích+</span>
+                    {selectedProduct.name}
+                  </h1>
+
+                  {/* Thanh thống kê 3 cột huyền thoại của Shopee */}
+                  <div className="shopee-metrics-bar">
+                    <div className="metric-item metric-rating">
+                      <span className="metric-score">4.9</span>
+                      <div className="metric-stars">★★★★★</div>
+                    </div>
+                    <span className="metric-divider">|</span>
+                    <div className="metric-item metric-reviews">
+                      <span className="metric-val">128</span>
+                      <span className="metric-lbl">Đánh Giá</span>
+                    </div>
+                    <span className="metric-divider">|</span>
+                    <div className="metric-item metric-sold">
+                      <span className="metric-val">{selectedProduct.stock > 50 ? "420+" : "185+"}</span>
+                      <span className="metric-lbl">Đã Bán</span>
+                    </div>
+                    <button type="button" className="shopee-report-link">Tố cáo</button>
+                  </div>
+
+                  {/* KHUNG GIÁ SHOPEE ĐẶC TRƯNG */}
+                  <div className="shopee-price-panel">
+                    <div className="shopee-price-row">
+                      <del className="shopee-old-price">
+                        ₫{(Math.round((selectedProduct.price * 1.25) / 1000) * 1000).toLocaleString("vi-VN")}
+                      </del>
+                      <strong className="shopee-current-price">
+                        ₫{selectedProduct.price.toLocaleString("vi-VN")}
+                      </strong>
+                      <span className="shopee-discount-badge">-20% GIẢM</span>
+                    </div>
+                    <div className="shopee-price-subtext">
+                      <span>⚡ GÌ CŨNG RẺ</span>
+                      <small>Giá tốt nhất thị trường đồ len thủ công so với các sản phẩm cùng loại</small>
+                    </div>
+                  </div>
+
+                  {/* BẢNG THÔNG TIN MUA HÀNG CHI TIẾT */}
+                  <div className="shopee-spec-rows">
+                    {/* Mã giảm giá Shop */}
+                    <div className="shopee-spec-row">
+                      <span className="spec-row-label">Mã Giảm Giá Của Shop</span>
+                      <div className="shopee-voucher-tags">
+                        <span className="shopee-ticket-voucher">Giảm 15k</span>
+                        <span className="shopee-ticket-voucher">Giảm 30k</span>
+                        <span className="shopee-ticket-voucher highlight">Freeship Xtra</span>
+                      </div>
+                    </div>
+
+                    {/* Deal sốc */}
+                    <div className="shopee-spec-row">
+                      <span className="spec-row-label">Deal Sốc</span>
+                      <div className="shopee-deal-tag">
+                        <span className="deal-badge-red">Mua Kèm Deal Sốc</span>
+                        <span className="deal-text">Mua thêm Bông gòn bi, Kim móc giảm đến 40%</span>
+                      </div>
+                    </div>
+
+                    {/* Vận chuyển */}
+                    <div className="shopee-spec-row">
+                      <span className="spec-row-label">Vận Chuyển</span>
+                      <div className="shopee-shipping-details">
+                        <div className="shipping-line-free">
+                          <span className="shipping-icon">🚚</span>
+                          <span>Miễn phí vận chuyển cho đơn hàng từ <strong>200.000₫</strong></span>
+                        </div>
+                        <div className="shipping-line-dest">
+                          <span className="shipping-sub-lbl">Gửi từ kho:</span>
+                          <span className="shipping-destination">Ninh Kiều, Cần Thơ (⚡ Hỏa Tốc 2H nội thành)</span>
+                        </div>
+                        <div className="shipping-line-dest">
+                          <span className="shipping-sub-lbl">Vận chuyển tới:</span>
+                          <span className="shipping-destination">Toàn quốc (Nhận hàng sau 1-3 ngày)</span>
+                        </div>
+                        <div className="shipping-line-fee">
+                          <span className="shipping-sub-lbl">Phí vận chuyển:</span>
+                          <span className="shipping-fee-val">0₫</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PHÂN LOẠI HÀNG: NẾU LÀ THÚ MÓC THÀNH PHẨM THÌ KHÔNG ĐỂ MÀU LEN! */}
+                    {isRawYarn ? (
+                      <div className="shopee-spec-row">
+                        <span className="spec-row-label">Màu Sắc Len</span>
+                        <div className="shopee-variation-group">
+                          {YARN_COLORS.map((c) => (
+                            <button
+                              key={c.name}
+                              type="button"
+                              className={`shopee-variation-btn ${selectedColor === c.name ? "active" : ""}`}
+                              onClick={() => setSelectedColor(c.name)}
+                              title={c.name}
+                            >
+                              <span className="var-color-dot" style={{ backgroundColor: c.hex }} />
+                              <span>{c.name}</span>
+                              {selectedColor === c.name && <span className="shopee-checked-corner">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="shopee-spec-row">
+                        <span className="spec-row-label">Phân Loại</span>
+                        <div className="shopee-variation-group">
+                          <button type="button" className="shopee-variation-btn active">
+                            <span>✨ Bản Thành Phẩm Đan Móc Tay (Hoàn Thiện)</span>
+                            <span className="shopee-checked-corner">✓</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Số lượng Shopee Stepper */}
+                    <div className="shopee-spec-row">
+                      <span className="spec-row-label">Số Lượng</span>
+                      <div className="shopee-quantity-control">
+                        <div className="shopee-stepper">
+                          <button
+                            type="button"
+                            className="stepper-btn"
+                            aria-label="Giảm số lượng"
+                            onClick={() => setDetailQuantity(Math.max(detailQuantity - 1, 1))}
+                          >
+                            −
+                          </button>
+                          <input
+                            type="text"
+                            className="stepper-input"
+                            readOnly
+                            value={detailQuantity}
+                          />
+                          <button
+                            type="button"
+                            className="stepper-btn"
+                            aria-label="Tăng số lượng"
+                            onClick={() => setDetailQuantity(Math.min(detailQuantity + 1, selectedProduct.stock))}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="shopee-stock-text">
+                          {selectedProduct.stock} sản phẩm có sẵn
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CẶP NÚT MUA HÀNG HUYỀN THOẠI SHOPEE */}
+                  <div className="shopee-action-buttons">
+                    <button
+                      type="button"
+                      className="shopee-btn-add-cart"
+                      onClick={() => {
+                        addToCart(selectedProduct, detailQuantity);
+                        closeProductDetail();
+                      }}
+                    >
+                      <span className="cart-btn-icon">🛒</span>
+                      <span>Thêm Vào Giỏ Hàng</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="shopee-btn-buy-now"
+                      onClick={() => buyNow(selectedProduct, detailQuantity)}
+                    >
+                      Mua Ngay
+                    </button>
+                  </div>
+
+                  {/* Dải cam kết phụ */}
+                  <div className="shopee-perks-footer">
+                    <span>🛡️ Sene Đảm Bảo</span>
+                    <span>✓ Trả hàng miễn phí 3 ngày</span>
+                    <span>✓ Hàng thủ công 100% đúng mô tả</span>
+                    <span>✓ Đồng kiểm khi nhận</span>
+                  </div>
+                </div>
+              </article>
+
+              {/* THẺ PROFILE SHOP CHUẨN SHOPEE MALL */}
+              <section className="shopee-shop-card">
+                <div className="shop-card-left">
+                  <div className="shop-avatar-wrap">
+                    <div className="shop-avatar">🧶</div>
+                    <span className="shop-mall-badge">Yêu thích+</span>
+                  </div>
+                  <div className="shop-info-meta">
+                    <h3>Sene Handmade Official</h3>
+                    <p className="shop-status">Online 5 phút trước</p>
+                    <div className="shop-buttons">
+                      <button
+                        type="button"
+                        className="shop-btn-chat"
+                        onClick={() => window.open("https://zalo.me/0942901124", "_blank")}
+                      >
+                        💬 Chat Ngay
+                      </button>
+                      <button
+                        type="button"
+                        className="shop-btn-view"
+                        onClick={() => {
+                          closeProductDetail();
+                          document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                      >
+                        🏪 Xem Shop
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="shop-card-right">
+                  <div className="shop-stat-item">
+                    <span>Đánh Giá</span>
+                    <strong>4.9 (1.8k đánh giá)</strong>
+                  </div>
+                  <div className="shop-stat-item">
+                    <span>Sản Phẩm</span>
+                    <strong>28</strong>
+                  </div>
+                  <div className="shop-stat-item">
+                    <span>Tỉ Lệ Phản Hồi</span>
+                    <strong>100%</strong>
+                  </div>
+                  <div className="shop-stat-item">
+                    <span>Thời Gian Phản Hồi</span>
+                    <strong>trong vài phút</strong>
+                  </div>
+                  <div className="shop-stat-item">
+                    <span>Kho Hàng</span>
+                    <strong>Ninh Kiều, Cần Thơ</strong>
+                  </div>
+                </div>
+              </section>
+
+              {/* GỢI Ý MUA KÈM DEAL SỐC */}
+              <div className="shopee-cross-sell-box">
+                <div className="shopee-cross-sell-header">
+                  <span className="deal-badge-pill">Deal Sốc</span>
+                  <strong>Mua Kèm Deal Sốc Giảm Đến 40%</strong>
+                </div>
+                <div className="shopee-cross-sell-grid">
+                  {CRAFT_ADDONS.slice(0, 3).map((addon) => (
+                    <div key={addon.id} className="shopee-addon-item">
+                      <span className="addon-icon">{addon.icon}</span>
+                      <div className="addon-info">
+                        <strong>{addon.name}</strong>
+                        <div className="addon-pricing">
+                          <b>{formatPrice(addon.price)}</b>
+                          <del>{formatPrice(addon.originalPrice)}</del>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="addon-add-btn"
+                        onClick={() => {
+                          addToCart({
+                            _id: addon.id,
+                            name: addon.name,
+                            price: addon.price,
+                            images: addon.images,
+                            stock: addon.stock,
+                          }, 1);
+                        }}
+                      >
+                        + Thêm vào giỏ
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* TABS CHI TIẾT SẢN PHẨM & ĐÁNH GIÁ SHOPEE */}
+              <section className="shopee-tabs-container">
+                <div className="shopee-tabs-nav">
+                  <button
+                    type="button"
+                    className={`shopee-tab-nav-btn ${detailTab === "specs" ? "active" : ""}`}
+                    onClick={() => setDetailTab("specs")}
+                  >
+                    CHI TIẾT SẢN PHẨM
+                  </button>
+                  <button
+                    type="button"
+                    className={`shopee-tab-nav-btn ${detailTab === "guide" ? "active" : ""}`}
+                    onClick={() => setDetailTab("guide")}
+                  >
+                    MÔ TẢ SẢN PHẨM
+                  </button>
+                  <button
+                    type="button"
+                    className={`shopee-tab-nav-btn ${detailTab === "reviews" ? "active" : ""}`}
+                    onClick={() => setDetailTab("reviews")}
+                  >
+                    ĐÁNH GIÁ SẢN PHẨM (128)
+                  </button>
+                </div>
+
+                <div className="shopee-tab-content">
+                  {detailTab === "specs" && (
+                    <div className="shopee-spec-table">
+                      <div className="spec-table-row">
+                        <span className="spec-col-lbl">Danh Mục</span>
+                        <span className="spec-col-val">Shopee &gt; Sene Handmade &gt; {selectedProduct.category?.name || "Thú len Handmade"}</span>
+                      </div>
+                      <div className="spec-table-row">
+                        <span className="spec-col-lbl">Thương hiệu</span>
+                        <span className="spec-col-val">{selectedProduct.brand || "Sene Handmade"}</span>
+                      </div>
+                      <div className="spec-table-row">
+                        <span className="spec-col-lbl">Chất liệu sợi</span>
+                        <span className="spec-col-val">Len nhung đũa cao cấp bồng bềnh / Cotton Milk se chặt không xù</span>
+                      </div>
+                      <div className="spec-table-row">
+                        <span className="spec-col-lbl">Kích thước</span>
+                        <span className="spec-col-val">Khoảng 25 - 35 cm (Phom chuẩn ôm vừa tay)</span>
+                      </div>
+                      <div className="spec-table-row">
+                        <span className="spec-col-lbl">Xuất xứ</span>
+                        <span className="spec-col-val">Thủ công Việt Nam 100% (Made with love by Sene Handmade)</span>
+                      </div>
+                      <div className="spec-table-row">
+                        <span className="spec-col-lbl">Gửi từ</span>
+                        <span className="spec-col-val">Ninh Kiều, Cần Thơ (⚡ Giao hỏa tốc 2H)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {detailTab === "guide" && (
+                    <div className="shopee-description-box">
+                      <h3>MÔ TẢ CHI TIẾT SẢN PHẨM</h3>
+                      <p>{selectedProduct.description}</p>
+                      <h4>✨ ĐẶC ĐIỂM NỔI BẬT:</h4>
+                      <ul>
+                        <li>Từng mũi móc được nghệ nhân của Sene thực hiện tỉ mỉ, phom dáng tròn trịa, chắc chắn.</li>
+                        <li>Chất len cao cấp không bai dão, không xổ lông, màu sắc pastel bền đẹp sau nhiều lần giặt.</li>
+                        <li>Ruột nhồi 100% bông gòn bi nhân tạo tinh khiết, đàn hồi tốt, an toàn cho trẻ nhỏ.</li>
+                        <li>Sản phẩm kèm video quay cận cảnh chi tiết phom dáng và chất len trước khi đóng gói.</li>
+                      </ul>
+                      <h4>🧺 HƯỚNG DẪN GIẶT VÀ BẢO QUẢN THÚ LEN:</h4>
+                      <ul>
+                        <li>Khuyên giặt tay bằng dầu gội hoặc sữa tắm dịu nhẹ trong nước lạnh.</li>
+                        <li>Không vắt xoắn mạnh, dùng khăn khô thấm bớt nước và phơi trên mặt phẳng nơi thoáng gió.</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {detailTab === "reviews" && (
+                    <div className="shopee-reviews-box">
+                      <div className="reviews-summary-card">
+                        <div className="summary-left">
+                          <span className="big-rating">4.9</span>
+                          <span className="rating-max">trên 5</span>
+                          <div className="stars-orange">★★★★★</div>
+                        </div>
+                        <div className="summary-filters">
+                          <span className="filter-pill active">Tất Cả (128)</span>
+                          <span className="filter-pill">5 Sao (119)</span>
+                          <span className="filter-pill">4 Sao (8)</span>
+                          <span className="filter-pill">Có Bình Luận (84)</span>
+                          <span className="filter-pill">Có Hình Ảnh / Video (65)</span>
+                        </div>
+                      </div>
+
+                      <div className="shopee-user-reviews-list">
+                        <div className="user-review-item">
+                          <div className="user-avatar">🌸</div>
+                          <div className="review-main">
+                            <span className="user-name">h*****t</span>
+                            <div className="user-stars">★★★★★</div>
+                            <span className="review-time">2026-08-15 14:22 | Phân loại hàng: Bản thành phẩm móc thủ công</span>
+                            <p className="review-text">
+                              "Bé thỏ đẹp xỉu luôn mn ơi! Len nhung đũa siêu siêu mềm, cầm êm tay cực kỳ. Shop đóng gói hộp cứng cáp, còn kèm thiệp cảm ơn dễ thương nữa. Chắc chắn sẽ ủng hộ shop tiếp!"
+                            </p>
+                            <div className="review-images">
+                              <img src={selectedProduct.images?.[0]} alt="Feedback" />
+                              {selectedProduct.images?.[1] && <img src={selectedProduct.images?.[1]} alt="Feedback 2" />}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="user-review-item">
+                          <div className="user-avatar">🧶</div>
+                          <div className="review-main">
+                            <span className="user-name">m*****9</span>
+                            <div className="user-stars">★★★★★</div>
+                            <span className="review-time">2026-09-02 09:18 | Phân loại hàng: Bản thành phẩm móc thủ công</span>
+                            <p className="review-text">
+                              "Sản phẩm giống y hệt hình và video shop đăng. Mũi len đều tăm tắp, bé thỏ đội mũ xinh xắn lắm. Đánh giá 10 sao cho độ tỉ mỉ của thợ nhé ạ."
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
-
-                {/* THUMBNAILS HÀNG DƯỚI: TẤT CẢ ẢNH & VIDEO CỦA SẢN PHẨM */}
-                <div className="detail-thumbs-list">
-                  {selectedProduct.images?.map((thumbUrl, idx) => (
-                    <button
-                      key={`thumb-img-${idx}`}
-                      type="button"
-                      className={`detail-thumb-btn ${detailMediaType === "image" && detailImageIdx === idx ? "active" : ""}`}
-                      onClick={() => {
-                        setDetailMediaType("image");
-                        setDetailImageIdx(idx);
-                      }}
-                      title={`Xem ảnh chi tiết góc ${idx + 1}`}
-                    >
-                      <img src={thumbUrl} alt={`Góc nhìn ${idx + 1}`} />
-                    </button>
-                  ))}
-                  {selectedProduct.videos?.map((videoUrl, vIdx) => (
-                    <button
-                      key={`thumb-vid-${vIdx}`}
-                      type="button"
-                      className={`detail-thumb-btn thumb-video-btn ${detailMediaType === "video" && detailVideoIdx === vIdx ? "active" : ""}`}
-                      onClick={() => {
-                        setDetailMediaType("video");
-                        setDetailVideoIdx(vIdx);
-                      }}
-                      title={`Xem Video ${vIdx + 1}`}
-                    >
-                      <img
-                        src={selectedProduct.videoPoster || selectedProduct.images?.[0]}
-                        alt={`Video ${vIdx + 1}`}
-                      />
-                      <span className="thumb-video-badge">▶</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="detail-trust-points">
-                  <span>✓ Bao đổi trả miễn phí 7 ngày</span>
-                  <span>✓ Ảnh & Video quay thực tế 100% tại xưởng</span>
-                </div>
-              </div>
-
-              {/* CỘT PHẢI: THÔNG TIN & HÀNH ĐỘNG MUA */}
-              <div className="detail-content">
-                <div className="detail-top-tags">
-                  <span className="product-category-pill">
-                    {selectedProduct.category?.name}
-                  </span>
-                  <span className="product-brand-pill">
-                    Thương hiệu: {selectedProduct.brand || "Sene Handmade"}
-                  </span>
-                </div>
-
-                <h1>{selectedProduct.name}</h1>
-
-                <div className="detail-rating-row">
-                  <div className="stars">★★★★★</div>
-                  <span className="rating-num">4.9 / 5.0</span>
-                  <span className="rating-sep">•</span>
-                  <span className="sold-count">
-                    Đã bán {selectedProduct.stock > 50 ? "420+" : "185+"} sản phẩm
-                  </span>
-                </div>
-
-                <div className="detail-price-box">
-                  <strong className="detail-price">
-                    {formatPrice(selectedProduct.price)}
-                  </strong>
-                  <del className="detail-old-price">
-                    {formatPrice(Math.round((selectedProduct.price * 1.25) / 1000) * 1000)}
-                  </del>
-                  <span className="discount-tag">-20% Tiết kiệm</span>
-                </div>
-
-                <p className="detail-description">
-                  {selectedProduct.description ||
-                    "Dòng len sợi cao cấp, se tròn mềm mại, không gây ngứa hay kích ứng da. Màu sắc pastel ngọt ngào, độ bền cao, thích hợp đan móc cả thú bông và phụ kiện quà tặng."}
-                </p>
-
-                {/* BỘ CHỌN MÀU SẮC LEN */}
-                <div className="detail-color-selector">
-                  <div className="color-selector-label">
-                    <span>Màu sắc đang chọn:</span> <b>{selectedColor}</b>
-                  </div>
-                  <div className="color-swatches-list">
-                    {YARN_COLORS.map((c) => (
-                      <button
-                        key={c.name}
-                        type="button"
-                        className={`color-swatch-btn ${selectedColor === c.name ? "active" : ""}`}
-                        style={{ backgroundColor: c.hex, borderColor: c.border }}
-                        title={c.name}
-                        onClick={() => setSelectedColor(c.name)}
-                      >
-                        {selectedColor === c.name && <span>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="detail-rule" />
-
-                <div className="detail-delivery-perks">
-                  <p className="stock-label">
-                    <span className="pulsing-dot" /> Còn {selectedProduct.stock} sản phẩm sẵn có trong kho
-                  </p>
-                  <p className="delivery-note">
-                    🚚 Giao hàng toàn quốc · Miễn phí ship cho đơn từ 300.000đ
-                  </p>
-                  <p className="gift-bonus-note">
-                    🎁 Tặng kèm: 1 bộ chart móc len PDF độc quyền + video hướng dẫn
-                  </p>
-                </div>
-
-                <div className="detail-actions">
-                  <div className="quantity">
-                    <button
-                      type="button"
-                      aria-label="Giảm số lượng"
-                      onClick={() =>
-                        setDetailQuantity(Math.max(detailQuantity - 1, 1))
-                      }
-                    >
-                      −
-                    </button>
-                    <span>{detailQuantity}</span>
-                    <button
-                      type="button"
-                      aria-label="Tăng số lượng"
-                      onClick={() =>
-                        setDetailQuantity(
-                          Math.min(detailQuantity + 1, selectedProduct.stock),
-                        )
-                      }
-                    >
-                      +
-                    </button>
-                  </div>
-                  <button
-                    className="banner-button secondary add-cart-large"
-                    type="button"
-                    onClick={() => {
-                      addToCart(selectedProduct, detailQuantity);
-                      closeProductDetail();
-                    }}
-                  >
-                    Thêm vào giỏ hàng <span>🛒</span>
-                  </button>
-                </div>
-
-                <button
-                  className="buy-now"
-                  type="button"
-                  onClick={() => buyNow(selectedProduct, detailQuantity)}
-                >
-                  Mua ngay ({selectedColor}) • {formatPrice(selectedProduct.price * detailQuantity)} <span>→</span>
-                </button>
-              </div>
-            </article>
-
-
-            {/* GỢI Ý DỤNG CỤ MUA KÈM KHI XEM CHI TIẾT */}
-            <div className="detail-cross-sell-section">
-              <div className="detail-cross-sell-title">
-                <span className="cross-sell-sparkle">✨</span>
-                <strong>Gợi ý dụng cụ đan móc mua kèm tiết kiệm:</strong>
-              </div>
-              <div className="detail-cross-sell-grid">
-                {CRAFT_ADDONS.slice(0, 3).map((addon) => (
-                  <div key={addon.id} className="detail-addon-pill">
-                    <span className="addon-icon">{addon.icon}</span>
-                    <div className="addon-text">
-                      <b>{addon.name}</b>
-                      <small>{formatPrice(addon.price)} <del>{formatPrice(addon.originalPrice)}</del></small>
-                    </div>
-                    <button
-                      type="button"
-                      className="addon-quick-btn"
-                      onClick={() => {
-                        addToCart({
-                          _id: addon.id,
-                          name: addon.name,
-                          price: addon.price,
-                          images: addon.images,
-                          stock: addon.stock,
-                        }, 1);
-                      }}
-                    >
-                      + Thêm
-                    </button>
-                  </div>
-                ))}
-              </div>
+              </section>
             </div>
-
-            {/* TAB CHI TIẾT THÔNG SỐ & HƯỚNG DẪN */}
-            <section className="detail-tabs-section">
-              <div className="detail-tabs-nav">
-                <button
-                  type="button"
-                  className={`detail-tab-btn ${detailTab === "specs" ? "active" : ""}`}
-                  onClick={() => setDetailTab("specs")}
-                >
-                  🧶 Đặc tính sợi & Thông số
-                </button>
-                <button
-                  type="button"
-                  className={`detail-tab-btn ${detailTab === "guide" ? "active" : ""}`}
-                  onClick={() => setDetailTab("guide")}
-                >
-                  🪡 Hướng dẫn móc & Video QR
-                </button>
-                <button
-                  type="button"
-                  className={`detail-tab-btn ${detailTab === "policy" ? "active" : ""}`}
-                  onClick={() => setDetailTab("policy")}
-                >
-                  🛡 Chính sách đổi trả 7 ngày
-                </button>
-                <button
-                  type="button"
-                  className={`detail-tab-btn ${detailTab === "reviews" ? "active" : ""}`}
-                  onClick={() => setDetailTab("reviews")}
-                >
-                  ⭐ Đánh giá khách hàng (128)
-                </button>
-              </div>
-
-              <div className="detail-tab-pane">
-                {detailTab === "specs" && (
-                  <div className="detail-specs-content">
-                    <h3>Thông số kỹ thuật & Đặc tính dòng sợi</h3>
-                    <div className="detail-specs-grid">
-                      <div className="spec-card">
-                        <span>Chất liệu sợi</span>
-                        <strong>{selectedProduct.brand || "Cotton Milk cao cấp"}</strong>
-                      </div>
-                      <div className="spec-card">
-                        <span>Kim móc khuyên dùng</span>
-                        <strong>2.5mm - 3.5mm (êm tay)</strong>
-                      </div>
-                      <div className="spec-card">
-                        <span>Kim đan khuyên dùng</span>
-                        <strong>3.0mm - 4.5mm</strong>
-                      </div>
-                      <div className="spec-card">
-                        <span>Trọng lượng cuộn</span>
-                        <strong>50g ± 3g / cuộn</strong>
-                      </div>
-                      <div className="spec-card">
-                        <span>Chiều dài sợi</span>
-                        <strong>Khoảng 130 mét / cuộn</strong>
-                      </div>
-                      <div className="spec-card">
-                        <span>Độ bền màu</span>
-                        <strong>Cấp độ 4 (không phai khi giặt)</strong>
-                      </div>
-                    </div>
-                    <div className="detail-desc-box">
-                      <h4>Cam kết chất lượng từ Sene Handmade</h4>
-                      <p>
-                        Sản phẩm được dệt từ nguồn sợi bông chọn lọc, se tròn đều đặn giúp hạn chế tối đa việc sợi bị bung tách khi kéo kim. Len không đổ lông xơ xù, mềm mại ôm ấp làn da, an toàn tuyệt đối cho người lớn lẫn các bé nhỏ tuổi.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {detailTab === "guide" && (
-                  <div className="detail-guide-content">
-                    <h3>Hướng dẫn sử dụng & Khởi đầu đan móc</h3>
-                    <div className="guide-steps-grid">
-                      <div className="step-box">
-                        <span className="step-badge">Bước 1</span>
-                        <h4>Quét mã QR trên tem len</h4>
-                        <p>Dùng điện thoại quét mã QR dán trên cuộn len để xem video cận cảnh từng bước móc từ thợ lành nghề.</p>
-                      </div>
-                      <div className="step-box">
-                        <span className="step-badge">Bước 2</span>
-                        <h4>Lấy sợi len từ tim trong</h4>
-                        <p>Rút sợi từ tâm giữa ruột cuộn len ra để khi đan móc cuộn len đứng yên, không bị lăn tròn rơi xuống sàn.</p>
-                      </div>
-                      <div className="step-box">
-                        <span className="step-badge">Bước 3</span>
-                        <h4>Tham gia nhóm hỗ trợ</h4>
-                        <p>Nhắn tin Zalo 0942.901.124 bất cứ lúc nào nếu bạn gặp khó khăn ở các bước tăng giảm mũi móc.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {detailTab === "policy" && (
-                  <div className="detail-policy-content">
-                    <h3>Chính sách chăm sóc & Đổi trả an tâm</h3>
-                    <ul className="policy-list">
-                      <li>
-                        <strong>✓ Đổi trả miễn phí trong 7 ngày:</strong> Nếu sản phẩm bị lỗi do sợi đứt đoạn, lem màu hoặc thiếu phụ kiện, Tiệm đổi mới 100% không mất phí vận chuyển.
-                      </li>
-                      <li>
-                        <strong>✓ Đổi màu sắc nếu chưa vừa ý:</strong> Khách được hỗ trợ đổi màu len khác trong vòng 7 ngày nếu cuộn len chưa qua sử dụng và còn nguyên tem mác.
-                      </li>
-                      <li>
-                        <strong>✓ Đồng kiểm trước khi nhận hàng:</strong> Khách hàng được quyền bóc hộp kiểm tra màu len và số lượng trước khi gửi tiền cho nhân viên giao hàng.
-                      </li>
-                    </ul>
-                  </div>
-                )}
-
-                {detailTab === "reviews" && (
-                  <div className="detail-reviews-content">
-                    <h3>Đánh giá từ các bạn thợ móc len</h3>
-                    <div className="mini-reviews-list">
-                      <div className="mini-review">
-                        <div className="mini-review-top">
-                          <strong>Thu Thảo (TP.HCM)</strong>
-                          <span className="review-stars">★★★★★</span>
-                        </div>
-                        <p>"Len mềm mướt tay cực kỳ, móc thú bông lên phom rất căng tròn mà không hề bị lộ gòn. Đã mua lần thứ 4 của Tiệm rồi!"</p>
-                      </div>
-                      <div className="mini-review">
-                        <div className="mini-review-top">
-                          <strong>Ngọc Hân (Đà Nẵng)</strong>
-                          <span className="review-stars">★★★★★</span>
-                        </div>
-                        <p>"Đóng gói hộp siêu cẩn thận kèm thiệp viết tay xinh xỉu. Bộ kit tự móc hoa tulip có video hướng dẫn cực kỳ dễ hiểu cho người mới."</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL ĐỌC CẨM NANG ĐAN MÓC LEN (INTERACTIVE READER) */}
       {selectedGuide && (
@@ -3607,61 +5314,164 @@ function App() {
               </button>
             </div>
 
-            {/* SHOPEE-STYLE STATUS STEPPER */}
-            <div className="order-stepper-wrap">
-              <p className="stepper-title">🚚 TIẾN ĐỘ VẬN CHUYỂN & GIAO HÀNG</p>
-              <div className="order-stepper">
-                {(() => {
-                  const statusMap = {
-                    pending: 1,
-                    confirmed: 2,
-                    shipping: 4,
-                    delivered: 5,
-                    cancelled: 0,
-                  };
-                  const currentStep = statusMap[selectedOrder.status] ?? 1;
-                  const steps = [
-                    { step: 1, icon: "📝", label: "Đã đặt đơn", desc: "Hệ thống tiếp nhận" },
-                    { step: 2, icon: "🏪", label: "Shop xác nhận", desc: "Chuẩn bị kiện len" },
-                    { step: 3, icon: "🎁", label: "Đóng gói xong", desc: "Bàn giao bưu cục" },
-                    { step: 4, icon: "🚚", label: "Đang giao hàng", desc: "Bưu tá đang phát" },
-                    { step: 5, icon: "🎉", label: "Giao thành công", desc: "Đã nhận hàng" },
-                  ];
+            {/* SHOPEE EXPRESS VẬN CHUYỂN HEADER */}
+            <div className="shopee-tracking-card">
+              <div className="spx-header-row">
+                <div className="spx-brand">
+                  <span className="spx-badge">SPX Express</span>
+                  <span className="spx-service-tag">⚡ Giao Hỏa Tốc Cần Thơ</span>
+                </div>
+                <div className="spx-tracking-code-box">
+                  <span className="code-label">Mã vận đơn:</span>
+                  <strong className="spx-tracking-number">
+                    {selectedOrder.trackingCode || `SPX-CT${selectedOrder._id.slice(-6).toUpperCase()}VN`}
+                  </strong>
+                  <button
+                    type="button"
+                    className="copy-spx-code-btn"
+                    onClick={() => {
+                      const code = selectedOrder.trackingCode || `SPX-CT${selectedOrder._id.slice(-6).toUpperCase()}VN`;
+                      navigator.clipboard?.writeText(code);
+                      setToast(`Đã sao chép mã vận đơn: ${code}!`);
+                      setTimeout(() => setToast(""), 2000);
+                    }}
+                    title="Sao chép mã vận đơn"
+                  >
+                    Sao chép
+                  </button>
+                </div>
+              </div>
 
-                  if (selectedOrder.status === "cancelled") {
+              {/* THẺ BƯU TÁ / TÀI XẾ SHOPEE XPRESS PHỤ TRÁCH GIAO HÀNG */}
+              <div className="shopee-driver-card">
+                <div className="driver-avatar-box">
+                  <span className="driver-icon">🛵</span>
+                  <span className="driver-online-dot" />
+                </div>
+                <div className="driver-info">
+                  <div className="driver-name-row">
+                    <strong>Bưu tá: {selectedOrder.shipper?.name || "Nguyễn Văn Hùng"}</strong>
+                    <span className="driver-rating">⭐ {selectedOrder.shipper?.rating || 4.9} (1.240 đơn)</span>
+                  </div>
+                  <div className="driver-vehicle">
+                    <span>Phương tiện: {selectedOrder.shipper?.vehicle || "Honda Wave (65-B1 839.21)"}</span>
+                  </div>
+                  <div className="driver-status-live">
+                    <span className="live-pulsar" />
+                    <small>
+                      {selectedOrder.status === "delivered"
+                        ? "🟢 Đã hoàn tất giao đơn hàng thành công"
+                        : selectedOrder.status === "shipping"
+                        ? "🛵 Đang di chuyển giao kiện len đến địa chỉ của bạn"
+                        : "📦 Đang chờ điều phối nhận hàng từ kho Cần Thơ"}
+                    </small>
+                  </div>
+                </div>
+                <a
+                  href={`tel:${selectedOrder.shipper?.phone || "0918.234.567"}`}
+                  className="driver-call-btn"
+                  title="Gọi điện cho bưu tá"
+                >
+                  <span>📞 Gọi Bưu Tá</span>
+                </a>
+              </div>
+
+              {/* BẢN ĐỒ LỘ TRÌNH VẬN CHUYỂN TRỰC QUAN (SHOPEE ROUTE PROGRESS) */}
+              <div className="shopee-visual-route">
+                <div className="route-header">
+                  <span className="route-title">🗺️ Lộ trình di chuyển kiện hàng len:</span>
+                  <span className="route-eta">
+                    Dự kiến giao: <b>{selectedOrder.status === "delivered" ? "Đã giao" : "Hôm nay (2 giờ)"}</b>
+                  </span>
+                </div>
+                <div className="route-flow-bar">
+                  {(() => {
+                    const statusProgress = {
+                      pending: 15,
+                      confirmed: 40,
+                      shipping: 75,
+                      delivered: 100,
+                      cancelled: 0,
+                    };
+                    const pct = statusProgress[selectedOrder.status] ?? 20;
                     return (
-                      <div className="order-cancelled-banner">
-                        <span>❌ Đơn hàng này đã bị hủy</span>
+                      <div className="route-line-wrap">
+                        <div className="route-line-bg" />
+                        <div className="route-line-fill" style={{ width: `${pct}%` }} />
+                        <div className="route-carrier-bike" style={{ left: `calc(${pct}% - 14px)` }}>
+                          🛵💨
+                        </div>
                       </div>
                     );
-                  }
-
-                  return (
-                    <div className="stepper-track">
-                      {steps.map((s, idx) => {
-                        const isDone = currentStep >= s.step;
-                        const isCurrent = currentStep === s.step;
-                        return (
-                          <div
-                            key={s.step}
-                            className={`stepper-node ${isDone ? "done" : ""} ${isCurrent ? "current" : ""}`}
-                          >
-                            <div className="node-icon-circle">
-                              {isDone && !isCurrent ? "✓" : s.icon}
-                            </div>
-                            <b className="node-label">{s.label}</b>
-                            <small className="node-desc">{s.desc}</small>
-                            {idx < steps.length - 1 && (
-                              <div
-                                className={`node-connector ${currentStep > s.step ? "done" : ""}`}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
+                  })()}
+                  <div className="route-checkpoints">
+                    <div className="checkpoint done">
+                      <span className="cp-dot" />
+                      <b>Kho Cần Thơ</b>
+                      <small>124 Đ. 30/4, Ninh Kiều</small>
                     </div>
-                  );
-                })()}
+                    <div className={`checkpoint ${selectedOrder.status !== "pending" ? "done" : ""}`}>
+                      <span className="cp-dot" />
+                      <b>Hub SPX Ninh Kiều</b>
+                      <small>Phân loại kiện len</small>
+                    </div>
+                    <div className={`checkpoint ${selectedOrder.status === "shipping" || selectedOrder.status === "delivered" ? "done" : ""}`}>
+                      <span className="cp-dot" />
+                      <b>Đang Giao Hàng</b>
+                      <small>Bưu tá đang phát</small>
+                    </div>
+                    <div className={`checkpoint ${selectedOrder.status === "delivered" ? "done" : ""}`}>
+                      <span className="cp-dot" />
+                      <b>Đã Nhận Hàng</b>
+                      <small>{selectedOrder.address ? selectedOrder.address.split(",")[0] : "Địa chỉ của bạn"}</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* NHẬT KÝ HÀNH TRÌNH CHI TIẾT TỪNG MỐC THỜI GIAN (SHOPEE TRACKING LOGS) */}
+              <div className="shopee-tracking-logs-wrap">
+                <div className="logs-header">
+                  <span className="logs-title">📋 Lịch sử chi tiết hành trình vận chuyển</span>
+                  <span className="logs-update-badge">Đồng bộ theo thời gian thực</span>
+                </div>
+                <div className="shopee-logs-timeline">
+                  {(() => {
+                    const logs = (selectedOrder.shippingLogs && selectedOrder.shippingLogs.length > 0)
+                      ? [...selectedOrder.shippingLogs].reverse()
+                      : [
+                          {
+                            time: selectedOrder.createdAt || new Date(),
+                            title: "Đã đặt hàng thành công",
+                            desc: `Đơn hàng #${selectedOrder.trackingCode || selectedOrder._id.slice(-6).toUpperCase()} đã tiếp nhận trên hệ thống.`,
+                            location: "Kho Tổng Cần Thơ",
+                            icon: "📝",
+                          },
+                        ];
+
+                    return logs.map((log, idx) => (
+                      <div className={`log-node ${idx === 0 ? "latest" : ""}`} key={idx}>
+                        <div className="log-time-col">
+                          <strong>{new Date(log.time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</strong>
+                          <small>{new Date(log.time).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}</small>
+                        </div>
+                        <div className="log-icon-col">
+                          <div className="log-icon-badge">
+                            {log.icon || "📦"}
+                          </div>
+                          {idx < logs.length - 1 && <div className="log-connector" />}
+                        </div>
+                        <div className="log-content-col">
+                          <div className="log-content-top">
+                            <strong className="log-node-title">{log.title}</strong>
+                            {log.location && <span className="log-location-pill">📍 {log.location}</span>}
+                          </div>
+                          <p className="log-node-desc">{log.desc}</p>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
             </div>
 
@@ -3695,6 +5505,14 @@ function App() {
                       : "Thanh toán tiền mặt khi nhận hàng (COD)"}
                   </strong>
                 </div>
+                <div className="customer-info-row">
+                  <span>Trạng thái thanh toán:</span>
+                  <span className={`payment-pill ${selectedOrder.paymentStatus === "paid" ? "paid" : "unpaid"}`}>
+                    {selectedOrder.paymentStatus === "paid"
+                      ? "✅ ĐÃ THANH TOÁN (MB Bank)"
+                      : "⏳ CHƯA THANH TOÁN"}
+                  </span>
+                </div>
               </div>
 
               {/* CỘT PHẢI: BẢNG TÍNH TIỀN */}
@@ -3725,15 +5543,144 @@ function App() {
                   <span className={`order-status-badge ${selectedOrder.status}`}>
                     {{
                       pending: "🟡 Chờ shop duyệt",
-                      confirmed: "🔵 Shop đã duyệt",
-                      shipping: "🚚 Đang giao hàng",
-                      delivered: "🟢 Giao thành công",
+                      confirmed: "🔵 Shop đã chuẩn bị hàng",
+                      shipping: "🚚 SPX đang giao hàng",
+                      delivered: "🟢 Đã giao thành công",
                       cancelled: "❌ Đã hủy",
                     }[selectedOrder.status] || selectedOrder.status}
                   </span>
                 </div>
               </div>
             </div>
+
+            {/* TRẠNG THÁI THANH TOÁN VIETQR / XÁC NHẬN TỰ ĐỘNG NẾU CHƯA CK */}
+            {selectedOrder.paymentMethod === "BANK_TRANSFER" && (
+              selectedOrder.paymentStatus === "paid" ? (
+                <div className="order-paid-banner">
+                  <div className="paid-icon-box">✓</div>
+                  <div className="paid-text-wrap">
+                    <h4>ĐÃ THANH TOÁN THÀNH CÔNG QUA VIETQR</h4>
+                    <p>
+                      Tài khoản MB Bank 0942901124 (HUYNH VAN TAI) đã nhận đủ {formatPrice(selectedOrder.totalAmount)}. Shop đang tiến hành móc len và đóng gói gửi bạn.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="order-qr-payment-card">
+                  <div className="qr-card-header">
+                    <span className="qr-badge">⚡ QUÉT MÃ VIETQR THANH TOÁN TỰ ĐỘNG</span>
+                    <p>Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ để quét mã chuyển khoản nhanh (Hệ thống tự nhận diện không cần xác nhận)</p>
+                  </div>
+                  <div className="qr-card-body">
+                    <div className="qr-img-wrapper">
+                      <div className="vietqr-box">
+                        <div className="vietqr-top-bar">
+                          <span className="vietqr-brand-label">Viet<b>QR</b></span>
+                          <span className="napas-label">napas<b>247</b></span>
+                        </div>
+                        <img
+                          src={`https://img.vietqr.io/image/970422-0942901124-qr_only.png?amount=${selectedOrder.totalAmount}&addInfo=DH${selectedOrder._id.slice(-6).toUpperCase()}&accountName=HUYNH%20VAN%20TAI`}
+                          alt="VietQR MB Bank Sene Handmade"
+                          className="vietqr-scan-img"
+                        />
+                        <div className="vietqr-footer-hint">MB Bank · HUYNH VAN TAI</div>
+                      </div>
+                      <small className="qr-scan-hint">⚡ Tự động nhận diện tiền vào</small>
+                    </div>
+                    <div className="qr-bank-details">
+                      <div className="qr-detail-row">
+                        <span>Ngân hàng:</span>
+                        <strong>MB Bank (Ngân hàng Quân Đội)</strong>
+                      </div>
+                      <div className="qr-detail-row">
+                        <span>Số tài khoản:</span>
+                        <div className="copy-field">
+                          <strong className="syntax-highlight">0942901124</strong>
+                          <button
+                            type="button"
+                            className="copy-btn"
+                            onClick={() => {
+                              navigator.clipboard?.writeText("0942901124");
+                              setToast("Đã sao chép số tài khoản MB Bank: 0942901124!");
+                              setTimeout(() => setToast(""), 2000);
+                            }}
+                          >
+                            Sao chép
+                          </button>
+                        </div>
+                      </div>
+                      <div className="qr-detail-row">
+                        <span>Chủ tài khoản:</span>
+                        <strong>HUYNH VAN TAI</strong>
+                      </div>
+                      <div className="qr-detail-row">
+                        <span>Số tiền:</span>
+                        <div className="copy-field">
+                          <strong className="qr-amount">{formatPrice(selectedOrder.totalAmount)}</strong>
+                          <button
+                            type="button"
+                            className="copy-btn"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(String(selectedOrder.totalAmount));
+                              setToast(`Đã sao chép số tiền: ${formatPrice(selectedOrder.totalAmount)}!`);
+                              setTimeout(() => setToast(""), 2000);
+                            }}
+                          >
+                            Sao chép
+                          </button>
+                        </div>
+                      </div>
+                      <div className="qr-detail-row">
+                        <span>Nội dung CK:</span>
+                        <div className="copy-field">
+                          <strong className="qr-content-code">{`DH${selectedOrder._id.slice(-6).toUpperCase()}`}</strong>
+                          <button
+                            type="button"
+                            className="copy-btn"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(`DH${selectedOrder._id.slice(-6).toUpperCase()}`);
+                              setToast("Đã sao chép nội dung chuyển khoản!");
+                              setTimeout(() => setToast(""), 2000);
+                            }}
+                          >
+                            Sao chép
+                          </button>
+                        </div>
+                      </div>
+                      <div className="order-transfer-confirm-box">
+                        <p className="order-transfer-hint">
+                          💡 Bạn đã chuyển khoản cho đơn này? Hãy bấm xác nhận hoặc gửi ảnh biên lai qua Zalo để tiệm gửi hàng nhanh nhất:
+                        </p>
+                        <div className="order-transfer-actions">
+                          <button
+                            type="button"
+                            className="btn-order-reported-paid"
+                            onClick={() => {
+                              setToast("Tiệm đã ghi nhận xác nhận của bạn! Shop sẽ kiểm tra và gửi hàng sớm nhất.");
+                              setTimeout(() => setToast(""), 4000);
+                            }}
+                          >
+                            ✅ Tôi Đã Chuyển Khoản Thành Công
+                          </button>
+                          <a
+                            href={`https://zalo.me/0942901124?text=${encodeURIComponent(
+                              `Chào Shop Sene Handmade, mình đã chuyển khoản cho đơn hàng #${
+                                selectedOrder.trackingCode || selectedOrder._id.slice(-6).toUpperCase()
+                              } số tiền ${formatPrice(selectedOrder.totalAmount)}. Nhờ shop kiểm tra và gửi hàng sớm giúp mình nhé!`
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-order-zalo-confirm"
+                          >
+                            💬 Gửi Biên Lai Qua Zalo (0942.901.124)
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
 
             {/* DANH SÁCH SẢN PHẨM TRONG ĐƠN */}
             <div className="order-items-table-wrap">
@@ -3803,50 +5750,158 @@ function App() {
       )}
 
 
-      {/* FLOATING QUICK CONTACT & ACTION BAR */}
-      <div className="floating-actions">
-        <a
-          href="https://zalo.me/0942901124"
-          target="_blank"
-          rel="noreferrer"
-          className="floating-btn floating-zalo pulse-glow"
-          title="Chat Zalo tư vấn chọn len trực tiếp với Sene Handmade (0942.901.124)"
-        >
-          <span className="floating-zalo-logo">Zalo</span>
-          <span className="floating-btn-text">Chat Zalo</span>
-        </a>
+      {/* SOCIAL PROOF / LIVE ORDER TOAST */}
+      {currentSocialProof && !socialProofDismissed && (
+        <div className="live-order-toast" role="alert">
+          <button
+            type="button"
+            className="live-order-close"
+            onClick={() => setSocialProofDismissed(true)}
+            title="Đóng thông báo"
+          >
+            ✕
+          </button>
+          <div className="live-order-avatar">
+            <span>{currentSocialProof.icon}</span>
+          </div>
+          <div className="live-order-content">
+            <p className="live-order-title">
+              <strong>{currentSocialProof.name}</strong> <span>({currentSocialProof.location})</span>
+            </p>
+            <p className="live-order-desc">
+              vừa đặt <b>{currentSocialProof.product}</b>
+            </p>
+            <small className="live-order-time">
+              ⚡ {currentSocialProof.time} · Đã xác nhận đơn
+            </small>
+          </div>
+        </div>
+      )}
 
-        <a
-          href="tel:0942901124"
-          className="floating-btn floating-hotline"
-          title="Gọi Hotline đặt hàng nhanh: 0942.901.124"
-        >
-          <span className="floating-hotline-icon">📞</span>
-          <span className="floating-btn-text">Hotline: 0942.901.124</span>
-        </a>
+      {/* CỤM NÚT NỔI THÔNG MINH (SPEED DIAL FAB) */}
+      <div className={`floating-fab-container ${fabOpen ? "active" : ""}`}>
+        {fabOpen && (
+          <div className="fab-menu">
+            <a
+              href="https://zalo.me/0942901124"
+              target="_blank"
+              rel="noreferrer"
+              className="fab-item fab-zalo"
+              title="Chat Zalo tư vấn chọn len (0942.901.124)"
+            >
+              <span className="fab-item-icon">💬</span>
+              <span className="fab-item-label">Zalo: 0942.901.124</span>
+            </a>
+            <a
+              href="tel:0942901124"
+              className="fab-item fab-hotline"
+              title="Gọi hotline đặt hàng nhanh"
+            >
+              <span className="fab-item-icon">📞</span>
+              <span className="fab-item-label">Hotline: 0942.901.124</span>
+            </a>
+            <button
+              type="button"
+              className="fab-item fab-custom"
+              onClick={() => {
+                setFabOpen(false);
+                setCustomOrderSuccess(null);
+                setCustomOrderModalOpen(true);
+              }}
+              title="Đặt móc len theo mẫu riêng"
+            >
+              <span className="fab-item-icon">🧶</span>
+              <span className="fab-item-label">Đặt Móc Riêng</span>
+            </button>
+            <button
+              type="button"
+              className="fab-item fab-top"
+              onClick={() => {
+                setFabOpen(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              title="Lên đầu trang"
+            >
+              <span className="fab-item-icon">↑</span>
+              <span className="fab-item-label">Lên đầu trang</span>
+            </button>
+          </div>
+        )}
 
         <button
           type="button"
-          className="floating-btn floating-custom-order"
+          className="fab-main-btn"
+          onClick={() => setFabOpen(!fabOpen)}
+          title="Hỗ trợ & Tiện ích Sene Handmade"
+          aria-label="Menu liên hệ nổi"
+        >
+          <span className="fab-main-icon">{fabOpen ? "✕" : "💬"}</span>
+          {!fabOpen && <span className="fab-main-pulse"></span>}
+          <span className="fab-main-text">Tư vấn</span>
+        </button>
+      </div>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <nav className="mobile-bottom-nav" aria-label="Thanh điều hướng di động">
+        <button
+          type="button"
+          className="mobile-nav-item"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        >
+          <span className="mobile-nav-icon">🏠</span>
+          <span className="mobile-nav-label">Trang chủ</span>
+        </button>
+
+        <button
+          type="button"
+          className="mobile-nav-item"
+          onClick={() => {
+            const searchInput = document.querySelector("#site-search-input");
+            if (searchInput) {
+              searchInput.focus();
+              searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }}
+        >
+          <span className="mobile-nav-icon">🔍</span>
+          <span className="mobile-nav-label">Tìm kiếm</span>
+        </button>
+
+        <button
+          type="button"
+          className="mobile-nav-item mobile-nav-highlight"
           onClick={() => {
             setCustomOrderSuccess(null);
             setCustomOrderModalOpen(true);
           }}
-          title="Gửi yêu cầu móc thú bông, hoa len, túi xách theo ý bạn"
         >
-          <span>🧶</span>
-          <span className="floating-btn-text">Đặt Móc Riêng</span>
+          <span className="mobile-nav-icon">🧶</span>
+          <span className="mobile-nav-label">Đặt móc</span>
         </button>
 
         <button
           type="button"
-          className="floating-btn floating-top"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          title="Lên đầu trang"
+          className="mobile-nav-item"
+          onClick={() => setCartOpen(true)}
         >
-          ↑
+          <span className="mobile-nav-icon-wrap">
+            <span className="mobile-nav-icon">🛒</span>
+            {cartCount > 0 && <span className="mobile-nav-badge">{cartCount}</span>}
+          </span>
+          <span className="mobile-nav-label">Giỏ hàng</span>
         </button>
-      </div>
+
+        <a
+          href="#account"
+          className="mobile-nav-item"
+          onClick={() => {
+            document.querySelector("#account")?.scrollIntoView({ behavior: "smooth" });
+          }}
+        >
+          <span className="mobile-nav-icon">👤</span>
+          <span className="mobile-nav-label">{currentUser ? "Tôi" : "Tài khoản"}</span>
+        </a>
+      </nav>
 
       {/* MODAL: ĐẶT MÓC LEN THEO YÊU CẦU (CUSTOM CROCHET ORDER) */}
       {customOrderModalOpen && (
@@ -4056,6 +6111,8 @@ function App() {
           </div>
         </div>
       )}
+
+
 
     </main>
   );

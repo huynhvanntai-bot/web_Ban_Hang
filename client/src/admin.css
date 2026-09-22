@@ -1,0 +1,1128 @@
+/* ==========================================================================
+   ADMIN DESKTOP PRO SUITE STYLES (20-30% ENLARGED, PROFESSIONAL DESKTOP ERP)
+   Theme: Elegant Pastel Pink & Crisp White (#fff5f8 / #ffffff / #f43f5e)
+   Optimized for: 1920x1080 Full HD & modern desktop business software
+   Zero scaling/zoom tricks - 100% Crisp Native Typography & Balanced Layout
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. SHELL & MAIN CONTENT WRAPPER
+   -------------------------------------------------------------------------- */
+.admin-shell {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  min-height: 100vh !important;
+  background: #fff5f8 !important;
+  color: #2c0e17 !important;
+  font-size: 15.5px !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  overflow-x: hidden !important;
+}
+
+/* MAIN CONTENT CONTAINER */
+.admin-content {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  margin-left: 300px !important;
+  width: calc(100% - 300px) !important;
+  max-width: calc(100% - 300px) !important;
+  min-height: 100vh !important;
+  padding: 28px 36px 80px !important;
+  box-sizing: border-box !important;
+  background: #fff5f8 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  transition: margin-left 0.22s ease, width 0.22s ease, max-width 0.22s ease !important;
+}
+
+/* FULL-WIDTH INNER CONTENT (ELIMINATES EXCESS WASTED PADDING) */
+.admin-content-inner {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. SIDEBAR NAVIGATION (ENLARGED TO 300px, CRYSTAL-CLEAR MENUS & PROFILES)
+   -------------------------------------------------------------------------- */
+.admin-sidebar {
+  width: 300px !important;
+  min-width: 300px !important;
+  max-width: 300px !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  z-index: 1000 !important;
+  background: #ffffff !important;
+  color: #831843 !important;
+  border-right: 2px solid #fce7f3 !important;
+  box-shadow: 4px 0 24px rgba(244, 114, 182, 0.08) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 20px 16px 18px !important;
+  box-sizing: border-box !important;
+  transition: width 0.22s ease, min-width 0.22s ease, max-width 0.22s ease, padding 0.22s ease !important;
+  overflow: hidden !important;
+}
+
+/* SIDEBAR HEADER & LOGO */
+.admin-sidebar-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-bottom: 16px !important;
+  border-bottom: 2px solid #fbcfe8 !important;
+  gap: 8px !important;
+  flex: 0 0 auto !important;
+}
+
+.admin-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  color: #831843 !important;
+  font-weight: 900 !important;
+  font-size: 19px !important;
+  letter-spacing: 0.3px !important;
+  text-decoration: none !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.admin-brand span:first-child {
+  font-size: 24px !important;
+  line-height: 1 !important;
+}
+
+.admin-brand .admin-brand-tag {
+  display: inline-block !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  background: linear-gradient(135deg, #f43f5e 0%, #fb7185 100%) !important;
+  color: #ffffff !important;
+  padding: 3px 8px !important;
+  border-radius: 7px !important;
+  letter-spacing: 0.8px !important;
+  vertical-align: middle !important;
+}
+
+.admin-sidebar-collapse-btn {
+  background: #ffffff !important;
+  border: 1.5px solid #fbcfe8 !important;
+  color: #be185d !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 9px !important;
+  cursor: pointer !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 13px !important;
+  transition: all 0.2s ease !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-sidebar-collapse-btn:hover {
+  background: #f43f5e !important;
+  border-color: #f43f5e !important;
+  color: #ffffff !important;
+  transform: scale(1.05) !important;
+}
+
+/* PROFILE CHIP */
+.admin-profile-chip {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #fbcfe8 !important;
+  box-shadow: 0 3px 12px rgba(244, 114, 182, 0.08) !important;
+  padding: 12px 14px !important;
+  border-radius: 14px !important;
+  margin: 14px 0 16px !important;
+  flex: 0 0 auto !important;
+  overflow: hidden !important;
+}
+
+.admin-profile-avatar {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 50% !important;
+  background: #fce7f3 !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 22px !important;
+  border: 2px solid #fbcfe8 !important;
+}
+
+.admin-profile-info {
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+
+.admin-profile-info strong {
+  display: block !important;
+  color: #831843 !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.admin-profile-info small {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  color: #be185d !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  margin-top: 3px !important;
+}
+
+/* SIDEBAR NAVIGATION ITEMS */
+.admin-sidebar-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px !important;
+  margin-top: 6px !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #fbcfe8 transparent !important;
+}
+
+.admin-nav-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 13px !important;
+  padding: 12px 16px !important;
+  margin: 4px 0 !important;
+  background: transparent !important;
+  color: #4b5563 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  font-family: inherit !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-height: 48px !important;
+}
+
+.admin-nav-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+}
+
+.admin-nav-icon {
+  font-size: 21px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 26px !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-nav-label {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #4b5563 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.admin-nav-item:hover {
+  background: #fff0f5 !important;
+  color: #db2777 !important;
+  transform: translateX(3px) !important;
+}
+
+.admin-nav-item:hover .admin-nav-label {
+  color: #db2777 !important;
+}
+
+.admin-nav-item.active {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 16px rgba(225, 29, 72, 0.3) !important;
+  transform: translateX(3px) !important;
+}
+
+.admin-nav-item.active .admin-nav-icon,
+.admin-nav-item.active .admin-nav-label {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+.admin-nav-badge {
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+  padding: 3px 9px !important;
+  border-radius: 999px !important;
+  background: #f43f5e !important;
+  color: #ffffff !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-nav-item.active .admin-nav-badge {
+  background: #ffffff !important;
+  color: #e11d48 !important;
+}
+
+/* SIDEBAR FOOTER ACTIONS */
+.admin-sidebar-footer {
+  flex: 0 0 auto !important;
+  margin-top: auto !important;
+  padding-top: 14px !important;
+  border-top: 2px solid #fce7f3 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.admin-toggle-full-btn,
+.admin-store-link,
+.admin-logout-btn {
+  min-height: 40px !important;
+  border-radius: 10px !important;
+  padding: 9px 14px !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  font-family: inherit !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+}
+
+.admin-toggle-full-btn {
+  background: #ffffff !important;
+  border: 1.5px solid #fbcfe8 !important;
+  color: #be185d !important;
+}
+.admin-toggle-full-btn:hover {
+  background: #fce7f3 !important;
+  color: #831843 !important;
+}
+
+.admin-store-link {
+  background: #ffffff !important;
+  border: 1.5px solid #fbcfe8 !important;
+  color: #be185d !important;
+}
+.admin-store-link:hover {
+  background: #fce7f3 !important;
+  color: #831843 !important;
+}
+
+.admin-logout-btn {
+  background: #fff1f2 !important;
+  border: 1.5px solid #fecdd3 !important;
+  color: #e11d48 !important;
+}
+.admin-logout-btn:hover {
+  background: #ffe4e6 !important;
+  border-color: #f43f5e !important;
+}
+
+/* COLLAPSED SIDEBAR STATE */
+.admin-sidebar.collapsed,
+.admin-shell.sidebar-collapsed .admin-sidebar {
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  padding: 20px 10px 18px !important;
+}
+
+.admin-sidebar.collapsed + .admin-content,
+.admin-shell.sidebar-collapsed .admin-content {
+  margin-left: 80px !important;
+  width: calc(100% - 80px) !important;
+  max-width: calc(100% - 80px) !important;
+}
+
+.admin-sidebar.collapsed .admin-brand,
+.admin-sidebar.collapsed .admin-profile-info,
+.admin-sidebar.collapsed .admin-nav-label,
+.admin-sidebar.collapsed .admin-nav-badge {
+  display: none !important;
+}
+
+.admin-sidebar.collapsed .admin-nav-item {
+  justify-content: center !important;
+  padding: 12px 0 !important;
+}
+
+.admin-sidebar.collapsed .admin-profile-chip {
+  justify-content: center !important;
+  padding: 8px 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* --------------------------------------------------------------------------
+   3. TOPBAR HEADER (PRO DESKTOP BANNER)
+   -------------------------------------------------------------------------- */
+.admin-topbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 18px !important;
+  margin-bottom: 26px !important;
+  padding: 18px 28px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #fce7f3 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 4px 20px rgba(244, 114, 182, 0.07) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  flex-wrap: wrap !important;
+}
+
+.admin-topbar-title h1 {
+  margin: 0 !important;
+  font-size: 28px !important;
+  font-weight: 900 !important;
+  color: #2c0e17 !important;
+  letter-spacing: -0.5px !important;
+  line-height: 1.25 !important;
+}
+
+.admin-topbar-title p {
+  margin: 5px 0 0 !important;
+  color: #7b4b5c !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+.admin-topbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.admin-clock-chip {
+  background: #fff0f5 !important;
+  border: 1.5px solid #fce7f3 !important;
+  color: #be123c !important;
+  font-weight: 700 !important;
+  padding: 9px 18px !important;
+  border-radius: 16px !important;
+  font-size: 14.5px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.admin-refresh-btn {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 14px !important;
+  padding: 10px 22px !important;
+  font-weight: 800 !important;
+  font-size: 15px !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.28) !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 42px !important;
+}
+
+.admin-refresh-btn:hover {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(244, 63, 94, 0.38) !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. KPI SUMMARY CARDS (EXPANDED & BEAUTIFUL NUMERICAL CALLOUTS)
+   -------------------------------------------------------------------------- */
+.admin-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 20px !important;
+  margin-bottom: 28px !important;
+  width: 100% !important;
+}
+
+.admin-kpi-card {
+  background: #ffffff !important;
+  border: 1.5px solid #fce7f3 !important;
+  border-radius: 20px !important;
+  padding: 24px 28px !important;
+  box-shadow: 0 4px 22px rgba(244, 63, 94, 0.08) !important;
+  transition: all 0.25s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+  min-height: 145px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+}
+
+.admin-kpi-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 12px 32px rgba(244, 63, 94, 0.16) !important;
+  border-color: #fbcfe8 !important;
+}
+
+.admin-kpi-card .kpi-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 14px !important;
+}
+
+.admin-kpi-card .kpi-icon {
+  width: 58px !important;
+  height: 58px !important;
+  border-radius: 16px !important;
+  background: #fff1f2 !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 28px !important;
+  border: 1.5px solid #ffe4e6 !important;
+}
+
+.admin-kpi-card .kpi-trend {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  color: #059669 !important;
+  background: #ecfdf5 !important;
+  padding: 6px 14px !important;
+  border-radius: 14px !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.admin-kpi-card .kpi-title {
+  font-size: 16.5px !important;
+  color: #7b4b5c !important;
+  font-weight: 700 !important;
+  margin: 0 0 6px !important;
+}
+
+.admin-kpi-card .kpi-val {
+  font-size: 34px !important;
+  font-weight: 900 !important;
+  color: #2c0e17 !important;
+  margin: 0 !important;
+  letter-spacing: -0.5px !important;
+  line-height: 1.15 !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. CARDS, SECTIONS & CONTAINER BLOCKS
+   -------------------------------------------------------------------------- */
+.admin-card {
+  background: #ffffff !important;
+  border: 1.5px solid #fce7f3 !important;
+  border-radius: 20px !important;
+  padding: 28px 34px !important;
+  box-shadow: 0 4px 24px rgba(244, 63, 94, 0.07) !important;
+  margin-bottom: 28px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.admin-card-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 22px !important;
+  padding-bottom: 18px !important;
+  border-bottom: 2px dashed #fce7f3 !important;
+  flex-wrap: wrap !important;
+  gap: 16px !important;
+}
+
+.admin-card-header h2 {
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  color: #2c0e17 !important;
+  margin: 0 !important;
+  letter-spacing: -0.3px !important;
+}
+
+.admin-card-header p {
+  font-size: 14.5px !important;
+  color: #7b4b5c !important;
+  margin: 4px 0 0 !important;
+}
+
+.admin-card-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+}
+
+/* --------------------------------------------------------------------------
+   6. FORM GROUPS, INPUTS, SELECTS & TEXTAREAS (HEIGHT: 42-44px CRITICAL)
+   -------------------------------------------------------------------------- */
+.admin-product-grid-form {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+  gap: 20px 26px !important;
+  margin-top: 18px !important;
+  margin-bottom: 24px !important;
+  width: 100% !important;
+}
+
+.admin-form-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.admin-form-group label {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #3f1a26 !important;
+  display: block !important;
+  margin-bottom: 2px !important;
+}
+
+/* UNIFIED INPUT / SELECT STYLES (42-44px TALL) */
+.admin-form-group input,
+.admin-form-group select,
+.admin-search-input,
+.order-status-select,
+.admin-date-input,
+.admin-content select,
+.admin-content input[type="text"],
+.admin-content input[type="number"],
+.admin-content input[type="password"],
+.admin-content input[type="email"],
+.admin-content input[type="date"],
+.admin-content input[type="datetime-local"] {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 10px 16px !important;
+  border: 1.5px solid #fbcfe8 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  font-size: 15px !important;
+  color: #2c0e17 !important;
+  font-family: inherit !important;
+  line-height: normal !important;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s !important;
+}
+
+.admin-form-group input:focus,
+.admin-form-group select:focus,
+.admin-search-input:focus,
+.order-status-select:focus,
+.admin-date-input:focus,
+.admin-content select:focus,
+.admin-content input:focus {
+  outline: none !important;
+  border-color: #f43f5e !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.18) !important;
+}
+
+.admin-form-group textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 12px 16px !important;
+  border: 1.5px solid #fbcfe8 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  font-size: 15px !important;
+  color: #2c0e17 !important;
+  font-family: inherit !important;
+  line-height: 1.5 !important;
+  min-height: 96px !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+.admin-form-group textarea:focus {
+  outline: none !important;
+  border-color: #f43f5e !important;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.18) !important;
+}
+
+/* --------------------------------------------------------------------------
+   7. BUTTONS (PRIMARY, OUTLINE, TABLE ACTION BUTTONS - 36-44px HEIGHT)
+   -------------------------------------------------------------------------- */
+.admin-btn-primary {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  min-height: 44px !important;
+  padding: 11px 24px !important;
+  font-size: 15.5px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.28) !important;
+  transition: all 0.2s ease !important;
+  font-family: inherit !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  text-decoration: none !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+}
+
+.admin-btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 22px rgba(244, 63, 94, 0.4) !important;
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%) !important;
+}
+
+.admin-btn-outline {
+  background: #ffffff !important;
+  border: 1.5px solid #fbcfe8 !important;
+  color: #be123c !important;
+  border-radius: 12px !important;
+  min-height: 42px !important;
+  padding: 10px 20px !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: inherit !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  text-decoration: none !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+}
+
+.admin-btn-outline:hover {
+  background: #ffe4e6 !important;
+  border-color: #f43f5e !important;
+  color: #9f1239 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* COMPACT TABLE ACTION BUTTONS (CONSISTENT ~36px HEIGHT, CLEAR CLICKABLE TARGETS) */
+.admin-table td .admin-btn-outline,
+.admin-table td button {
+  min-height: 36px !important;
+  height: 36px !important;
+  padding: 6px 14px !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  border-radius: 9px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. TABLES (LARGE, READABLE, LUXURIOUS ROW HEIGHT & NON-DISTORTED IMAGES)
+   -------------------------------------------------------------------------- */
+.admin-table-wrap {
+  width: 100% !important;
+  overflow-x: auto !important;
+  border-radius: 16px !important;
+  border: 1.5px solid #fce7f3 !important;
+  box-shadow: 0 2px 14px rgba(244, 114, 182, 0.05) !important;
+  background: #ffffff !important;
+}
+
+.admin-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  font-size: 15px !important;
+  text-align: left !important;
+}
+
+.admin-table th {
+  background: #fff0f5 !important;
+  color: #7b4b5c !important;
+  font-weight: 800 !important;
+  font-size: 14.5px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 16px 20px !important;
+  border-bottom: 2px solid #fbcfe8 !important;
+  white-space: nowrap !important;
+}
+
+.admin-table th:first-child {
+  border-radius: 14px 0 0 0 !important;
+}
+.admin-table th:last-child {
+  border-radius: 0 14px 0 0 !important;
+}
+
+.admin-table td {
+  padding: 16px 20px !important;
+  border-bottom: 1.5px solid #fdf2f8 !important;
+  color: #2c0e17 !important;
+  vertical-align: middle !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
+}
+
+.admin-table tr:hover td {
+  background: #fff8fa !important;
+}
+
+/* PRODUCT IMAGES IN TABLE - CLEAN 58x58px, NEVER DISTORTED */
+.admin-table td img,
+.admin-product-thumb {
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  min-height: 58px !important;
+  border-radius: 12px !important;
+  object-fit: cover !important;
+  display: block !important;
+  flex-shrink: 0 !important;
+  border: 1.5px solid #fce7f3 !important;
+  box-shadow: 0 2px 8px rgba(244, 114, 182, 0.12) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.admin-table td img:hover,
+.admin-product-thumb:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 4px 14px rgba(244, 114, 182, 0.3) !important;
+}
+
+/* PRODUCT NAME & METADATA IN TABLE */
+.admin-table td strong {
+  font-size: 15.5px !important;
+  font-weight: 800 !important;
+  color: #2c0e17 !important;
+  line-height: 1.35 !important;
+}
+
+.admin-table td small {
+  font-size: 12.5px !important;
+  color: #8d6271 !important;
+  margin-top: 3px !important;
+  line-height: 1.35 !important;
+}
+
+/* --------------------------------------------------------------------------
+   9. STATUS BADGES, PROFIT PILLS & PRICE TAGS (ENHANCED LEGIBILITY)
+   -------------------------------------------------------------------------- */
+.status-pill-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 7px 15px !important;
+  border-radius: 14px !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+}
+
+.profit-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 8px 18px !important;
+  border-radius: 14px !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.2px !important;
+}
+
+.price-pill-item {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 6px 12px !important;
+  border-radius: 10px !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+.profit-mini-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 5px 12px !important;
+  border-radius: 9px !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  width: fit-content !important;
+}
+
+.price-tag-cost {
+  color: #334155 !important;
+  font-weight: 800 !important;
+  font-size: 16.5px !important;
+  background: #f1f5f9 !important;
+  padding: 8px 16px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #cbd5e1 !important;
+  display: inline-block !important;
+}
+
+.price-tag-sell {
+  color: #e11d48 !important;
+  font-weight: 900 !important;
+  font-size: 18px !important;
+  background: #fff1f5 !important;
+  padding: 8px 16px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #fecdd3 !important;
+  display: inline-block !important;
+}
+
+/* --------------------------------------------------------------------------
+   10. DATE FILTERS & FILTER TOOLBARS
+   -------------------------------------------------------------------------- */
+.admin-date-filter-panel {
+  background: linear-gradient(135deg, #fffafc 0%, #fff1f5 100%) !important;
+  border: 1.5px solid #fbcfe8 !important;
+  border-radius: 16px !important;
+  padding: 20px 24px !important;
+  margin-bottom: 24px !important;
+  box-shadow: 0 4px 16px rgba(244, 114, 182, 0.08) !important;
+}
+
+.admin-date-filter-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  margin-bottom: 16px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1.5px dashed #fce7f3 !important;
+}
+
+.admin-date-preset-chips {
+  display: flex !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 16px !important;
+}
+
+.admin-date-chip {
+  background: #ffffff !important;
+  border: 1.5px solid #fbcfe8 !important;
+  color: #831843 !important;
+  padding: 8px 18px !important;
+  border-radius: 20px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-height: 40px !important;
+}
+
+.admin-date-chip:hover {
+  background: #fff1f5 !important;
+  border-color: #f43f5e !important;
+  color: #be123c !important;
+  transform: translateY(-1px) !important;
+}
+
+.admin-date-chip.active {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important;
+  border-color: #e11d48 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.3) !important;
+}
+
+.admin-date-picker-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 16px !important;
+  background: #ffffff !important;
+  padding: 14px 20px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #fce7f3 !important;
+}
+
+.admin-date-active-banner {
+  background: #fff1f2 !important;
+  border: 1.5px solid #fecdd3 !important;
+  border-radius: 12px !important;
+  padding: 12px 20px !important;
+  margin-bottom: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  font-size: 14.5px !important;
+  color: #be123c !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 10px rgba(225, 29, 72, 0.08) !important;
+}
+
+.admin-overview-date-bar {
+  background: #ffffff !important;
+  border: 1.5px solid #fbcfe8 !important;
+  border-radius: 16px !important;
+  padding: 14px 20px !important;
+  margin-bottom: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 14px !important;
+  box-shadow: 0 4px 16px rgba(244, 114, 182, 0.06) !important;
+}
+
+.admin-overview-date-btn {
+  background: #fff1f5 !important;
+  border: 1.5px solid #fce7f3 !important;
+  color: #be123c !important;
+  padding: 8px 16px !important;
+  border-radius: 18px !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  min-height: 38px !important;
+}
+
+.admin-overview-date-btn:hover {
+  background: #fce7f3 !important;
+  border-color: #fbcfe8 !important;
+}
+
+.admin-overview-date-btn.active {
+  background: #f43f5e !important;
+  border-color: #f43f5e !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(244, 63, 94, 0.28) !important;
+}
+
+.profit-filter-bar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-bottom: 24px !important;
+  flex-wrap: wrap !important;
+  padding: 14px 20px !important;
+  background: #fff5f8 !important;
+  border: 1.5px solid #fce7f3 !important;
+  border-radius: 18px !important;
+}
+
+.profit-filter-pill {
+  border: 1.5px solid #fce7f3 !important;
+  background: #ffffff !important;
+  color: #6e3247 !important;
+  padding: 9px 18px !important;
+  border-radius: 20px !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  min-height: 40px !important;
+}
+
+/* --------------------------------------------------------------------------
+   11. MODALS & DIALOGS (EASY-TO-READ DESKTOP POPUPS)
+   -------------------------------------------------------------------------- */
+.admin-dialog-card,
+.quick-price-modal {
+  background: #ffffff !important;
+  border-radius: 24px !important;
+  max-width: 600px !important;
+  width: 100% !important;
+  padding: 34px !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25) !important;
+  border: 2px solid #fce7f3 !important;
+}
+
+.admin-invoice-paper {
+  background: #ffffff !important;
+  border-radius: 24px !important;
+  max-width: 780px !important;
+  width: 100% !important;
+  padding: 36px !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25) !important;
+  border: 2px solid #fce7f3 !important;
+}
+
+/* --------------------------------------------------------------------------
+   12. RESPONSIVENESS (SMOOTH FLUID COLLAPSE ON TABLETS & MOBILE)
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .admin-sidebar {
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+  }
+  .admin-content {
+    margin-left: 260px !important;
+    width: calc(100% - 260px) !important;
+    max-width: calc(100% - 260px) !important;
+    padding: 20px 20px 60px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar {
+    position: fixed !important;
+    left: -320px !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    z-index: 2000 !important;
+    transition: left 0.3s ease !important;
+  }
+  .admin-sidebar.mobile-open {
+    left: 0 !important;
+  }
+  .admin-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 16px 14px 60px !important;
+  }
+}

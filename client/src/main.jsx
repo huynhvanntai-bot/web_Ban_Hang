@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import './admin.css'
+
 
 // Fix Google Translate / browser extensions DOM manipulation crash
 // (NotFoundError: Failed to execute 'removeChild' on 'Node')

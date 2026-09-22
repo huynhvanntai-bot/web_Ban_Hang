@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import "./admin.css";
 
-const apiUrl =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? "/api" : "http://localhost:5000/api");
+const apiUrl = (() => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== "undefined") {
+    const { hostname, port, protocol } = window.location;
+    if (protocol === "file:") return "http://localhost:5000/api";
+    if ((hostname === "localhost" || hostname === "127.0.0.1") && port && port !== "5000") {
+      return "http://localhost:5000/api";
+    }
+  }
+  return "/api";
+})();
 
 const statusLabels = {
   pending: "Chờ xác nhận",
@@ -18,6 +27,20 @@ const statusIcons = {
   shipping: "🚚",
   delivered: "✅",
   cancelled: "❌",
+};
+
+const roleLabels = {
+  superadmin: "👑 Super Admin",
+  admin: "🛡️ Quản trị viên",
+  staff: "🪡 Nhân viên",
+  user: "👤 Khách hàng",
+};
+
+const roleColors = {
+  superadmin: { bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" },
+  admin: { bg: "#fce7f3", text: "#be123c", border: "#fbcfe8" },
+  staff: { bg: "#e0f2fe", text: "#0369a1", border: "#bae6fd" },
+  user: { bg: "#f3f4f6", text: "#4b5563", border: "#e5e7eb" },
 };
 
 const money = (value) =>
@@ -42,6 +65,41 @@ const productTypeLabels = {
   self_made: "🌸 Tiệm tự móc (Thành phẩm)",
   outsourced: "🪡 Thợ móc gia công (Thành phẩm)",
 };
+
+// Vietnam UTC+7 date formatting helpers
+function getVnDateOnly(dateVal) {
+  if (!dateVal) return "";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch (e) {
+    return "";
+  }
+}
+
+function formatVnDateTime(dateVal) {
+  if (!dateVal) return "";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (e) {
+    return "";
+  }
+}
 
 const defaultSuppliers = [
   {
@@ -130,11 +188,11 @@ const ADMIN_TAB_META = {
   },
   orders: {
     title: "📦 Quản Lý & Theo Dõi Đơn Hàng",
-    desc: "Kiểm tra tiến trình đóng gói, duyệt đơn COD và in phiếu giao hàng",
+    desc: "Kiểm tra tiến trình đóng gói, lọc đơn theo thời gian, duyệt đơn và in tem giao hàng",
   },
   customers: {
     title: "👥 Danh Sách Khách Hàng Thành Viên",
-    desc: "Quản lý thông tin liên hệ và lịch sử chi tiêu của người mua",
+    desc: "Quản lý thông tin liên hệ, xem toàn bộ lịch sử mua hàng và cấp lại mật khẩu",
   },
   suppliers: {
     title: "🏢 Quản Lý Nhà Cung Cấp Len Sợi & Phụ Kiện",
@@ -156,12 +214,17 @@ const ADMIN_TAB_META = {
     title: "🎟️ Chương Trình Khuyến Mãi & Voucher",
     desc: "Tạo mã voucher giảm giá %, freeship cho khách hàng",
   },
+  admins: {
+    title: "👤 Quản Trị Viên & Phân Quyền Nhân Sự",
+    desc: "Phân quyền quản trị đa tài khoản (Super Admin, Quản trị viên, Nhân viên kho)",
+  },
 };
 
 function AdminClock() {
   const [time, setTime] = useState(() => {
     const now = new Date();
     return now.toLocaleDateString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
       weekday: "short",
       day: "2-digit",
       month: "2-digit",
@@ -177,6 +240,7 @@ function AdminClock() {
       const now = new Date();
       setTime(
         now.toLocaleDateString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
           weekday: "short",
           day: "2-digit",
           month: "2-digit",
@@ -184,7 +248,7 @@ function AdminClock() {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
-        })
+        }),
       );
     }, 1000);
     return () => clearInterval(interval);
@@ -194,15 +258,34 @@ function AdminClock() {
 }
 
 function AdminPage() {
-  const [token, setToken] = useState(
-    localStorage.getItem("tai-shop-token") || "",
-  );
-  const [adminUser, setAdminUser] = useState(() =>
-    JSON.parse(localStorage.getItem("tai-shop-user") || "null"),
-  );
+  // Authentication & session: read from tai-admin-token first, fallback to tai-shop-token if role is admin/staff
+  const [token, setToken] = useState(() => {
+    return (
+      localStorage.getItem("tai-admin-token") ||
+      localStorage.getItem("tai-shop-token") ||
+      ""
+    );
+  });
+
+  const [adminUser, setAdminUser] = useState(() => {
+    try {
+      const savedAdmin = localStorage.getItem("tai-admin-user");
+      if (savedAdmin) return JSON.parse(savedAdmin);
+      const savedShop = localStorage.getItem("tai-shop-user");
+      if (savedShop) {
+        const u = JSON.parse(savedShop);
+        if (["admin", "superadmin", "staff"].includes(u.role)) return u;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  });
+
   const [login, setLogin] = useState({ email: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+
   const [data, setData] = useState({
     dashboard: {},
     products: [],
@@ -214,26 +297,83 @@ function AdminPage() {
     suppliers: [],
     staff: [],
     imports: [],
+    customOrders: [],
+    admins: [],
   });
-  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // Filters & State for Orders
   const [orderFilter, setOrderFilter] = useState("all");
+  const [orderPaymentFilter, setOrderPaymentFilter] = useState("all");
+  const [orderPaymentMethodFilter, setOrderPaymentMethodFilter] = useState("all");
+  const [orderDatePreset, setOrderDatePreset] = useState("all");
+  const [orderStartDate, setOrderStartDate] = useState("");
+  const [orderEndDate, setOrderEndDate] = useState("");
+  const [orderSingleDate, setOrderSingleDate] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
-  const [productSearch, setProductSearch] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [shippingLabelOrder, setShippingLabelOrder] = useState(null);
+
+  // Filters & State for Overview Dashboard (Xem lại ngày trước)
+  const [overviewDatePreset, setOverviewDatePreset] = useState("today");
+  const [overviewStartDate, setOverviewStartDate] = useState("");
+  const [overviewEndDate, setOverviewEndDate] = useState("");
+  const [overviewSingleDate, setOverviewSingleDate] = useState("");
+
+  // Layout State
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem("admin-sidebar-collapsed") === "true";
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [toast, setToast] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Products state & filters
+  const [productSearch, setProductSearch] = useState("");
   const [productCategoryFilter, setProductCategoryFilter] = useState("all");
   const [profitFilter, setProfitFilter] = useState("all");
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    slug: "",
+    price: "",
+    costPrice: "",
+    productType: "yarn_retail",
+    stock: "",
+    category: "",
+    brand: "",
+    images: "",
+    description: "",
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+
+  // Modals state
+  const [quickStockModal, setQuickStockModal] = useState({
+    open: false,
+    product: null,
+    addStock: 20,
+  });
   const [quickPriceModal, setQuickPriceModal] = useState({
     open: false,
     product: null,
     price: "",
     costPrice: "",
   });
+  const [resetPasswordModal, setResetPasswordModal] = useState({
+    open: false,
+    customer: null,
+    newPassword: "",
+    resultMsg: "",
+    errorMsg: "",
+  });
+  const [customerHistoryModal, setCustomerHistoryModal] = useState({
+    open: false,
+    customer: null,
+    orders: [],
+    loading: false,
+  });
   const [importSearch, setImportSearch] = useState("");
   const [selectedImportReceipt, setSelectedImportReceipt] = useState(null);
-  const [toast, setToast] = useState("");
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
   const [importModal, setImportModal] = useState({
     open: false,
     form: {
@@ -253,16 +393,6 @@ function AdminPage() {
       ],
     },
   });
-
-  // Modals for New Features
-  const [resetPasswordModal, setResetPasswordModal] = useState({
-    open: false,
-    customer: null,
-    newPassword: "",
-    resultMsg: "",
-    errorMsg: "",
-  });
-
   const [supplierModal, setSupplierModal] = useState({
     open: false,
     isEdit: false,
@@ -277,7 +407,6 @@ function AdminPage() {
       notes: "",
     },
   });
-
   const [staffModal, setStaffModal] = useState({
     open: false,
     isEdit: false,
@@ -294,13 +423,6 @@ function AdminPage() {
       notes: "",
     },
   });
-
-  const [quickStockModal, setQuickStockModal] = useState({
-    open: false,
-    product: null,
-    addStock: 20,
-  });
-
   const [promotionForm, setPromotionForm] = useState({
     title: "",
     code: "",
@@ -310,146 +432,29 @@ function AdminPage() {
     endAt: "",
     description: "",
   });
-
-  const [productForm, setProductForm] = useState({
-    name: "",
-    slug: "",
-    price: "",
-    costPrice: "",
-    productType: "yarn_retail",
-    stock: "",
-    category: "",
-    brand: "",
-    images: "",
-    description: "",
-  });
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState("");
-  // STATE NÂNG CẤP: IN TEM GỬI HÀNG & ĐƠN ĐẶT MÓC RIÊNG
-  const [shippingLabelOrder, setShippingLabelOrder] = useState(null);
   const [previewImageModal, setPreviewImageModal] = useState(null);
 
-  // HÀM XUẤT CSV / EXCEL CHUẨN TIẾNG VIỆT (UTF-8 BOM)
-  function exportToCsv(filename, rows) {
-    const processRow = (row) =>
-      row
-        .map((val) => {
-          if (val === null || val === undefined) return '""';
-          const str = String(val).replace(/"/g, '""');
-          return `"${str}"`;
-        })
-        .join(",");
-
-    const csvContent = "\uFEFF" + rows.map(processRow).join("\r\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast("📥 Đã xuất file Excel thành công!");
-  }
-
-  function exportProductsExcel() {
-    const rows = [
-      ["STT", "Mã Sản Phẩm", "Tên Sản Phẩm Len", "Danh Mục", "Phân Loại", "Giá Bán (VNĐ)", "Giá Vốn (VNĐ)", "Lãi Gộp (VNĐ)", "Biên Lãi (%)", "Tồn Kho (Cuộn/Bộ)", "Doanh Số Đã Bán", "Trạng Thái"],
-    ];
-    data.products.forEach((p, index) => {
-      const profit = (p.price || 0) - (p.costPrice || 0);
-      const margin = p.price > 0 ? ((profit / p.price) * 100).toFixed(1) + "%" : "0%";
-      rows.push([
-        index + 1,
-        "SP-" + (p._id ? p._id.slice(-6).toUpperCase() : index + 1),
-        p.name,
-        p.category?.name || "Len Sợi",
-        p.productType === "outsourced" ? "Thợ gia công" : p.productType === "inhouse" ? "Tiệm tự móc" : "Hàng nhập sỉ",
-        p.price || 0,
-        p.costPrice || 0,
-        profit,
-        margin,
-        p.stock || 0,
-        p.sold || 0,
-        (p.stock || 0) > 0 ? "Còn hàng" : "Hết hàng",
-      ]);
-    });
-    exportToCsv("Danh_Sach_Kho_Len_Sene_Handmade", rows);
-  }
-
-  function exportShipperOrdersExcel() {
-    const rows = [
-      ["STT", "Mã Đơn Hàng", "Người Nhận", "Số Điện Thoại", "Địa Chỉ Giao Hàng", "Chi Tiết Mặt Hàng", "Hình Thức Thanh Toán", "Tiền Thu Hộ COD (VNĐ)", "Trạng Thái Đơn", "Ghi Chú Giao Hàng"],
-    ];
-    data.orders.forEach((o, index) => {
-      const itemsStr = (o.items || [])
-        .map((i) => `${i.name} (x${i.quantity})`)
-        .join("; ");
-      rows.push([
-        index + 1,
-        "#" + (o._id ? o._id.slice(-6).toUpperCase() : index + 1),
-        o.customerName || "Khách mua lẻ",
-        o.phone || "",
-        o.address || "",
-        itemsStr,
-        o.paymentMethod === "COD" ? "Thu hộ COD" : "Chuyển khoản VietQR",
-        o.paymentMethod === "COD" ? o.totalAmount : 0,
-        statusLabels[o.status] || o.status,
-        o.note || "",
-      ]);
-    });
-    exportToCsv("Bang_Ke_Giao_Hang_Shipper_COD", rows);
-  }
-
-  function exportFinancialReportExcel() {
-    const rows = [
-      ["STT", "Mã Đơn Hàng", "Ngày Đặt", "Khách Hàng", "Doanh Thu Thực Thu (VNĐ)", "Giảm Giá (VNĐ)", "Chi Phí Giá Vốn (VNĐ)", "Lợi Nhuận Gộp (VNĐ)", "Phương Thức", "Trạng Thái"],
-    ];
-    data.orders.forEach((o, index) => {
-      const estCost = Math.round((o.totalAmount || 0) * 0.55);
-      const estProfit = (o.totalAmount || 0) - estCost;
-      rows.push([
-        index + 1,
-        "#" + (o._id ? o._id.slice(-6).toUpperCase() : index + 1),
-        new Date(o.createdAt).toLocaleDateString("vi-VN"),
-        o.customerName,
-        o.totalAmount || 0,
-        o.discountAmount || 0,
-        estCost,
-        estProfit,
-        o.paymentMethod,
-        statusLabels[o.status] || o.status,
-      ]);
-    });
-    exportToCsv("Bao_Cao_Tai_Chinh_Doanh_Thu", rows);
-  }
-
-  async function updateCustomOrderStatus(id, status, quotedPrice, adminNotes) {
-    try {
-      await request(`custom-orders/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ status, quotedPrice, adminNotes }),
-      });
-      showToast("✓ Đã cập nhật đơn đặt móc riêng!");
-      loadAdmin();
-    } catch (err) {
-      alert("Lỗi cập nhật: " + err.message);
-    }
-  }
-
-  async function deleteCustomOrder(id) {
-    if (!window.confirm("Bạn có chắc muốn xóa yêu cầu đặt móc này?")) return;
-    try {
-      await request(`custom-orders/${id}`, { method: "DELETE" });
-      showToast("🗑️ Đã xóa yêu cầu đặt móc");
-      loadAdmin();
-    } catch (err) {
-      alert("Lỗi xóa: " + err.message);
-    }
-  }
-
-  const [editingProductId, setEditingProductId] = useState(null);
+  // Admin accounts modal
+  const [adminModal, setAdminModal] = useState({
+    open: false,
+    isEdit: false,
+    targetId: null,
+    form: {
+      name: "",
+      email: "",
+      password: "",
+      phone: "",
+      role: "staff",
+      isActive: true,
+    },
+  });
+  const [adminPasswordModal, setAdminPasswordModal] = useState({
+    open: false,
+    admin: null,
+    newPassword: "",
+    errorMsg: "",
+    resultMsg: "",
+  });
 
   function showToast(msg) {
     setToast(msg);
@@ -457,11 +462,12 @@ function AdminPage() {
   }
 
   async function request(path, options = {}) {
+    const activeTk = token || localStorage.getItem("tai-admin-token") || localStorage.getItem("tai-shop-token");
     const response = await fetch(`${apiUrl}/admin/${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${activeTk}`,
         ...(options.headers || {}),
       },
     });
@@ -481,10 +487,11 @@ function AdminPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
-      if (result.user.role !== "admin")
-        throw new Error("Tài khoản này không có quyền Quản trị viên (Admin)");
-      localStorage.setItem("tai-shop-token", result.token);
-      localStorage.setItem("tai-shop-user", JSON.stringify(result.user));
+      if (!["admin", "superadmin", "staff"].includes(result.user.role)) {
+        throw new Error("Tài khoản này không có quyền Quản trị viên (Admin/Staff)");
+      }
+      localStorage.setItem("tai-admin-token", result.token);
+      localStorage.setItem("tai-admin-user", JSON.stringify(result.user));
       setToken(result.token);
       setAdminUser(result.user);
       showToast(`🎉 Xin chào, ${result.user.name || "Admin"}!`);
@@ -493,8 +500,16 @@ function AdminPage() {
     }
   }
 
-  async function loadAdmin() {
-    setIsRefreshing(true);
+  function logout() {
+    localStorage.removeItem("tai-admin-token");
+    localStorage.removeItem("tai-admin-user");
+    setToken("");
+    setAdminUser(null);
+    showToast("👋 Đã đăng xuất khỏi hệ thống quản trị");
+  }
+
+  async function loadAdmin(silent = false) {
+    if (!silent) setIsRefreshing(true);
     try {
       const [
         dashboard,
@@ -508,6 +523,7 @@ function AdminPage() {
         suppliersRes,
         staffRes,
         importsRes,
+        adminsRes,
       ] = await Promise.all([
         request("dashboard"),
         request("products"),
@@ -520,7 +536,9 @@ function AdminPage() {
         request("suppliers").catch(() => []),
         request("staff").catch(() => []),
         request("imports").catch(() => []),
+        request("admins").catch(() => []),
       ]);
+
       setData({
         dashboard,
         products,
@@ -539,176 +557,251 @@ function AdminPage() {
             : defaultSuppliers,
         staff: staffRes && staffRes.length > 0 ? staffRes : defaultStaff,
         imports: importsRes || [],
+        admins: adminsRes || [],
       });
     } catch (error) {
-      setLoginError(error.message);
-      setToken("");
+      if (!silent) {
+        setLoginError(error.message);
+        if (error.message.includes("403") || error.message.includes("token")) {
+          setToken("");
+        }
+      }
     } finally {
-      setIsRefreshing(false);
+      if (!silent) setIsRefreshing(false);
     }
   }
 
+  // Initial load and background polling every 20s
   useEffect(() => {
-    if (token) loadAdmin();
+    if (!token) return;
+    loadAdmin(false);
+    const pollInterval = setInterval(() => {
+      loadAdmin(true);
+    }, 20000);
+    return () => clearInterval(pollInterval);
   }, [token]);
 
-  // Order Counts
+  // Derived Metrics & Filters
   const pendingOrders = useMemo(
-    () => data.orders.filter((o) => o.status === "pending"),
+    () => (data.orders || []).filter((o) => o.status === "pending"),
     [data.orders],
   );
   const confirmedOrders = useMemo(
-    () => data.orders.filter((o) => o.status === "confirmed"),
+    () => (data.orders || []).filter((o) => o.status === "confirmed"),
     [data.orders],
   );
   const shippingOrders = useMemo(
-    () => data.orders.filter((o) => o.status === "shipping"),
+    () => (data.orders || []).filter((o) => o.status === "shipping"),
     [data.orders],
   );
   const deliveredOrders = useMemo(
-    () => data.orders.filter((o) => o.status === "delivered"),
+    () => (data.orders || []).filter((o) => o.status === "delivered"),
     [data.orders],
   );
   const cancelledOrders = useMemo(
-    () => data.orders.filter((o) => o.status === "cancelled"),
+    () => (data.orders || []).filter((o) => o.status === "cancelled"),
     [data.orders],
   );
+
   const lowStockCount = useMemo(
-    () => data.products.filter((p) => (p.stock || 0) < 10).length,
+    () => (data.products || []).filter((p) => (p.stock || 0) < 10).length,
     [data.products],
   );
   const lowStockProducts = useMemo(
-    () => data.products.filter((p) => (p.stock || 0) < 10),
+    () => (data.products || []).filter((p) => (p.stock || 0) < 10),
     [data.products],
   );
 
-  // Dynamic Revenue & Profit Breakdown for Donut Chart & Strategic Advisory
-  const revenueBreakdown = useMemo(() => {
-    let revYarn = 0;
-    let revSelf = 0;
-    let revOutsource = 0;
+  const pendingCustomOrders = useMemo(
+    () => (data.customOrders || []).filter((o) => o.status === "pending" || !o.status),
+    [data.customOrders],
+  );
 
-    (data.products || []).forEach((p) => {
-      const type =
-        p.productType ||
-        (p.category?.name?.toLowerCase().includes("thành phẩm") ||
-          p.name?.toLowerCase().includes("thú") ||
-          p.name?.toLowerCase().includes("hoa")
-          ? p.name?.toLowerCase().includes("hoa")
-            ? "outsourced"
-            : "self_made"
-          : "yarn_retail");
-
-      const soldQty = Math.max(12, 35 - Math.min(30, p.stock || 0));
-      const itemRev = (p.price || 25000) * soldQty;
-      if (type === "yarn_retail") revYarn += itemRev;
-      else if (type === "self_made") revSelf += itemRev;
-      else revOutsource += itemRev;
+  // Calculate Today's Stats (UTC+7 accurate)
+  const todayVn = useMemo(() => getVnDateOnly(new Date()), []);
+  const todayOrders = useMemo(() => {
+    return (data.orders || []).filter((o) => {
+      if (o.status === "cancelled") return false;
+      return getVnDateOnly(o.createdAt) === todayVn;
     });
+  }, [data.orders, todayVn]);
 
-    if (revYarn === 0 && revSelf === 0 && revOutsource === 0) {
-      revYarn = 14500000;
-      revSelf = 19200000;
-      revOutsource = 16800000;
+  const todayRevenue = useMemo(() => {
+    if (data.dashboard?.todayRevenue !== undefined) {
+      return data.dashboard.todayRevenue;
     }
+    return todayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  }, [data.dashboard, todayOrders]);
 
-    const total = revYarn + revSelf + revOutsource;
-    const pctYarn = Math.round((revYarn / total) * 100);
-    const pctSelf = Math.round((revSelf / total) * 100);
-    const pctOutsource = 100 - pctYarn - pctSelf;
+  // Overview dynamic date calculations (cho phép xem lại doanh thu & đơn hàng các ngày trước)
+  const overviewPeriodLabel = useMemo(() => {
+    if (overviewSingleDate) {
+      const parts = overviewSingleDate.split("-");
+      return `ngày ${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    if (overviewDatePreset === "today") return "hôm nay";
+    if (overviewDatePreset === "yesterday") return "hôm qua";
+    if (overviewDatePreset === "7days") return "7 ngày qua";
+    if (overviewDatePreset === "30days") return "30 ngày qua";
+    if (overviewDatePreset === "thismonth") return "tháng này";
+    if (overviewDatePreset === "lastmonth") return "tháng trước";
+    if (overviewDatePreset === "custom") {
+      if (overviewStartDate && overviewEndDate) {
+        return `từ ${overviewStartDate.split("-").reverse().join("/")} đến ${overviewEndDate.split("-").reverse().join("/")}`;
+      }
+      if (overviewStartDate) return `từ ${overviewStartDate.split("-").reverse().join("/")}`;
+      if (overviewEndDate) return `đến ${overviewEndDate.split("-").reverse().join("/")}`;
+    }
+    return "toàn thời gian";
+  }, [overviewDatePreset, overviewSingleDate, overviewStartDate, overviewEndDate]);
 
-    const costYarn = Math.round(revYarn * 0.6); // 40% margin
-    const costSelf = Math.round(revSelf * 0.25); // 75% margin
-    const costOutsource = Math.round(revOutsource * 0.52); // 48% margin
-    const totalCost = costYarn + costSelf + costOutsource;
-    const netProfit = total - totalCost;
-    const marginPct = ((netProfit / total) * 100).toFixed(1);
-
-    return {
-      revYarn,
-      revSelf,
-      revOutsource,
-      total,
-      pctYarn,
-      pctSelf,
-      pctOutsource,
-      costYarn,
-      costSelf,
-      costOutsource,
-      totalCost,
-      netProfit,
-      marginPct,
-    };
-  }, [data.products]);
-
-  // Thống kê Tồn Kho & Lời/Lỗ Sản Phẩm
-  const productInventoryStats = useMemo(() => {
-    let totalStock = 0;
-    let totalCostVal = 0;
-    let totalRetailVal = 0;
-    let itemsWithCost = 0;
-
-    (data.products || []).forEach((p) => {
-      const stock = Number(p.stock) || 0;
-      const price = Number(p.price) || 0;
-      const cost = Number(p.costPrice) || 0;
-      totalStock += stock;
-      totalCostVal += stock * cost;
-      totalRetailVal += stock * price;
-      if (cost > 0) itemsWithCost++;
-    });
-
-    const projectedProfit = totalRetailVal - totalCostVal;
-    const marginPercent =
-      totalRetailVal > 0
-        ? Math.round((projectedProfit / totalRetailVal) * 100)
-        : 0;
-
-    return {
-      totalProducts: data.products.length,
-      totalStock,
-      totalCostVal,
-      totalRetailVal,
-      projectedProfit,
-      marginPercent,
-      itemsWithCost,
-    };
-  }, [data.products]);
-
-  // Filtered Orders
-  const filteredOrders = useMemo(() => {
+  const overviewFilteredOrders = useMemo(() => {
+    const todayStr = getVnDateOnly(new Date());
     return (data.orders || []).filter((order) => {
-      const matchStatus =
-        orderFilter === "all" ? true : order.status === orderFilter;
-      const q = orderSearch.toLowerCase().trim();
-      const dateStr = order.createdAt ? new Date(order.createdAt).toISOString().slice(0, 10) : "";
-      const matchQuery =
-        !q ||
-        order._id.toLowerCase().includes(q) ||
-        order.customerName?.toLowerCase().includes(q) ||
-        order.phone?.includes(q) ||
-        dateStr.includes(q);
-      return matchStatus && matchQuery;
+      if (order.status === "cancelled") return false;
+      const orderDateVn = getVnDateOnly(order.createdAt);
+      if (overviewSingleDate) {
+        return orderDateVn === overviewSingleDate;
+      }
+      if (overviewDatePreset === "today") {
+        return orderDateVn === todayStr;
+      }
+      if (overviewDatePreset === "yesterday") {
+        const yest = new Date(Date.now() - 86400000);
+        return orderDateVn === getVnDateOnly(yest);
+      }
+      if (overviewDatePreset === "7days") {
+        const sevenAgo = new Date(Date.now() - 6 * 86400000);
+        return orderDateVn >= getVnDateOnly(sevenAgo) && orderDateVn <= todayStr;
+      }
+      if (overviewDatePreset === "30days") {
+        const thirtyAgo = new Date(Date.now() - 29 * 86400000);
+        return orderDateVn >= getVnDateOnly(thirtyAgo) && orderDateVn <= todayStr;
+      }
+      if (overviewDatePreset === "thismonth") {
+        return orderDateVn.startsWith(todayStr.slice(0, 7));
+      }
+      if (overviewDatePreset === "lastmonth") {
+        const now = new Date();
+        const lastM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return orderDateVn.startsWith(getVnDateOnly(lastM).slice(0, 7));
+      }
+      if (overviewDatePreset === "custom") {
+        if (overviewStartDate && orderDateVn < overviewStartDate) return false;
+        if (overviewEndDate && orderDateVn > overviewEndDate) return false;
+        return true;
+      }
+      return true;
     });
-  }, [data.orders, orderFilter, orderSearch]);
+  }, [data.orders, overviewDatePreset, overviewSingleDate, overviewStartDate, overviewEndDate]);
 
-  // Filtered Imports
-  const filteredImports = useMemo(() => {
-    const term = (importSearch || "").toLowerCase().trim();
-    return (data.imports || []).filter((imp) => {
-      if (!term) return true;
-      const codeMatch = (imp.code || "").toLowerCase().includes(term);
-      const supplierMatch = (imp.supplierName || "").toLowerCase().includes(term);
-      const itemsMatch = (imp.items || []).some((it) =>
-        (it.productName || "").toLowerCase().includes(term),
-      );
-      return codeMatch || supplierMatch || itemsMatch;
+  const overviewRevenue = useMemo(() => {
+    return overviewFilteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  }, [overviewFilteredOrders]);
+
+  const overviewOrdersCount = overviewFilteredOrders.length;
+
+  // Active label for orders tab filter
+  const orderDateFilterLabel = useMemo(() => {
+    if (orderSingleDate) {
+      const parts = orderSingleDate.split("-");
+      return `Ngày ${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    if (orderDatePreset === "today") return "Hôm nay";
+    if (orderDatePreset === "yesterday") return "Hôm qua (Xem ngày trước)";
+    if (orderDatePreset === "7days") return "7 ngày qua";
+    if (orderDatePreset === "30days") return "30 ngày qua";
+    if (orderDatePreset === "thismonth") return "Tháng này";
+    if (orderDatePreset === "lastmonth") return "Tháng trước";
+    if (orderDatePreset === "custom") {
+      if (orderStartDate && orderEndDate) {
+        return `Khoảng ngày từ ${orderStartDate.split("-").reverse().join("/")} đến ${orderEndDate.split("-").reverse().join("/")}`;
+      }
+      if (orderStartDate) return `Từ ngày ${orderStartDate.split("-").reverse().join("/")}`;
+      if (orderEndDate) return `Đến ngày ${orderEndDate.split("-").reverse().join("/")}`;
+    }
+    return "";
+  }, [orderDatePreset, orderSingleDate, orderStartDate, orderEndDate]);
+
+  // Filtered Orders logic based on presets, dates, search, and status
+  const filteredOrders = useMemo(() => {
+    const q = (orderSearch || "").toLowerCase().trim();
+    const todayStr = getVnDateOnly(new Date());
+
+    return (data.orders || []).filter((order) => {
+      // 1. Status Filter
+      if (orderFilter !== "all" && order.status !== orderFilter) return false;
+
+      // 2. Payment Status Filter
+      if (orderPaymentFilter !== "all") {
+        const pStatus = order.paymentStatus || "unpaid";
+        if (pStatus !== orderPaymentFilter) return false;
+      }
+
+      // 3. Payment Method Filter
+      if (orderPaymentMethodFilter !== "all") {
+        if (order.paymentMethod !== orderPaymentMethodFilter) return false;
+      }
+
+      // 4. Date Filter (UTC+7 accurate)
+      const orderDateVn = getVnDateOnly(order.createdAt);
+      if (orderSingleDate) {
+        if (orderDateVn !== orderSingleDate) return false;
+      } else if (orderDatePreset === "today") {
+        if (orderDateVn !== todayStr) return false;
+      } else if (orderDatePreset === "yesterday") {
+        const yest = new Date(Date.now() - 86400000);
+        if (orderDateVn !== getVnDateOnly(yest)) return false;
+      } else if (orderDatePreset === "7days") {
+        const sevenAgo = new Date(Date.now() - 6 * 86400000);
+        if (orderDateVn < getVnDateOnly(sevenAgo) || orderDateVn > todayStr) return false;
+      } else if (orderDatePreset === "30days") {
+        const thirtyAgo = new Date(Date.now() - 29 * 86400000);
+        if (orderDateVn < getVnDateOnly(thirtyAgo) || orderDateVn > todayStr) return false;
+      } else if (orderDatePreset === "thismonth") {
+        const curMonth = todayStr.slice(0, 7);
+        if (!orderDateVn.startsWith(curMonth)) return false;
+      } else if (orderDatePreset === "lastmonth") {
+        const now = new Date();
+        const lastM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastMonthPrefix = getVnDateOnly(lastM).slice(0, 7);
+        if (!orderDateVn.startsWith(lastMonthPrefix)) return false;
+      } else if (orderDatePreset === "custom") {
+        if (orderStartDate && orderDateVn < orderStartDate) return false;
+        if (orderEndDate && orderDateVn > orderEndDate) return false;
+      }
+
+      // 5. Query Search
+      if (q) {
+        const matchId = (order._id || "").toLowerCase().includes(q);
+        const matchTracking = (order.trackingCode || "").toLowerCase().includes(q);
+        const matchName = (order.customerName || "").toLowerCase().includes(q);
+        const matchPhone = (order.phone || "").includes(q);
+        const matchAddress = (order.address || "").toLowerCase().includes(q);
+        const matchItem = (order.items || []).some((i) =>
+          (i.name || "").toLowerCase().includes(q),
+        );
+        if (!matchId && !matchTracking && !matchName && !matchPhone && !matchAddress && !matchItem) {
+          return false;
+        }
+      }
+
+      return true;
     });
-  }, [data.imports, importSearch]);
+  }, [
+    data.orders,
+    orderFilter,
+    orderPaymentFilter,
+    orderPaymentMethodFilter,
+    orderDatePreset,
+    orderStartDate,
+    orderEndDate,
+    orderSearch,
+  ]);
 
-  // Filtered Products (support name, category, and profit/loss filter)
+  // Product filtering
   const filteredProducts = useMemo(() => {
-    return data.products.filter((product) => {
+    return (data.products || []).filter((product) => {
       const q = productSearch.toLowerCase().trim();
       const matchQuery =
         !q ||
@@ -718,8 +811,7 @@ function AdminPage() {
       const matchCat =
         productCategoryFilter === "all"
           ? true
-          : (product.category?._id || product.category) ===
-          productCategoryFilter;
+          : (product.category?._id || product.category) === productCategoryFilter;
 
       let matchProfit = true;
       const price = Number(product.price) || 0;
@@ -738,63 +830,342 @@ function AdminPage() {
     });
   }, [data.products, productSearch, productCategoryFilter, profitFilter]);
 
-  async function handleSaveQuickPrice(e) {
-    e.preventDefault();
-    if (!quickPriceModal.product) return;
-    try {
-      const p = Number(quickPriceModal.price);
-      const c = Number(quickPriceModal.costPrice);
-      if (isNaN(p) || p < 0) {
-        alert("Giá bán ra phải là số dương hợp lệ");
-        return;
-      }
-      await request(`products/${quickPriceModal.product._id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          price: p,
-          costPrice: isNaN(c) || c < 0 ? 0 : c,
-        }),
+  // Imports filtering
+  const filteredImports = useMemo(() => {
+    const term = (importSearch || "").toLowerCase().trim();
+    return (data.imports || []).filter((imp) => {
+      if (!term) return true;
+      const codeMatch = (imp.code || "").toLowerCase().includes(term);
+      const supplierMatch = (imp.supplierName || "").toLowerCase().includes(term);
+      const itemsMatch = (imp.items || []).some((it) =>
+        (it.productName || "").toLowerCase().includes(term),
+      );
+      return codeMatch || supplierMatch || itemsMatch;
+    });
+  }, [data.imports, importSearch]);
+
+  // Revenue breakdown for donut chart
+  const revenueBreakdown = useMemo(() => {
+    let revYarn = 0;
+    let revSelf = 0;
+    let revOutsource = 0;
+    let totalCost = 0;
+
+    (data.products || []).forEach((p) => {
+      const type = p.productType || "yarn_retail";
+      const sold = p.sold || 0;
+      const price = p.price || 0;
+      const cost = p.costPrice || (price * 0.6);
+      const productRev = sold * price;
+      const productCost = sold * cost;
+
+      totalCost += productCost;
+      if (type === "yarn_retail") revYarn += productRev;
+      else if (type === "self_made") revSelf += productRev;
+      else revOutsource += productRev;
+    });
+
+    const total = revYarn + revSelf + revOutsource || 1;
+    const netProfit = Math.max(0, total - totalCost);
+    const marginPct = Math.round((netProfit / total) * 100);
+
+    return {
+      revYarn,
+      revSelf,
+      revOutsource,
+      total: total === 1 ? 0 : total,
+      totalCost,
+      netProfit,
+      marginPct,
+      pctYarn: Math.round((revYarn / total) * 100),
+      pctSelf: Math.round((revSelf / total) * 100),
+      pctOutsource: Math.round((revOutsource / total) * 100),
+    };
+  }, [data.products]);
+
+  // 7-day revenue trend data
+  const trendData = useMemo(() => {
+    if (data.dashboard?.dailyStats && data.dashboard.dailyStats.length > 0) {
+      return data.dashboard.dailyStats;
+    }
+    // Compute fallback from last 7 days
+    const stats = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const dStr = getVnDateOnly(d);
+      const parts = dStr.split("-");
+      const dayLabel = `${parts[2]}/${parts[1]}`;
+      const dayOrders = (data.orders || []).filter(
+        (o) => o.status !== "cancelled" && getVnDateOnly(o.createdAt) === dStr,
+      );
+      const dayRev = dayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+      stats.push({
+        date: dStr,
+        dayLabel,
+        orderCount: dayOrders.length,
+        revenue: dayRev,
       });
-      showToast(`💰 Đã cập nhật giá bán & giá vốn cho "${quickPriceModal.product.name}"!`);
-      setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" });
-      loadAdmin();
-    } catch (err) {
-      alert("Lỗi cập nhật giá: " + err.message);
     }
-  }
+    return stats;
+  }, [data.dashboard, data.orders]);
 
-  async function addProduct(event) {
-    event.preventDefault();
-    if (uploadingImage) return;
+  // Actions & API handlers
+  async function updateOrderStatus(id, status, paymentStatus) {
     try {
-      const payload = {
-        ...productForm,
-        price: Number(productForm.price),
-        costPrice: Number(productForm.costPrice || 0),
-        stock: Number(productForm.stock),
-        productType: productForm.productType || "yarn_retail",
-        images: productForm.images ? [productForm.images] : [],
-        featured: true,
-      };
-      await request(
-        editingProductId ? `products/${editingProductId}` : "products",
-        {
-          method: editingProductId ? "PUT" : "POST",
-          body: JSON.stringify(payload),
-        },
-      );
-      showToast(
-        editingProductId
-          ? "🎉 Đã cập nhật sản phẩm thành công!"
-          : "🎉 Đã thêm sản phẩm mới vào kho len!",
-      );
-      resetProductForm();
-      loadAdmin();
+      const payload = { status };
+      if (paymentStatus) payload.paymentStatus = paymentStatus;
+      await request(`orders/${id}/status`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      showToast(`✓ Đã cập nhật đơn sang: ${statusLabels[status] || status}`);
+      loadAdmin(true);
+      if (selectedOrder && selectedOrder._id === id) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status, ...(paymentStatus ? { paymentStatus } : {}) } : null));
+      }
     } catch (err) {
-      alert(err.message);
+      alert("Lỗi cập nhật đơn: " + err.message);
     }
   }
 
+  async function toggleOrderPaymentStatus(order) {
+    const nextStatus = order.paymentStatus === "paid" ? "unpaid" : "paid";
+    try {
+      await request(`orders/${order._id}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ paymentStatus: nextStatus }),
+      });
+      showToast(`✓ Đã chuyển thanh toán sang: ${nextStatus === "paid" ? "ĐÃ THANH TOÁN" : "CHƯA THANH TOÁN"}`);
+      loadAdmin(true);
+      if (selectedOrder && selectedOrder._id === order._id) {
+        setSelectedOrder((prev) => (prev ? { ...prev, paymentStatus: nextStatus } : null));
+      }
+    } catch (err) {
+      alert("Lỗi đổi trạng thái thanh toán: " + err.message);
+    }
+  }
+
+  function showOrder(orderOrId) {
+    if (!orderOrId) return;
+    let orderObj = typeof orderOrId === "object" ? orderOrId : (data.orders || []).find((o) => o._id === orderOrId);
+    if (orderObj) setSelectedOrder(orderObj);
+    const id = typeof orderOrId === "object" ? orderOrId._id : orderOrId;
+    if (id) {
+      request(`orders/${id}`)
+        .then((fresh) => {
+          if (fresh && fresh._id) setSelectedOrder(fresh);
+        })
+        .catch(() => {});
+    }
+  }
+
+  async function openCustomerHistory(customer) {
+    setCustomerHistoryModal({ open: true, customer, orders: [], loading: true });
+    try {
+      const ordersRes = await request(`customers/${customer._id}/orders`);
+      setCustomerHistoryModal({ open: true, customer, orders: ordersRes || [], loading: false });
+    } catch (err) {
+      const matched = (data.orders || []).filter(
+        (o) =>
+          o.user?._id === customer._id ||
+          o.user === customer._id ||
+          (customer.phone && o.phone === customer.phone) ||
+          (customer.name && o.customerName === customer.name),
+      );
+      setCustomerHistoryModal({ open: true, customer, orders: matched, loading: false });
+    }
+  }
+
+  // Export to CSV / Excel helpers
+  function exportToCsv(filename, rows) {
+    const processRow = (row) =>
+      row
+        .map((val) => {
+          if (val === null || val === undefined) return '""';
+          const str = String(val).replace(/"/g, '""');
+          return `"${str}"`;
+        })
+        .join(",");
+
+    const csvContent = "\uFEFF" + rows.map(processRow).join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}_${getVnDateOnly(new Date())}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("📥 Đã xuất file Excel thành công!");
+  }
+
+  function exportShipperOrdersExcel() {
+    const rows = [
+      ["STT", "Mã Đơn / Vận Đơn", "Người Nhận", "Số Điện Thoại", "Địa Chỉ Giao Hàng", "Chi Tiết Mặt Hàng", "Hình Thức Thanh Toán", "Tiền Thu Hộ COD (VNĐ)", "Trạng Thái Đơn", "Ghi Chú Giao Hàng"],
+    ];
+    filteredOrders.forEach((o, index) => {
+      const itemsStr = (o.items || []).map((i) => `${i.name} (x${i.quantity})`).join("; ");
+      const isCod = o.paymentMethod === "COD";
+      const codAmount = isCod && o.paymentStatus !== "paid" ? o.totalAmount : 0;
+      rows.push([
+        index + 1,
+        o.trackingCode || ("#" + (o._id ? o._id.slice(-6).toUpperCase() : index + 1)),
+        o.customerName || "Khách mua lẻ",
+        o.phone || "",
+        o.address || "",
+        itemsStr,
+        isCod ? "Thu hộ COD" : "Chuyển khoản VietQR",
+        codAmount,
+        statusLabels[o.status] || o.status,
+        o.note || "",
+      ]);
+    });
+    exportToCsv("Bang_Ke_Giao_Hang_Shipper_COD", rows);
+  }
+
+  function exportFinancialReportExcel() {
+    const rows = [
+      ["STT", "Mã Đơn", "Ngày Đặt", "Khách Hàng", "Doanh Thu (VNĐ)", "Giảm Giá (VNĐ)", "Chi Phí Giá Vốn (VNĐ)", "Lợi Nhuận Gộp (VNĐ)", "Phương Thức", "Trạng Thái Đơn"],
+    ];
+    filteredOrders.forEach((o, index) => {
+      const estCost = Math.round((o.totalAmount || 0) * 0.55);
+      const estProfit = (o.totalAmount || 0) - estCost;
+      rows.push([
+        index + 1,
+        o.trackingCode || ("#" + (o._id ? o._id.slice(-6).toUpperCase() : index + 1)),
+        formatVnDateTime(o.createdAt),
+        o.customerName,
+        o.totalAmount || 0,
+        o.discountAmount || 0,
+        estCost,
+        estProfit,
+        o.paymentMethod,
+        statusLabels[o.status] || o.status,
+      ]);
+    });
+    exportToCsv("Bao_Cao_Tai_Chinh_Doanh_Thu", rows);
+  }
+
+  function exportProductsExcel() {
+    const rows = [
+      ["STT", "Mã Sản Phẩm", "Tên Sản Phẩm Len", "Danh Mục", "Phân Loại", "Giá Bán (VNĐ)", "Giá Vốn (VNĐ)", "Lãi Gộp (VNĐ)", "Biên Lãi (%)", "Tồn Kho", "Đã Bán", "Trạng Thái"],
+    ];
+    (data.products || []).forEach((p, index) => {
+      const profit = (p.price || 0) - (p.costPrice || 0);
+      const margin = p.price > 0 ? ((profit / p.price) * 100).toFixed(1) + "%" : "0%";
+      rows.push([
+        index + 1,
+        "SP-" + (p._id ? p._id.slice(-6).toUpperCase() : index + 1),
+        p.name,
+        p.category?.name || "Len Sợi",
+        p.productType === "outsourced" ? "Thợ gia công" : p.productType === "self_made" ? "Tiệm tự móc" : "Hàng nhập sỉ",
+        p.price || 0,
+        p.costPrice || 0,
+        profit,
+        margin,
+        p.stock || 0,
+        p.sold || 0,
+        (p.stock || 0) > 0 ? "Còn hàng" : "Hết hàng",
+      ]);
+    });
+    exportToCsv("Danh_Sach_Kho_Len_Sene_Handmade", rows);
+  }
+
+  // Custom Orders Handlers
+  async function updateCustomOrderStatus(id, status, quotedPrice, adminNotes) {
+    try {
+      await request(`custom-orders/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status, quotedPrice, adminNotes }),
+      });
+      showToast("✓ Đã cập nhật đơn đặt móc riêng!");
+      loadAdmin(true);
+    } catch (err) {
+      alert("Lỗi cập nhật: " + err.message);
+    }
+  }
+
+  async function deleteCustomOrder(id) {
+    if (!window.confirm("Bạn có chắc muốn xóa yêu cầu đặt móc này?")) return;
+    try {
+      await request(`custom-orders/${id}`, { method: "DELETE" });
+      showToast("🗑️ Đã xóa yêu cầu đặt móc");
+      loadAdmin(true);
+    } catch (err) {
+      alert("Lỗi xóa: " + err.message);
+    }
+  }
+
+  // Admin Account Handlers
+  async function handleSaveAdmin(e) {
+    e.preventDefault();
+    try {
+      const { isEdit, targetId, form } = adminModal;
+      if (isEdit) {
+        await request(`admins/${targetId}`, {
+          method: "PUT",
+          body: JSON.stringify(form),
+        });
+        showToast("✓ Đã cập nhật tài khoản quản trị!");
+      } else {
+        await request("admins", {
+          method: "POST",
+          body: JSON.stringify(form),
+        });
+        showToast("🎉 Đã tạo mới tài khoản quản trị thành công!");
+      }
+      setAdminModal({
+        open: false,
+        isEdit: false,
+        targetId: null,
+        form: { name: "", email: "", password: "", phone: "", role: "staff", isActive: true },
+      });
+      loadAdmin(true);
+    } catch (err) {
+      alert("Lỗi lưu tài khoản: " + err.message);
+    }
+  }
+
+  async function handleDeleteAdmin(id, name) {
+    if (String(adminUser?._id) === String(id)) {
+      alert("⚠️ Bạn không thể xóa tài khoản của chính mình!");
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${name}"?`)) return;
+    try {
+      await request(`admins/${id}`, { method: "DELETE" });
+      showToast("🗑️ Đã xóa tài khoản thành công!");
+      loadAdmin(true);
+    } catch (err) {
+      alert("Lỗi xóa tài khoản: " + err.message);
+    }
+  }
+
+  async function handleChangeAdminPassword(e) {
+    e.preventDefault();
+    if (!adminPasswordModal.admin) return;
+    try {
+      await request(`admins/${adminPasswordModal.admin._id}`, {
+        method: "PUT",
+        body: JSON.stringify({ password: adminPasswordModal.newPassword }),
+      });
+      setAdminPasswordModal((prev) => ({
+        ...prev,
+        resultMsg: "✓ Đã đổi mật khẩu thành công!",
+        errorMsg: "",
+      }));
+      showToast("🔑 Đã cập nhật mật khẩu mới!");
+    } catch (err) {
+      setAdminPasswordModal((prev) => ({
+        ...prev,
+        errorMsg: err.message,
+        resultMsg: "",
+      }));
+    }
+  }
+
+  // Product save & quick price/stock handlers
   function resetProductForm() {
     setEditingProductId(null);
     setProductForm({
@@ -828,6 +1199,86 @@ function AdminPage() {
     });
     setActiveTab("products");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleSaveProduct(e) {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...productForm,
+        slug: productForm.slug || slugify(productForm.name),
+        price: Number(productForm.price),
+        costPrice: Number(productForm.costPrice) || 0,
+        stock: Number(productForm.stock),
+        images: productForm.images ? [productForm.images] : [],
+      };
+      if (editingProductId) {
+        await request(`products/${editingProductId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        showToast("✓ Đã cập nhật sản phẩm!");
+      } else {
+        await request("products", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        showToast("✓ Đã thêm sản phẩm mới vào kho!");
+      }
+      resetProductForm();
+      loadAdmin(true);
+    } catch (err) {
+      alert("Lỗi lưu sản phẩm: " + err.message);
+    }
+  }
+
+  async function deleteProduct(id) {
+    if (!window.confirm("Bạn có chắc muốn xóa sản phẩm này khỏi kho?")) return;
+    try {
+      await request(`products/${id}`, { method: "DELETE" });
+      if (editingProductId === id) resetProductForm();
+      showToast("🗑️ Đã xóa sản phẩm khỏi kho.");
+      loadAdmin(true);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function handleQuickAddStock(e) {
+    e.preventDefault();
+    if (!quickStockModal.product) return;
+    try {
+      const newStock =
+        (quickStockModal.product.stock || 0) + Number(quickStockModal.addStock || 20);
+      await request(`products/${quickStockModal.product._id}`, {
+        method: "PUT",
+        body: JSON.stringify({ stock: newStock }),
+      });
+      showToast(`⚡ Đã nhập thêm +${quickStockModal.addStock} vào kho!`);
+      setQuickStockModal({ open: false, product: null, addStock: 20 });
+      loadAdmin(true);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function handleSaveQuickPrice(e) {
+    e.preventDefault();
+    if (!quickPriceModal.product) return;
+    try {
+      await request(`products/${quickPriceModal.product._id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          price: Number(quickPriceModal.price),
+          costPrice: Number(quickPriceModal.costPrice) || 0,
+        }),
+      });
+      showToast("✓ Đã cập nhật giá bán & giá vốn!");
+      setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" });
+      loadAdmin(true);
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   async function uploadProductImage(event) {
@@ -889,20 +1340,7 @@ function AdminPage() {
     }
   }
 
-  async function deleteProduct(id) {
-    if (!window.confirm("Bạn có chắc muốn xóa vĩnh viễn sản phẩm này không?"))
-      return;
-    try {
-      await request(`products/${id}`, { method: "DELETE" });
-      if (editingProductId === id) resetProductForm();
-      showToast("🗑️ Đã xóa sản phẩm khỏi kho.");
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  // Cấp lại mật khẩu khách hàng
+  // Customer Password Reset
   async function handleResetPassword(e) {
     e.preventDefault();
     if (!resetPasswordModal.customer) return;
@@ -911,20 +1349,16 @@ function AdminPage() {
         `customers/${resetPasswordModal.customer._id}/reset-password`,
         {
           method: "PUT",
-          body: JSON.stringify({
-            newPassword: resetPasswordModal.newPassword,
-          }),
+          body: JSON.stringify({ newPassword: resetPasswordModal.newPassword }),
         },
       );
       setResetPasswordModal((prev) => ({
         ...prev,
-        resultMsg: `✓ Đã cập nhật mật khẩu mới thành công: ${res.newPassword}`,
+        resultMsg: `✓ Đã cấp lại mật khẩu mới: ${res.newPassword}`,
         errorMsg: "",
       }));
-      showToast(
-        `🔑 Đã cấp lại mật khẩu cho khách ${resetPasswordModal.customer.name}!`,
-      );
-      loadAdmin();
+      showToast(`🔑 Đã cấp lại mật khẩu cho khách ${resetPasswordModal.customer.name}!`);
+      loadAdmin(true);
     } catch (err) {
       setResetPasswordModal((prev) => ({
         ...prev,
@@ -934,188 +1368,10 @@ function AdminPage() {
     }
   }
 
-  // Nhà cung cấp handlers
-  async function handleSaveSupplier(e) {
-    e.preventDefault();
-    try {
-      const isEdit = supplierModal.isEdit;
-      const url = isEdit
-        ? `suppliers/${supplierModal.supplierId}`
-        : "suppliers";
-      const method = isEdit ? "PUT" : "POST";
-      await request(url, {
-        method,
-        body: JSON.stringify(supplierModal.form),
-      });
-      showToast(
-        isEdit
-          ? "✓ Đã cập nhật nhà cung cấp!"
-          : "🎉 Đã thêm nhà cung cấp mới!",
-      );
-      setSupplierModal({
-        open: false,
-        isEdit: false,
-        supplierId: null,
-        form: {
-          name: "",
-          phone: "",
-          address: "",
-          supplyItems: "",
-          rating: 5,
-          totalImported: 0,
-          notes: "",
-        },
-      });
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  async function handleDeleteSupplier(id) {
-    if (!window.confirm("Bạn có chắc muốn xóa nhà cung cấp này?")) return;
-    try {
-      await request(`suppliers/${id}`, { method: "DELETE" });
-      showToast("🗑️ Đã xóa nhà cung cấp.");
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  // Nhân viên & Thợ móc handlers
-  async function handleSaveStaff(e) {
-    e.preventDefault();
-    try {
-      const isEdit = staffModal.isEdit;
-      const url = isEdit ? `staff/${staffModal.staffId}` : "staff";
-      const method = isEdit ? "PUT" : "POST";
-      await request(url, {
-        method,
-        body: JSON.stringify(staffModal.form),
-      });
-      showToast(
-        isEdit
-          ? "✓ Đã cập nhật thợ móc / nhân sự!"
-          : "🎉 Đã thêm thợ móc / nhân sự mới!",
-      );
-      setStaffModal({
-        open: false,
-        isEdit: false,
-        staffId: null,
-        form: {
-          name: "",
-          phone: "",
-          role: "Thợ gia công hoa len",
-          pieceRate: 20000,
-          completedCount: 0,
-          totalPaid: 0,
-          skills: "",
-          status: "active",
-          notes: "",
-        },
-      });
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  async function handleDeleteStaff(id) {
-    if (!window.confirm("Bạn có chắc muốn xóa nhân sự này?")) return;
-    try {
-      await request(`staff/${id}`, { method: "DELETE" });
-      showToast("🗑️ Đã xóa nhân sự.");
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  async function handleIncrementStaffCount(member, count = 5) {
-    try {
-      const newCount = (member.completedCount || 0) + count;
-      const newPaid = newCount * (member.pieceRate || 20000);
-      await request(`staff/${member._id}`, {
-        method: "PUT",
-        body: JSON.stringify({ completedCount: newCount, totalPaid: newPaid }),
-      });
-      showToast(
-        `✓ Đã ghi nhận +${count} sản phẩm hoàn thành cho ${member.name}!`,
-      );
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  // Nhập thêm kho nhanh
-  async function handleQuickAddStock(e) {
-    e.preventDefault();
-    if (!quickStockModal.product) return;
-    try {
-      const newStock =
-        (quickStockModal.product.stock || 0) +
-        Number(quickStockModal.addStock || 20);
-      await request(`products/${quickStockModal.product._id}`, {
-        method: "PUT",
-        body: JSON.stringify({ stock: newStock }),
-      });
-      showToast(
-        `⚡ Đã nhập thêm +${quickStockModal.addStock} vào kho cho ${quickStockModal.product.name}!`,
-      );
-      setQuickStockModal({ open: false, product: null, addStock: 20 });
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-
-  async function updateOrderStatus(id, status) {
-    try {
-      await request(`orders/${id}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ status }),
-      });
-      showToast(`✓ Đã cập nhật trạng thái đơn sang: ${statusLabels[status]}`);
-      loadAdmin();
-      if (selectedOrder && selectedOrder._id === id) {
-        setSelectedOrder((prev) => ({ ...prev, status }));
-      }
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  function showOrder(orderOrId) {
-    if (!orderOrId) return;
-    let orderObj = null;
-    if (typeof orderOrId === "object") {
-      orderObj = orderOrId;
-    } else {
-      orderObj = (data.orders || []).find((o) => o._id === orderOrId);
-    }
-    if (orderObj) {
-      setSelectedOrder(orderObj);
-    }
-    const id = typeof orderOrId === "object" ? orderOrId._id : orderOrId;
-    if (id) {
-      request(`orders/${id}`)
-        .then((fresh) => {
-          if (fresh && fresh._id) setSelectedOrder(fresh);
-        })
-        .catch(() => {
-          if (!orderObj) {
-            showToast("⚠️ Không thể tải thông tin chi tiết đơn hàng.");
-          }
-        });
-    }
-  }
-
+  // Import Receipt Handlers
   function openCreateImport(preProduct = null) {
     const defaultSup = data.suppliers?.[0];
-    const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+    const dateStr = getVnDateOnly(new Date()).replace(/-/g, "").slice(2);
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const code = `PN-${dateStr}-${randomSuffix}`;
     const initialProduct = preProduct || data.products?.[0];
@@ -1131,170 +1387,157 @@ function AdminPage() {
         notes: "",
         items: initialProduct
           ? [
-            {
-              productId: initialProduct._id,
-              productName: initialProduct.name,
-              quantity: 20,
-              costPrice:
-                initialProduct.costPrice ||
-                Math.round((initialProduct.price || 20000) * 0.6) ||
-                12000,
-            },
-          ]
+              {
+                productId: initialProduct._id,
+                productName: initialProduct.name,
+                quantity: 20,
+                costPrice:
+                  initialProduct.costPrice ||
+                  Math.round((initialProduct.price || 20000) * 0.6) ||
+                  12000,
+              },
+            ]
           : [
-            {
-              productId: "",
-              productName: "",
-              quantity: 20,
-              costPrice: 15000,
-            },
-          ],
+              {
+                productId: "",
+                productName: "",
+                quantity: 20,
+                costPrice: 15000,
+              },
+            ],
       },
-    });
-  }
-
-  function handleImportItemChange(index, field, value) {
-    setImportModal((prev) => {
-      const newItems = [...prev.form.items];
-      if (field === "productId") {
-        if (value === "NEW_CUSTOM") {
-          newItems[index] = {
-            ...newItems[index],
-            productId: "",
-            productName: "",
-            costPrice: 15000,
-          };
-        } else {
-          const selectedProd = (data.products || []).find((p) => p._id === value);
-          newItems[index] = {
-            ...newItems[index],
-            productId: value,
-            productName: selectedProd ? selectedProd.name : "",
-            costPrice:
-              selectedProd?.costPrice ||
-              Math.round((selectedProd?.price || 20000) * 0.6) ||
-              12000,
-          };
-        }
-      } else {
-        newItems[index] = {
-          ...newItems[index],
-          [field]:
-            field === "quantity" || field === "costPrice"
-              ? Number(value)
-              : value,
-        };
-      }
-      return {
-        ...prev,
-        form: { ...prev.form, items: newItems },
-      };
-    });
-  }
-
-  function addImportItemRow() {
-    setImportModal((prev) => {
-      const firstProd = data.products?.[0];
-      return {
-        ...prev,
-        form: {
-          ...prev.form,
-          items: [
-            ...prev.form.items,
-            {
-              productId: firstProd?._id || "",
-              productName: firstProd?.name || "",
-              quantity: 20,
-              costPrice: firstProd?.costPrice || 15000,
-            },
-          ],
-        },
-      };
-    });
-  }
-
-  function removeImportItemRow(index) {
-    setImportModal((prev) => {
-      if (prev.form.items.length <= 1) {
-        showToast("⚠️ Phiếu nhập phải có ít nhất 1 mặt hàng");
-        return prev;
-      }
-      return {
-        ...prev,
-        form: {
-          ...prev.form,
-          items: prev.form.items.filter((_, i) => i !== index),
-        },
-      };
     });
   }
 
   async function handleCreateImport(e) {
     e.preventDefault();
     try {
-      const { items } = importModal.form;
-      for (const it of items) {
-        if (!it.productName && !it.productId) {
-          alert("Vui lòng chọn hoặc nhập tên sản phẩm len cần nhập");
-          return;
-        }
-        if (!it.quantity || Number(it.quantity) <= 0) {
-          alert("Số lượng nhập phải lớn hơn 0");
-          return;
-        }
+      const { form } = importModal;
+      if (!form.items || form.items.length === 0) {
+        alert("Vui lòng thêm ít nhất 1 sản phẩm vào phiếu nhập!");
+        return;
       }
-
+      const totalAmount = form.items.reduce(
+        (sum, item) => sum + Number(item.quantity || 0) * Number(item.costPrice || 0),
+        0,
+      );
       const payload = {
-        code: importModal.form.code.trim(),
-        supplierId: importModal.form.supplierId,
-        supplierName: importModal.form.supplierName.trim(),
-        supplierPhone: importModal.form.supplierPhone.trim(),
-        importedBy: importModal.form.importedBy.trim(),
-        notes: importModal.form.notes.trim(),
-        items: items.map((it) => ({
-          productId: it.productId || undefined,
-          productName: it.productName.trim(),
-          quantity: Number(it.quantity),
-          costPrice: Number(it.costPrice) || 0,
+        code: form.code,
+        supplier: form.supplierId || null,
+        supplierName: form.supplierName,
+        supplierPhone: form.supplierPhone,
+        importedBy: form.importedBy,
+        notes: form.notes,
+        totalAmount,
+        items: form.items.map((item) => ({
+          product: item.productId || null,
+          productName: item.productName,
+          quantity: Number(item.quantity),
+          costPrice: Number(item.costPrice),
+          total: Number(item.quantity) * Number(item.costPrice),
         })),
       };
 
-      const res = await request("imports", {
+      await request("imports", {
         method: "POST",
         body: JSON.stringify(payload),
       });
 
-      showToast(res.message || "🎉 Nhập kho thành công! Đã tự động tăng tồn kho cho sản phẩm.");
+      showToast(`✓ Đã tạo phiếu nhập ${form.code} và tăng tồn kho thành công!`);
       setImportModal((prev) => ({ ...prev, open: false }));
-      await loadAdmin();
+      loadAdmin(true);
     } catch (err) {
-      alert("Lỗi nhập hàng: " + err.message);
+      alert("Lỗi lập phiếu nhập: " + err.message);
     }
   }
 
-  async function handleDeleteImport(id) {
-    if (!window.confirm("Bạn có chắc muốn xóa phiếu nhập hàng này?")) return;
+  // Supplier handlers
+  async function handleSaveSupplier(e) {
+    e.preventDefault();
     try {
-      await request(`imports/${id}`, { method: "DELETE" });
-      showToast("Đã xóa phiếu nhập hàng");
-      await loadAdmin();
+      const isEdit = supplierModal.isEdit;
+      const url = isEdit ? `suppliers/${supplierModal.supplierId}` : "suppliers";
+      const method = isEdit ? "PUT" : "POST";
+      await request(url, {
+        method,
+        body: JSON.stringify(supplierModal.form),
+      });
+      showToast(`✓ Đã ${isEdit ? "cập nhật" : "thêm"} nhà cung cấp!`);
+      setSupplierModal((prev) => ({ ...prev, open: false }));
+      loadAdmin(true);
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      alert(err.message);
     }
   }
 
+  async function handleDeleteSupplier(id, name) {
+    if (!window.confirm(`Bạn có chắc muốn xóa nhà cung cấp "${name}"?`)) return;
+    try {
+      await request(`suppliers/${id}`, { method: "DELETE" });
+      showToast("🗑️ Đã xóa nhà cung cấp");
+      loadAdmin(true);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  // Staff handlers
+  async function handleSaveStaff(e) {
+    e.preventDefault();
+    try {
+      const isEdit = staffModal.isEdit;
+      const url = isEdit ? `staff/${staffModal.staffId}` : "staff";
+      const method = isEdit ? "PUT" : "POST";
+      await request(url, {
+        method,
+        body: JSON.stringify(staffModal.form),
+      });
+      showToast(`✓ Đã ${isEdit ? "cập nhật" : "thêm"} thợ thủ công / nhân sự!`);
+      setStaffModal((prev) => ({ ...prev, open: false }));
+      loadAdmin(true);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function handleDeleteStaff(id, name) {
+    if (!window.confirm(`Bạn có chắc muốn xóa hồ sơ của "${name}"?`)) return;
+    try {
+      await request(`staff/${id}`, { method: "DELETE" });
+      showToast("🗑️ Đã xóa hồ sơ nhân sự");
+      loadAdmin(true);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function handleRecordStaffPieces(member, count = 10) {
+    try {
+      const pieceRate = member.pieceRate || 20000;
+      const addPay = count * pieceRate;
+      await request(`staff/${member._id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          completedCount: (member.completedCount || 0) + count,
+          totalPaid: (member.totalPaid || 0) + addPay,
+        }),
+      });
+      showToast(`✓ Đã ghi nhận +${count} sản phẩm cho ${member.name}!`);
+      loadAdmin(true);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  // Promotion handlers
   async function addPromotion(event) {
     event.preventDefault();
     try {
       await request("promotions", {
         method: "POST",
-        body: JSON.stringify({
-          ...promotionForm,
-          value: Number(promotionForm.value),
-          startAt: new Date(promotionForm.startAt).toISOString(),
-          endAt: new Date(promotionForm.endAt).toISOString(),
-        }),
+        body: JSON.stringify(promotionForm),
       });
+      showToast("🎉 Đã tạo mã khuyến mãi mới!");
       setPromotionForm({
         title: "",
         code: "",
@@ -1304,141 +1547,121 @@ function AdminPage() {
         endAt: "",
         description: "",
       });
-      showToast("🎉 Đã tạo mã khuyến mãi thành công!");
-      loadAdmin();
-    } catch (err) {
-      alert(err.message);
+      loadAdmin(true);
+    } catch (error) {
+      alert(error.message);
     }
   }
 
-  function logout() {
-    localStorage.removeItem("tai-shop-token");
-    localStorage.removeItem("tai-shop-user");
-    setToken("");
-    setAdminUser(null);
-  }
-
-  // LOGIN SCREEN
+  // Login Screen
   if (!token) {
     return (
-      <main className="admin-login notranslate" translate="no">
+      <main className="admin-login-screen">
         <div className="admin-login-card">
-          <p className="admin-kicker">SENE HANDMADE</p>
-          <h1>Admin Studio</h1>
-          <p>Đăng nhập tài khoản quản trị để quản lý kho len & đơn hàng.</p>
+          <div className="admin-login-brand">
+            <span style={{ fontSize: "36px" }}>🌸</span>
+            <h1>Sene Handmade</h1>
+            <p>Hệ Thống Quản Trị Cửa Hàng & Kho Len Sợi</p>
+          </div>
+
           <form onSubmit={loginAdmin}>
-            <input
-              required
-              type="email"
-              placeholder="Email admin (VD: admin@gmail.com)"
-              value={login.email}
-              onChange={(event) =>
-                setLogin({ ...login, email: event.target.value })
-              }
-            />
-            <input
-              required
-              type="password"
-              placeholder="Mật khẩu"
-              value={login.password}
-              onChange={(event) =>
-                setLogin({ ...login, password: event.target.value })
-              }
-            />
-            <button type="submit">Đăng nhập quản trị →</button>
+            {loginError && <div className="admin-login-error">{loginError}</div>}
+            <div className="admin-form-group">
+              <label>Email Quản Trị / Nhân Viên</label>
+              <input
+                required
+                type="email"
+                placeholder="admin@senehandmade.vn"
+                value={login.email}
+                onChange={(e) => setLogin({ ...login, email: e.target.value })}
+              />
+            </div>
+            <div className="admin-form-group">
+              <label>Mật Khẩu</label>
+              <input
+                required
+                type="password"
+                placeholder="••••••••"
+                value={login.password}
+                onChange={(e) => setLogin({ ...login, password: e.target.value })}
+              />
+            </div>
+            <button className="admin-btn-primary" type="submit" style={{ width: "100%", padding: "12px", fontSize: "15px" }}>
+              🔑 Đăng Nhập Quản Trị
+            </button>
           </form>
-          {loginError && <small>{loginError}</small>}
+          <div style={{ marginTop: "18px", textAlign: "center", fontSize: "13px" }}>
+            <a href="/" style={{ color: "#be123c", textDecoration: "none", fontWeight: 700 }}>
+              ← Quay lại cửa hàng Sene Handmade
+            </a>
+          </div>
         </div>
       </main>
     );
   }
 
-  const dashboard = data.dashboard || {};
-
   return (
-    <main className={`admin-shell notranslate ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} translate="no">
-      {/* MOBILE BACKDROP */}
-      {mobileMenuOpen && (
-        <div
-          className="admin-mobile-backdrop"
-          onClick={() => setMobileMenuOpen(false)}
-          aria-label="Đóng menu"
-        />
-      )}
-
-      {/* SIDEBAR NAVIGATION (DRAWER TRÊN MOBILE, CÓ NÚT THU GỌN TRÊN DESKTOP) */}
+    <main className={`admin-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      {/* SIDEBAR NAVIGATION */}
       <aside className={`admin-sidebar ${sidebarCollapsed ? "collapsed" : ""} ${mobileMenuOpen ? "mobile-open" : ""}`}>
         <div className="admin-sidebar-header">
-          <a className="admin-brand notranslate" href="/" translate="no" title="Sene Handmade Pro">
-            <span>✨ SENE</span> {!sidebarCollapsed && "HANDMADE"}
-            {!sidebarCollapsed && <span className="admin-brand-tag">PRO</span>}
+          <a className="admin-brand" href="/" target="_blank" rel="noreferrer" title="Sene Handmade Admin Center">
+            <span>🌸</span>
+            {(!sidebarCollapsed || mobileMenuOpen) && (
+              <>
+                <strong>Sene Handmade</strong>
+                <span className="admin-brand-tag">ADMIN</span>
+              </>
+            )}
           </a>
-          <div className="admin-sidebar-header-btns">
-            <button
-              type="button"
-              className="admin-sidebar-collapse-btn desktop-only"
-              onClick={() => {
-                const next = !sidebarCollapsed;
-                setSidebarCollapsed(next);
-                localStorage.setItem("admin-sidebar-collapsed", String(next));
-              }}
-              title={sidebarCollapsed ? "Mở rộng thanh công cụ" : "Thu gọn thanh công cụ"}
-            >
-              {sidebarCollapsed ? "▶" : "◀"}
-            </button>
-            <button
-              type="button"
-              className="admin-sidebar-close-btn mobile-only"
-              onClick={() => setMobileMenuOpen(false)}
-              title="Đóng menu"
-            >
-              ✕
-            </button>
-          </div>
+          <button
+            type="button"
+            className="admin-sidebar-collapse-btn desktop-only"
+            onClick={() => {
+              const next = !sidebarCollapsed;
+              setSidebarCollapsed(next);
+              localStorage.setItem("admin-sidebar-collapsed", String(next));
+            }}
+            title={sidebarCollapsed ? "Mở rộng thanh menu" : "Thu gọn thanh menu"}
+          >
+            {sidebarCollapsed ? "▶" : "◀"}
+          </button>
         </div>
 
-        <div className="admin-profile-chip" title={adminUser?.name || "Quản trị viên"}>
-          <div className="admin-profile-avatar">
-            {adminUser?.name
-              ? adminUser.name
-                .trim()
-                .split(" ")
-                .map((w) => w[0])
-                .slice(-2)
-                .join("")
-                .toUpperCase()
-              : "AD"}
-          </div>
-          {(!sidebarCollapsed || mobileMenuOpen) && (
+        {/* Current Admin User Profile Chip */}
+        {adminUser && (!sidebarCollapsed || mobileMenuOpen) && (
+          <div className="admin-profile-chip" style={{ marginTop: "12px" }}>
+            <div className="admin-profile-avatar">
+              {adminUser.name ? adminUser.name[0].toUpperCase() : "A"}
+            </div>
             <div className="admin-profile-info">
-              <strong>{adminUser?.name || "Quản trị viên"}</strong>
-              <small>
-                <span className="online-dot"></span> Đang hoạt động
+              <strong>{adminUser.name || "Admin"}</strong>
+              <small style={{ color: roleColors[adminUser.role]?.text || "#be123c", fontWeight: 700 }}>
+                {roleLabels[adminUser.role] || "Quản trị viên"}
               </small>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        <nav className="admin-sidebar-nav">
+        <nav className="admin-sidebar-nav" style={{ marginTop: "16px" }}>
           {[
             { key: "overview", label: "Tổng quan", icon: "📊" },
             {
               key: "products",
               label: "Sản phẩm & Kho",
-              icon: "🧶",
-              badge: data.products.length,
+              icon: "📦",
+              badge: (data.products || []).length,
             },
             {
               key: "imports",
               label: "Nhập Hàng & Tồn Kho",
               icon: "📥",
               badge: (data.imports || []).length,
-              badgeColor: "#059669",
             },
             {
               key: "orders",
               label: "Quản lý đơn hàng",
-              icon: "📦",
+              icon: "🛒",
               badge: pendingOrders.length > 0 ? pendingOrders.length : null,
               badgeColor: "#f43f5e",
             },
@@ -1446,7 +1669,7 @@ function AdminPage() {
               key: "customers",
               label: "Khách hàng",
               icon: "👥",
-              badge: data.customers.length,
+              badge: (data.customers || []).length,
             },
             {
               key: "suppliers",
@@ -1460,12 +1683,11 @@ function AdminPage() {
               icon: "🪡",
               badge: (data.staff || []).length,
             },
-
             {
               key: "custom-orders",
               label: "Đơn Móc Theo Mẫu",
               icon: "🧶",
-              badge: (data.customOrders || []).filter((o) => o.status === "pending").length || null,
+              badge: pendingCustomOrders.length > 0 ? pendingCustomOrders.length : null,
               badgeColor: "#ec4899",
             },
             { key: "reports", label: "Báo cáo doanh thu", icon: "📈" },
@@ -1473,7 +1695,13 @@ function AdminPage() {
               key: "promotions",
               label: "Mã khuyến mãi",
               icon: "🎟️",
-              badge: data.promotions.length,
+              badge: (data.promotions || []).length,
+            },
+            {
+              key: "admins",
+              label: "Tài khoản Quản trị",
+              icon: "👤",
+              badge: (data.admins || []).length,
             },
           ].map((item) => (
             <button
@@ -1493,9 +1721,7 @@ function AdminPage() {
               {item.badge !== null && item.badge !== undefined && (
                 <span
                   className="admin-nav-badge"
-                  style={
-                    item.badgeColor ? { background: item.badgeColor } : {}
-                  }
+                  style={item.badgeColor ? { background: item.badgeColor } : {}}
                 >
                   {item.badge}
                 </span>
@@ -1513,20 +1739,19 @@ function AdminPage() {
               setSidebarCollapsed(next);
               localStorage.setItem("admin-sidebar-collapsed", String(next));
             }}
-            title={sidebarCollapsed ? "Mở rộng thanh menu" : "Thu gọn thanh menu"}
           >
             {sidebarCollapsed ? "▶" : "◀ Thu gọn menu"}
           </button>
-          <a className="admin-store-link" href="/" target="_blank" rel="noreferrer" title="Xem cửa hàng Sene Handmade">
+          <a className="admin-store-link" href="/" target="_blank" rel="noreferrer">
             🛍️ {(!sidebarCollapsed || mobileMenuOpen) && "Xem cửa hàng ↗"}
           </a>
-          <button className="admin-logout-btn" type="button" onClick={logout} title="Đăng xuất">
+          <button className="admin-logout-btn" type="button" onClick={logout}>
             🚪 {(!sidebarCollapsed || mobileMenuOpen) && "Đăng xuất"}
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT REGION */}
+      {/* MAIN CONTENT AREA */}
       <section className="admin-content">
         <div className="admin-content-inner">
           {/* TOPBAR */}
@@ -1545,7 +1770,6 @@ function AdminPage() {
                       localStorage.setItem("admin-sidebar-collapsed", String(next));
                     }
                   }}
-                  title="Menu danh mục quản trị"
                 >
                   ☰ <span className="admin-menu-btn-text">Menu</span>
                 </button>
@@ -1563,8 +1787,9 @@ function AdminPage() {
               <button
                 type="button"
                 className="admin-refresh-btn"
-                onClick={loadAdmin}
+                onClick={() => loadAdmin(false)}
                 disabled={isRefreshing}
+                title="Cập nhật toàn bộ dữ liệu đơn hàng và kho"
               >
                 {isRefreshing ? "⏳ Đang tải..." : "🔄 Cập nhật dữ liệu"}
               </button>
@@ -1574,20 +1799,173 @@ function AdminPage() {
           {/* TOAST ALERT */}
           {toast && <div className="toast">{toast}</div>}
 
-          {/* TAB 1: TỔNG QUAN (OVERVIEW) */}
+          {/* ========================================================
+              TAB 1: TỔNG QUAN (OVERVIEW)
+          ======================================================== */}
           {activeTab === "overview" && (
             <>
-              {/* 4 Grand KPI Cards */}
-              <div className="admin-kpi-grid">
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon">💰</div>
-                    <span className="kpi-trend">+14.2% tuần này</span>
-                  </div>
-                  <div className="kpi-title">Doanh thu đã thu (Giao thành công)</div>
-                  <div className="kpi-val">{money(dashboard.revenue)}</div>
+              {/* THANH LỌC THỜI GIAN KINH DOANH (XEM LẠI NGÀY TRƯỚC) */}
+              <div className="admin-overview-date-bar">
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14.5px", fontWeight: 800, color: "#831843", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>📅</span> Xem số liệu theo ngày:
+                  </span>
+                  {[
+                    { id: "today", label: "⭐ Hôm nay" },
+                    { id: "yesterday", label: "⏪ Hôm qua" },
+                    { id: "7days", label: "📊 7 ngày qua" },
+                    { id: "30days", label: "🗓️ 30 ngày qua" },
+                    { id: "thismonth", label: "📅 Tháng này" },
+                    { id: "lastmonth", label: "⏮️ Tháng trước" },
+                    { id: "all", label: "Toàn bộ" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className={`admin-overview-date-btn ${overviewDatePreset === preset.id && !overviewSingleDate ? "active" : ""}`}
+                      onClick={() => {
+                        setOverviewDatePreset(preset.id);
+                        setOverviewSingleDate("");
+                        setOverviewStartDate("");
+                        setOverviewEndDate("");
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
                 </div>
 
+                {/* Chọn ngày cụ thể hoặc khoảng ngày */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <label style={{ fontSize: "13.5px", color: "#831843", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                    Chọn 1 ngày cụ thể:
+                    <input
+                      type="date"
+                      className="admin-date-input"
+                      value={overviewSingleDate}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setOverviewSingleDate(val);
+                        if (val) {
+                          setOverviewDatePreset("single");
+                          setOverviewStartDate("");
+                          setOverviewEndDate("");
+                        }
+                      }}
+                      title="Chọn một ngày cụ thể bất kỳ trong quá khứ để xem doanh thu & đơn hàng"
+                    />
+                  </label>
+
+                  <label style={{ fontSize: "13.5px", color: "#831843", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                    Hoặc từ:
+                    <input
+                      type="date"
+                      className="admin-date-input"
+                      value={overviewStartDate}
+                      onChange={(e) => {
+                        setOverviewStartDate(e.target.value);
+                        setOverviewDatePreset("custom");
+                        setOverviewSingleDate("");
+                      }}
+                    />
+                    đến:
+                    <input
+                      type="date"
+                      className="admin-date-input"
+                      value={overviewEndDate}
+                      onChange={(e) => {
+                        setOverviewEndDate(e.target.value);
+                        setOverviewDatePreset("custom");
+                        setOverviewSingleDate("");
+                      }}
+                    />
+                  </label>
+
+                  {(overviewDatePreset !== "today" || overviewSingleDate || overviewStartDate || overviewEndDate) && (
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      style={{ fontSize: "13px", padding: "6px 12px" }}
+                      onClick={() => {
+                        setOverviewDatePreset("today");
+                        setOverviewSingleDate("");
+                        setOverviewStartDate("");
+                        setOverviewEndDate("");
+                      }}
+                    >
+                      ✕ Về hôm nay
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 5 KPI Cards (Doanh thu theo mốc đã chọn, Đơn hàng theo mốc đã chọn, Đơn chờ duyệt, Khách hàng, Cảnh báo tồn kho) */}
+              <div className="admin-kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
+                {/* 1. DOANH THU */}
+                <div
+                  className="admin-kpi-card"
+                  onClick={() => {
+                    setActiveTab("orders");
+                    if (overviewSingleDate) {
+                      setOrderSingleDate(overviewSingleDate);
+                      setOrderDatePreset("single");
+                    } else if (overviewDatePreset === "custom") {
+                      setOrderDatePreset("custom");
+                      setOrderStartDate(overviewStartDate);
+                      setOrderEndDate(overviewEndDate);
+                    } else {
+                      setOrderDatePreset(overviewDatePreset);
+                      setOrderSingleDate("");
+                      setOrderStartDate("");
+                      setOrderEndDate("");
+                    }
+                  }}
+                  style={{ cursor: "pointer" }}
+                  title="Bấm để xem danh sách đơn hàng tương ứng trong mục Quản Lý Đơn Hàng"
+                >
+                  <div className="kpi-top">
+                    <div className="kpi-icon">💰</div>
+                    <span className="kpi-trend" style={{ background: "#ecfdf5", color: "#047857", textTransform: "capitalize" }}>
+                      {overviewPeriodLabel}
+                    </span>
+                  </div>
+                  <div className="kpi-title">Doanh thu ({overviewPeriodLabel})</div>
+                  <div className="kpi-val" style={{ color: "#e11d48", fontWeight: 900 }}>
+                    {money(overviewRevenue)}
+                  </div>
+                </div>
+
+                {/* 2. ĐƠN HÀNG */}
+                <div
+                  className="admin-kpi-card"
+                  onClick={() => {
+                    setActiveTab("orders");
+                    if (overviewSingleDate) {
+                      setOrderSingleDate(overviewSingleDate);
+                      setOrderDatePreset("single");
+                    } else if (overviewDatePreset === "custom") {
+                      setOrderDatePreset("custom");
+                      setOrderStartDate(overviewStartDate);
+                      setOrderEndDate(overviewEndDate);
+                    } else {
+                      setOrderDatePreset(overviewDatePreset);
+                      setOrderSingleDate("");
+                      setOrderStartDate("");
+                      setOrderEndDate("");
+                    }
+                  }}
+                  style={{ cursor: "pointer" }}
+                  title="Bấm để lọc đơn hàng phát sinh trong khoảng thời gian này"
+                >
+                  <div className="kpi-top">
+                    <div className="kpi-icon">📦</div>
+                    <span className="kpi-trend">Đã phát sinh</span>
+                  </div>
+                  <div className="kpi-title">Đơn hàng ({overviewPeriodLabel})</div>
+                  <div className="kpi-val">{overviewOrdersCount} đơn</div>
+                </div>
+
+                {/* 3. ĐƠN CHỜ XỬ LÝ */}
                 <div
                   className="admin-kpi-card"
                   onClick={() => {
@@ -1595,51 +1973,60 @@ function AdminPage() {
                     setOrderFilter("pending");
                   }}
                   style={{ cursor: "pointer" }}
-                  title="Bấm để xem các đơn chờ xác nhận"
+                  title="Bấm để lọc các đơn chờ duyệt"
                 >
                   <div className="kpi-top">
-                    <div className="kpi-icon">📦</div>
+                    <div className="kpi-icon">⏳</div>
                     {pendingOrders.length > 0 ? (
-                      <span
-                        className="kpi-trend"
-                        style={{ background: "#fef2f2", color: "#e11d48" }}
-                      >
-                        {pendingOrders.length} đơn cần duyệt
+                      <span className="kpi-trend" style={{ background: "#fef2f2", color: "#e11d48", fontWeight: 800 }}>
+                        {pendingOrders.length} cần duyệt gấp
                       </span>
                     ) : (
                       <span className="kpi-trend">Đã xử lý hết</span>
                     )}
                   </div>
-                  <div className="kpi-title">Tổng số đơn hàng</div>
-                  <div className="kpi-val">{dashboard.totalOrders || 0}</div>
-                </div>
-
-                <div
-                  className="admin-kpi-card"
-                  onClick={() => setActiveTab("products")}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div className="kpi-top">
-                    <div className="kpi-icon">🧶</div>
-                    <span className="kpi-trend">
-                      {data.categories.length} danh mục
-                    </span>
+                  <div className="kpi-title">Đơn chờ xử lý</div>
+                  <div className="kpi-val" style={{ color: pendingOrders.length > 0 ? "#e11d48" : "inherit" }}>
+                    {pendingOrders.length} đơn
                   </div>
-                  <div className="kpi-title">Sản phẩm len đang bán</div>
-                  <div className="kpi-val">{dashboard.totalProducts || 0}</div>
                 </div>
 
+                {/* 4. KHÁCH HÀNG */}
                 <div
                   className="admin-kpi-card"
                   onClick={() => setActiveTab("customers")}
                   style={{ cursor: "pointer" }}
+                  title="Bấm để xem danh sách khách hàng"
                 >
                   <div className="kpi-top">
-                    <div className="kpi-icon">🌸</div>
-                    <span className="kpi-trend">Thành viên Tiệm</span>
+                    <div className="kpi-icon">👥</div>
+                    <span className="kpi-trend">Thành viên shop</span>
                   </div>
-                  <div className="kpi-title">Khách hàng đăng ký</div>
-                  <div className="kpi-val">{dashboard.totalCustomers || 0}</div>
+                  <div className="kpi-title">Tổng khách hàng</div>
+                  <div className="kpi-val">{(data.customers || []).length}</div>
+                </div>
+
+                {/* 5. TỒN KHO CẢNH BÁO */}
+                <div
+                  className="admin-kpi-card"
+                  onClick={() => setActiveTab("products")}
+                  style={{ cursor: "pointer" }}
+                  title="Bấm để xem các sản phẩm sắp hết hàng"
+                >
+                  <div className="kpi-top">
+                    <div className="kpi-icon">⚠️</div>
+                    {lowStockCount > 0 ? (
+                      <span className="kpi-trend" style={{ background: "#fee2e2", color: "#b91c1c" }}>
+                        Cần nhập thêm
+                      </span>
+                    ) : (
+                      <span className="kpi-trend">Đủ hàng bán</span>
+                    )}
+                  </div>
+                  <div className="kpi-title">Tồn kho thấp (&lt;10)</div>
+                  <div className="kpi-val" style={{ color: lowStockCount > 0 ? "#b91c1c" : "inherit" }}>
+                    {lowStockCount} sản phẩm
+                  </div>
                 </div>
               </div>
 
@@ -1697,19 +2084,260 @@ function AdminPage() {
                 )}
               </div>
 
-              {/* BIỂU ĐỒ TRÒN DOANH THU & PHÂN TÍCH LỜI / LỖ (DONUT CHART & PROFIT ANALYSIS) */}
+              {/* 7-DAY REVENUE & ORDER TREND CHART (SVG) */}
               <div className="admin-card" style={{ marginBottom: "24px" }}>
                 <div className="admin-card-header">
                   <div>
-                    <h2>📊 Biểu Đồ Tròn Doanh Thu & Phân Tích Lời / Lỗ</h2>
-                    <p
-                      style={{
-                        margin: "4px 0 0",
-                        color: "#8d6271",
-                        fontSize: "14.5px",
-                      }}
+                    <h2>📈 Biểu Đồ Doanh Thu & Đơn Hàng 7 Ngày Qua</h2>
+                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "13px" }}>
+                      Số liệu thực tế theo múi giờ Việt Nam (UTC+7), tự động cập nhật liên tục.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-btn-outline"
+                    onClick={() => setActiveTab("reports")}
+                    style={{ fontSize: "12.5px" }}
+                  >
+                    Xem chi tiết báo cáo ↗
+                  </button>
+                </div>
+
+                <div style={{ padding: "16px 8px 0" }}>
+                  {/* SVG Bar Chart */}
+                  <div style={{ width: "100%", overflowX: "auto" }}>
+                    <div style={{ minWidth: "600px", height: "220px", position: "relative", display: "flex", alignItems: "flex-end", gap: "20px", padding: "0 10px 40px 10px", borderBottom: "2px solid #fce7f3" }}>
+                      {(() => {
+                        const maxRev = Math.max(...trendData.map((d) => d.revenue), 100000);
+                        return trendData.map((day, idx) => {
+                          const heightPct = Math.max(10, Math.round((day.revenue / maxRev) * 160));
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                flex: 1,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                position: "relative",
+                                height: "100%",
+                                justifyContent: "flex-end",
+                              }}
+                            >
+                              {/* Amount Tooltip / Label */}
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  color: day.revenue > 0 ? "#be123c" : "#9ca3af",
+                                  marginBottom: "6px",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {day.revenue > 0 ? `${Math.round(day.revenue / 1000)}k` : "0đ"}
+                              </span>
+
+                              {/* Bar */}
+                              <div
+                                style={{
+                                  width: "70%",
+                                  maxWidth: "44px",
+                                  height: `${heightPct}px`,
+                                  background:
+                                    day.revenue > 0
+                                      ? "linear-gradient(180deg, #f43f5e 0%, #fda4af 100%)"
+                                      : "#f3f4f6",
+                                  borderRadius: "8px 8px 3px 3px",
+                                  boxShadow: day.revenue > 0 ? "0 4px 10px rgba(244, 63, 94, 0.2)" : "none",
+                                  transition: "all 0.3s ease",
+                                }}
+                                title={`${day.dayLabel} (${day.date}): ${money(day.revenue)} - ${day.orderCount} đơn`}
+                              />
+
+                              {/* Day Label & Order count */}
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  bottom: "-32px",
+                                  textAlign: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <strong style={{ fontSize: "12px", display: "block", color: "#475569" }}>
+                                  {day.dayLabel}
+                                </strong>
+                                <span style={{ fontSize: "10.5px", color: "#8d6271", fontWeight: 600 }}>
+                                  {day.orderCount} đơn
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* RECENT ORDERS & TOP SELLING GRID */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(460px, 1fr))", gap: "24px", marginBottom: "24px" }}>
+                {/* Đơn hàng mới nhất */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <div>
+                      <h2>🛒 Đơn Hàng Mới Nhất</h2>
+                      <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                        Các đơn khách vừa đặt trên trang cửa hàng
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      onClick={() => setActiveTab("orders")}
+                      style={{ fontSize: "12px", padding: "4px 10px" }}
                     >
-                      Tách bạch 3 nguồn doanh thu: Len cuộn nhập bán, Sản phẩm tiệm tự móc và Nhờ thợ móc gia công.
+                      Xem tất cả ({data.orders.length}) →
+                    </button>
+                  </div>
+
+                  <div className="admin-table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Mã đơn</th>
+                          <th>Khách hàng</th>
+                          <th>Tổng tiền</th>
+                          <th>Trạng thái</th>
+                          <th>Xem</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(data.orders || []).slice(0, 6).map((ord) => (
+                          <tr key={ord._id}>
+                            <td>
+                              <strong>{ord.trackingCode || `#${ord._id.slice(-6).toUpperCase()}`}</strong>
+                              <small style={{ display: "block", color: "#94a3b8", fontSize: "11px" }}>
+                                {formatVnDateTime(ord.createdAt)}
+                              </small>
+                            </td>
+                            <td>
+                              <strong>{ord.customerName}</strong>
+                              <small style={{ display: "block", color: "#8d6271", fontSize: "11px" }}>
+                                📱 {ord.phone}
+                              </small>
+                            </td>
+                            <td>
+                              <strong style={{ color: "#e11d48" }}>{money(ord.totalAmount)}</strong>
+                            </td>
+                            <td>
+                              <span
+                                className="status-pill-badge"
+                                style={{
+                                  background: ord.status === "delivered" ? "#ecfdf5" : ord.status === "pending" ? "#fff1f2" : "#fdf2f8",
+                                  color: ord.status === "delivered" ? "#047857" : ord.status === "pending" ? "#e11d48" : "#be123c",
+                                }}
+                              >
+                                {statusIcons[ord.status]} {statusLabels[ord.status] || ord.status}
+                              </span>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ padding: "4px 8px", fontSize: "11.5px" }}
+                                onClick={() => showOrder(ord)}
+                              >
+                                👁️ Chi tiết
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {(data.orders || []).length === 0 && (
+                          <tr>
+                            <td colSpan="5" style={{ textAlign: "center", padding: "28px" }}>
+                              Chưa có đơn hàng nào phát sinh.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Sản phẩm bán chạy */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <div>
+                      <h2>🔥 Top Sản Phẩm Bán Chạy</h2>
+                      <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                        Mẫu len & thành phẩm được yêu thích nhất
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      onClick={() => setActiveTab("products")}
+                      style={{ fontSize: "12px", padding: "4px 10px" }}
+                    >
+                      Kho hàng ({data.products.length}) →
+                    </button>
+                  </div>
+
+                  <div className="admin-table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Sản phẩm</th>
+                          <th>Giá bán</th>
+                          <th>Đã bán</th>
+                          <th>Tồn kho</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...(data.products || [])]
+                          .sort((a, b) => (b.sold || 0) - (a.sold || 0))
+                          .slice(0, 6)
+                          .map((p) => (
+                            <tr key={p._id}>
+                              <td>
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                  <img
+                                    src={p.images?.[0] || "/placeholder.jpg"}
+                                    alt=""
+                                    style={{ width: "34px", height: "34px", borderRadius: "6px", objectFit: "cover" }}
+                                  />
+                                  <div>
+                                    <strong>{p.name}</strong>
+                                    <small style={{ display: "block", color: "#8d6271" }}>
+                                      {p.category?.name || "Len sợi"}
+                                    </small>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>{money(p.price)}</td>
+                              <td>
+                                <strong style={{ color: "#059669" }}>{p.sold || 0}</strong>
+                              </td>
+                              <td>
+                                <span style={{ color: (p.stock || 0) < 10 ? "#e11d48" : "inherit", fontWeight: (p.stock || 0) < 10 ? 800 : 500 }}>
+                                  {p.stock || 0} cuộn
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* DONUT CHART & STRATEGIC ADVISORY (Preserved & Enhanced) */}
+              <div className="admin-card" style={{ marginBottom: "24px" }}>
+                <div className="admin-card-header">
+                  <div>
+                    <h2>📊 Biểu Đồ Tròn Nguồn Doanh Thu & Biên Lãi</h2>
+                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "13.5px" }}>
+                      Tách bạch 3 nguồn doanh thu: Len cuộn nhập sỉ, Sản phẩm tiệm tự móc và Nhờ thợ móc gia công.
                     </p>
                   </div>
                   <span className="profit-margin-pill">
@@ -1718,123 +2346,57 @@ function AdminPage() {
                 </div>
 
                 <div className="profit-analysis-box">
-                  {/* Left: Phân tích số liệu & Tư vấn kinh doanh */}
                   <div>
                     <div className="profit-stats-summary">
                       <div className="profit-stat-item revenue">
                         <span>💰 Tổng Doanh Thu Ước Tính</span>
                         <strong>{money(revenueBreakdown.total)}</strong>
-                        <small
-                          style={{
-                            color: "#8d6271",
-                            display: "block",
-                            marginTop: "4px",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                          }}
-                        >
+                        <small style={{ color: "#8d6271", display: "block", marginTop: "4px", fontSize: "12.5px" }}>
                           (Cả 3 nguồn sản phẩm)
                         </small>
                       </div>
                       <div className="profit-stat-item cogs">
                         <span>📦 Chi Phí Vốn & Tiền Công</span>
                         <strong>{money(revenueBreakdown.totalCost)}</strong>
-                        <small
-                          style={{
-                            color: "#8d6271",
-                            display: "block",
-                            marginTop: "4px",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                          }}
-                        >
+                        <small style={{ color: "#8d6271", display: "block", marginTop: "4px", fontSize: "12.5px" }}>
                           (Giá vốn len + Công thợ)
                         </small>
                       </div>
                       <div className="profit-stat-item net-profit">
                         <span>📈 Lợi Nhuận Ròng (LÃI LỜI)</span>
                         <strong>{money(revenueBreakdown.netProfit)}</strong>
-                        <small
-                          style={{
-                            color: "#059669",
-                            display: "block",
-                            marginTop: "4px",
-                            fontSize: "13.5px",
-                            fontWeight: 700,
-                          }}
-                        >
-                          Biên lãi ròng: {revenueBreakdown.marginPct}%
+                        <small style={{ color: "#059669", display: "block", marginTop: "4px", fontSize: "12.5px", fontWeight: 700 }}>
+                          Biên lãi: {revenueBreakdown.marginPct}%
                         </small>
                       </div>
                     </div>
 
-                    {/* Hộp Tư Vấn Chiến Lược: Có nên nhập hàng từ đầu về bán không? */}
                     <div className="strategy-advice-card">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          marginBottom: "8px",
-                        }}
-                      >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                         <span style={{ fontSize: "18px" }}>💡</span>
-                        <strong style={{ fontSize: "14px" }}>
-                          TƯ VẤN THIẾT LẬP KINH DOANH: CÓ NÊN NHẬP HÀNG TỪ ĐẦU VỀ BÁN KHÔNG?
+                        <strong style={{ fontSize: "13.5px" }}>
+                          CHIẾN LƯỢC KINH DOANH CHO SHOP LEN HANDMADE:
                         </strong>
                       </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "6px",
-                        }}
-                      >
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px" }}>
                         <div>
-                          <strong>
-                            1. Len cuộn & phụ kiện nhập bán (
-                            {revenueBreakdown.pctYarn}% DT):
-                          </strong>{" "}
-                          <em>Rất nên nhập từ đầu!</em> Giúp tiệm xoay vòng vốn cực nhanh, có đơn hàng phát sinh mỗi ngày vì người đan móc luôn cần nguyên liệu. Khách mua len sẽ có xu hướng mua kèm kim móc, bông gòn, mắt thú.
+                          <strong>1. Len cuộn & phụ kiện nhập bán ({revenueBreakdown.pctYarn}% DT):</strong> Giúp tiệm xoay vòng vốn cực nhanh, phát sinh đơn đều đặn mỗi ngày vì người đan móc luôn mua thêm sợi và phụ kiện đi kèm.
                         </div>
                         <div>
-                          <strong>
-                            2. Tiệm tự móc thành phẩm (
-                            {revenueBreakdown.pctSelf}% DT):
-                          </strong>{" "}
-                          <em>Tỷ suất lợi nhuận cao nhất (~75%)</em>. Dùng để quay video làm mẫu (TikTok, Reels) khẳng định tay nghề của Tiệm. Chỉ nên nhận số lượng vừa sức để đảm bảo độ tỉ mỉ.
+                          <strong>2. Tiệm tự móc thành phẩm ({revenueBreakdown.pctSelf}% DT):</strong> Tỷ suất lợi nhuận cao nhất (~75%), dùng để chụp ảnh, quay video TikTok/Reels khẳng định tay nghề của Tiệm.
                         </div>
                         <div>
-                          <strong>
-                            3. Nhờ thợ móc gia công (
-                            {revenueBreakdown.pctOutsource}% DT):
-                          </strong>{" "}
-                          <em>Bí quyết mở rộng quy mô khi đông khách!</em> Vào các dịp lễ (20/10, Valentine, 8/3, Giáng sinh), shop dùng đòn bẩy thợ móc trả công theo sản phẩm ({money(20000)} - {money(50000)}/món) để trả hàng loạt bó hoa, thú len mà không lo thiếu hàng hay kiệt sức.
+                          <strong>3. Nhờ thợ móc gia công ({revenueBreakdown.pctOutsource}% DT):</strong> Đòn bẩy mở rộng quy mô vào các dịp lễ (20/10, Valentine, 8/3, Giáng sinh) trả công thợ theo sản phẩm mà không lo quá tải.
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right: SVG Donut Chart */}
+                  {/* SVG Donut Chart */}
                   <div className="donut-container">
                     <div className="donut-svg-wrap">
-                      <svg
-                        viewBox="0 0 160 160"
-                        width="160"
-                        height="160"
-                        style={{ transform: "rotate(-90deg)" }}
-                      >
-                        {/* Background circle */}
-                        <circle
-                          cx="80"
-                          cy="80"
-                          r="60"
-                          fill="transparent"
-                          stroke="#ffe4e6"
-                          strokeWidth="22"
-                        />
-
-                        {/* Slice 1: Len nhập bán (#f43f5e) */}
+                      <svg viewBox="0 0 160 160" width="160" height="160" style={{ transform: "rotate(-90deg)" }}>
+                        <circle cx="80" cy="80" r="60" fill="transparent" stroke="#ffe4e6" strokeWidth="22" />
                         <circle
                           cx="80"
                           cy="80"
@@ -1842,1362 +2404,468 @@ function AdminPage() {
                           fill="transparent"
                           stroke="#f43f5e"
                           strokeWidth="22"
-                          strokeDasharray={`${(revenueBreakdown.pctYarn / 100) * 377} 377`}
+                          strokeDasharray={`${(revenueBreakdown.pctYarn * 377) / 100} 377`}
                           strokeDashoffset="0"
-                          strokeLinecap="round"
                         />
-
-                        {/* Slice 2: Tự móc (#f59e0b) */}
                         <circle
                           cx="80"
                           cy="80"
                           r="60"
                           fill="transparent"
-                          stroke="#f59e0b"
+                          stroke="#ec4899"
                           strokeWidth="22"
-                          strokeDasharray={`${(revenueBreakdown.pctSelf / 100) * 377} 377`}
-                          strokeDashoffset={`-${(revenueBreakdown.pctYarn / 100) * 377}`}
-                          strokeLinecap="round"
+                          strokeDasharray={`${(revenueBreakdown.pctSelf * 377) / 100} 377`}
+                          strokeDashoffset={`-${(revenueBreakdown.pctYarn * 377) / 100}`}
                         />
-
-                        {/* Slice 3: Thợ gia công (#10b981) */}
                         <circle
                           cx="80"
                           cy="80"
                           r="60"
                           fill="transparent"
-                          stroke="#10b981"
+                          stroke="#8b5cf6"
                           strokeWidth="22"
-                          strokeDasharray={`${(revenueBreakdown.pctOutsource / 100) * 377} 377`}
-                          strokeDashoffset={`-${((revenueBreakdown.pctYarn + revenueBreakdown.pctSelf) / 100) * 377}`}
-                          strokeLinecap="round"
+                          strokeDasharray={`${(revenueBreakdown.pctOutsource * 377) / 100} 377`}
+                          strokeDashoffset={`-${((revenueBreakdown.pctYarn + revenueBreakdown.pctSelf) * 377) / 100}`}
                         />
                       </svg>
-
-                      <div className="donut-center-text">
-                        <small>TỶ SUẤT LÃI</small>
+                      <div className="donut-center-label">
                         <strong>{revenueBreakdown.marginPct}%</strong>
+                        <small>Lãi ròng</small>
                       </div>
                     </div>
 
                     <div className="donut-legend">
                       <div className="legend-item">
-                        <div className="legend-dot-label">
-                          <span
-                            className="legend-dot"
-                            style={{ background: "#f43f5e" }}
-                          ></span>
-                          <span>Len nhập bán</span>
-                        </div>
-                        <strong>
-                          {money(revenueBreakdown.revYarn)} (
-                          {revenueBreakdown.pctYarn}%)
-                        </strong>
+                        <span className="legend-color" style={{ background: "#f43f5e" }} />
+                        <span>Len cuộn nhập sỉ: <strong>{revenueBreakdown.pctYarn}%</strong></span>
                       </div>
                       <div className="legend-item">
-                        <div className="legend-dot-label">
-                          <span
-                            className="legend-dot"
-                            style={{ background: "#f59e0b" }}
-                          ></span>
-                          <span>Tiệm tự móc</span>
-                        </div>
-                        <strong>
-                          {money(revenueBreakdown.revSelf)} (
-                          {revenueBreakdown.pctSelf}%)
-                        </strong>
+                        <span className="legend-color" style={{ background: "#ec4899" }} />
+                        <span>Tiệm tự móc mẫu: <strong>{revenueBreakdown.pctSelf}%</strong></span>
                       </div>
                       <div className="legend-item">
-                        <div className="legend-dot-label">
-                          <span
-                            className="legend-dot"
-                            style={{ background: "#10b981" }}
-                          ></span>
-                          <span>Thợ gia công</span>
-                        </div>
-                        <strong>
-                          {money(revenueBreakdown.revOutsource)} (
-                          {revenueBreakdown.pctOutsource}%)
-                        </strong>
+                        <span className="legend-color" style={{ background: "#8b5cf6" }} />
+                        <span>Thợ gia công: <strong>{revenueBreakdown.pctOutsource}%</strong></span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </>
+          )}
 
-              {/* BÁO CÁO HÀNG SẮP HẾT KHO (COMPACT LOW STOCK ALERT) */}
-              {lowStockProducts.length > 0 && (
-                <div className="low-stock-bar">
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
-                    >
-                      <span style={{ fontSize: "18px" }}>⚠️</span>
-                      <strong style={{ fontSize: "16px", color: "#be123c" }}>
-                        BÁO CÁO HÀNG SẮP HẾT KHO ({lowStockProducts.length} sản phẩm dưới 10 cuộn)
-                      </strong>
-                    </div>
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      style={{ fontSize: "14px", padding: "6px 16px", fontWeight: 700 }}
-                      onClick={() => setActiveTab("products")}
-                    >
-                      Xem toàn bộ kho hàng →
-                    </button>
-                  </div>
-
-                  <div className="low-stock-grid">
-                    {lowStockProducts.slice(0, 4).map((p) => (
-                      <div key={p._id} className="low-stock-card">
-                        <img
-                          src={p.images?.[0] || "/placeholder.jpg"}
-                          alt={p.name}
-                          style={{
-                            width: "50px",
-                            height: "50px",
-                            borderRadius: "10px",
-                            objectFit: "cover",
-                            border: "1px solid #fecdd3",
-                          }}
-                        />
-                        <div className="low-stock-info">
-                          <strong title={p.name}>{p.name}</strong>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              marginTop: "2px",
-                            }}
-                          >
-                            <span className="low-stock-badge">
-                              Còn {p.stock || 0} cuộn
-                            </span>
-                            <span
-                              style={{ fontSize: "11px", color: "#8d6271" }}
-                            >
-                              Bán: <strong style={{ color: "#e11d48" }}>{money(p.price)}</strong>
-                              {p.costPrice > 0 && (
-                                <> · Vốn: <strong style={{ color: "#475569" }}>{money(p.costPrice)}</strong></>
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className="admin-btn-outline"
-                          style={{
-                            fontSize: "13px",
-                            padding: "6px 12px",
-                            fontWeight: 700,
-                            borderColor: "#f43f5e",
-                            color: "#f43f5e",
-                            whiteSpace: "nowrap",
-                          }}
-                          onClick={() =>
-                            setQuickStockModal({
-                              open: true,
-                              product: p,
-                              addStock: 20,
-                            })
-                          }
-                        >
-                          ⚡ +20 cuộn
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+          {/* ========================================================
+              TAB 2: QUẢN LÝ ĐƠN HÀNG (ORDERS) - ENHANCED
+          ======================================================== */}
+          {activeTab === "orders" && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <h2>📦 Quản Lý {filteredOrders.length} / {data.orders.length} Đơn Hàng</h2>
+                  <p style={{ margin: "3px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Thời gian chuẩn Việt Nam (UTC+7), kiểm tra tiến trình đóng gói và xuất phiếu giao shipper
+                  </p>
                 </div>
-              )}
-
-              {/* Bảng đơn hàng mới nhất */}
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h2>📦 5 Đơn Hàng Mới Đặt Gần Nhất</h2>
+                <div className="admin-card-actions" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <button
                     type="button"
                     className="admin-btn-outline"
-                    onClick={() => setActiveTab("orders")}
+                    onClick={exportShipperOrdersExcel}
+                    style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
+                    title="Xuất bảng kê danh sách giao hàng cho bưu tá COD"
                   >
-                    Xem tất cả {data.orders.length} đơn hàng →
+                    📥 Bảng Kê Shipper COD
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn-outline"
+                    onClick={exportFinancialReportExcel}
+                    style={{ background: "#fdf2f8", color: "#be123c", borderColor: "#fbcfe8", fontWeight: 700 }}
+                  >
+                    📊 Báo Cáo Doanh Thu
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn-primary"
+                    onClick={() => loadAdmin(false)}
+                  >
+                    🔄 Làm Mới
                   </button>
                 </div>
+              </div>
 
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Mã đơn</th>
-                        <th>Khách hàng</th>
-                        <th>Số món</th>
-                        <th>Tổng tiền</th>
-                        <th>Thanh toán</th>
-                        <th>Trạng thái</th>
-                        <th>Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.orders.slice(0, 5).map((order) => (
+              {/* DEDICATED DATE FILTER PANEL (XEM LẠI CÁC NGÀY TRƯỚC) */}
+              <div className="admin-date-filter-panel">
+                <div className="admin-date-filter-header">
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "20px" }}>📅</span>
+                    <div>
+                      <strong style={{ fontSize: "16px", color: "#831843", display: "block" }}>
+                        BỘ LỌC THỜI GIAN & NGÀY ĐẶT HÀNG (XEM LẠI CÁC NGÀY TRƯỚC)
+                      </strong>
+                      <span style={{ fontSize: "13.5px", color: "#9d174d" }}>
+                        Bấm các nút mốc nhanh hoặc chọn trực tiếp ngày bất kỳ bên dưới để tra cứu đơn cũ
+                      </span>
+                    </div>
+                  </div>
+
+                  {(orderDatePreset !== "all" || orderSingleDate || orderStartDate || orderEndDate) && (
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      style={{ fontSize: "13.5px", padding: "6px 16px", color: "#be123c", borderColor: "#fecdd3", background: "#ffffff", fontWeight: 700 }}
+                      onClick={() => {
+                        setOrderDatePreset("all");
+                        setOrderSingleDate("");
+                        setOrderStartDate("");
+                        setOrderEndDate("");
+                      }}
+                    >
+                      ✕ Xóa lọc ngày (Xem tất cả)
+                    </button>
+                  )}
+                </div>
+
+                {/* Hàng 1: Các nút mốc nhanh 1 chạm */}
+                <div className="admin-date-preset-chips">
+                  {[
+                    { id: "all", label: "📅 Tất cả ngày" },
+                    { id: "today", label: "⭐ Hôm nay" },
+                    { id: "yesterday", label: "⏪ Hôm qua (Xem ngày trước)" },
+                    { id: "7days", label: "📊 7 ngày qua" },
+                    { id: "30days", label: "🗓️ 30 ngày qua" },
+                    { id: "thismonth", label: "📅 Tháng này" },
+                    { id: "lastmonth", label: "⏮️ Tháng trước" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className={`admin-date-chip ${orderDatePreset === preset.id && !orderSingleDate ? "active" : ""}`}
+                      onClick={() => {
+                        setOrderDatePreset(preset.id);
+                        setOrderSingleDate("");
+                        setOrderStartDate("");
+                        setOrderEndDate("");
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Hàng 2: Chọn ngày cụ thể hoặc khoảng ngày (Luôn hiển thị rõ ràng) */}
+                <div className="admin-date-picker-row">
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <label style={{ fontSize: "14px", fontWeight: 800, color: "#831843", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span>🔍</span> Xem riêng 1 ngày cụ thể:
+                      <input
+                        type="date"
+                        className="admin-date-input"
+                        value={orderSingleDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOrderSingleDate(val);
+                          if (val) {
+                            setOrderDatePreset("single");
+                            setOrderStartDate("");
+                            setOrderEndDate("");
+                          }
+                        }}
+                        title="Chọn ngày cụ thể bất kỳ trong quá khứ để xem các đơn đã đặt"
+                      />
+                    </label>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 800, color: "#831843" }}>
+                      Hoặc xem khoảng ngày:
+                    </span>
+                    <label style={{ fontSize: "13.5px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      Từ ngày:
+                      <input
+                        type="date"
+                        className="admin-date-input"
+                        value={orderStartDate}
+                        onChange={(e) => {
+                          setOrderStartDate(e.target.value);
+                          setOrderDatePreset("custom");
+                          setOrderSingleDate("");
+                        }}
+                      />
+                    </label>
+                    <label style={{ fontSize: "13.5px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      Đến ngày:
+                      <input
+                        type="date"
+                        className="admin-date-input"
+                        value={orderEndDate}
+                        onChange={(e) => {
+                          setOrderEndDate(e.target.value);
+                          setOrderDatePreset("custom");
+                          setOrderSingleDate("");
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Banner hiển thị trạng thái lọc ngày đang kích hoạt */}
+              {(orderDateFilterLabel || orderDatePreset !== "all") && (
+                <div className="admin-date-active-banner">
+                  <div>
+                    <span>🔔 Đang lọc đơn hàng: </span>
+                    <strong style={{ fontSize: "15px", textDecoration: "underline" }}>
+                      {orderDateFilterLabel || "Theo mốc đã chọn"}
+                    </strong>
+                    <span style={{ marginLeft: "14px", color: "#475569", fontWeight: 600 }}>
+                      (Tìm thấy: <strong>{filteredOrders.length}</strong> đơn • Doanh thu:{" "}
+                      <strong style={{ color: "#e11d48" }}>
+                        {money(filteredOrders.reduce((s, o) => s + (o.status !== "cancelled" ? o.totalAmount : 0), 0))}
+                      </strong>)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-btn-outline"
+                    style={{ fontSize: "13px", padding: "6px 14px", background: "#ffffff" }}
+                    onClick={() => {
+                      setOrderDatePreset("all");
+                      setOrderSingleDate("");
+                      setOrderStartDate("");
+                      setOrderEndDate("");
+                    }}
+                  >
+                    ✕ Đặt lại (Xem tất cả)
+                  </button>
+                </div>
+              )}
+
+              {/* Secondary Filter: Search, Payment Status, Payment Method, Status Pills */}
+              <div
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #fce7f3",
+                  borderRadius: "12px",
+                  padding: "14px",
+                  marginBottom: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                {/* Search & Payment Dropdowns */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px" }}>
+                  <input
+                    className="admin-search-input"
+                    style={{ width: "100%" }}
+                    placeholder="🔍 Tìm mã đơn, mã vận đơn, tên khách, SĐT..."
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                  />
+
+                  {/* Payment status filter */}
+                  <select
+                    className="order-status-select"
+                    style={{ width: "100%", padding: "8px 12px", background: "#fff", borderColor: "#fbcfe8" }}
+                    value={orderPaymentFilter}
+                    onChange={(e) => setOrderPaymentFilter(e.target.value)}
+                  >
+                    <option value="all">💳 Tất cả trạng thái thanh toán</option>
+                    <option value="paid">✅ Đã thanh toán</option>
+                    <option value="unpaid">⏳ Chưa thanh toán</option>
+                  </select>
+
+                  {/* Payment method filter */}
+                  <select
+                    className="order-status-select"
+                    style={{ width: "100%", padding: "8px 12px", background: "#fff", borderColor: "#fbcfe8" }}
+                    value={orderPaymentMethodFilter}
+                    onChange={(e) => setOrderPaymentMethodFilter(e.target.value)}
+                  >
+                    <option value="all">💵 Tất cả phương thức thanh toán</option>
+                    <option value="COD">💵 Thu hộ COD</option>
+                    <option value="VIETQR">💳 Chuyển khoản VietQR</option>
+                  </select>
+                </div>
+
+                {/* Status Pills */}
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", paddingTop: "6px", borderTop: "1px solid #fce7f3" }}>
+                  {[
+                    { id: "all", label: "Tất cả", count: data.orders.length },
+                    { id: "pending", label: "⏳ Chờ xác nhận", count: pendingOrders.length },
+                    { id: "confirmed", label: "🏪 Đã xác nhận", count: confirmedOrders.length },
+                    { id: "shipping", label: "🚚 Đang giao", count: shippingOrders.length },
+                    { id: "delivered", label: "✅ Đã giao", count: deliveredOrders.length },
+                    { id: "cancelled", label: "❌ Đã hủy", count: cancelledOrders.length },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setOrderFilter(tab.id)}
+                      style={{
+                        border: "0",
+                        background: orderFilter === tab.id ? "#f43f5e" : "#fff1f5",
+                        color: orderFilter === tab.id ? "#fff" : "#be123c",
+                        padding: "6px 14px",
+                        borderRadius: "16px",
+                        fontSize: "12.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Orders Table */}
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Mã đơn & Vận đơn</th>
+                      <th>Khách hàng & SĐT</th>
+                      <th>Ngày đặt (UTC+7)</th>
+                      <th>Mặt hàng</th>
+                      <th>Tổng tiền</th>
+                      <th>Thanh toán</th>
+                      <th>Trạng thái đơn</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.map((order) => {
+                      const isPaid = order.paymentStatus === "paid";
+                      return (
                         <tr key={order._id}>
                           <td>
-                            <strong>#{order._id.slice(-6).toUpperCase()}</strong>
-                          </td>
-                          <td>
-                            <strong>{order.customerName}</strong>
-                            <small style={{ display: "block", color: "#8d6271" }}>
-                              📱 {order.phone}
+                            <strong style={{ fontSize: "15.5px" }}>{order.trackingCode || `#${order._id.slice(-6).toUpperCase()}`}</strong>
+                            <small style={{ display: "block", color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>
+                              ID: {order._id.slice(-6)}
                             </small>
                           </td>
-                          <td>{order.items?.length || 0} món</td>
                           <td>
-                            <strong style={{ color: "#e11d48" }}>
+                            <strong style={{ fontSize: "15.5px" }}>{order.customerName}</strong>
+                            <small style={{ display: "block", color: "#8d6271", fontSize: "13px", marginTop: "2px" }}>
+                              📱 {order.phone}
+                            </small>
+                            <small
+                              style={{
+                                display: "block",
+                                color: "#8d6271",
+                                maxWidth: "260px",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                fontSize: "13px",
+                                marginTop: "2px",
+                              }}
+                              title={order.address}
+                            >
+                              📍 {order.address}
+                            </small>
+                          </td>
+                          <td>
+                            <strong style={{ fontSize: "14.5px" }}>{formatVnDateTime(order.createdAt)}</strong>
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: 700, fontSize: "15px" }}>{order.items?.length || 0} món</span>
+                            <small
+                              style={{
+                                display: "block",
+                                color: "#64748b",
+                                maxWidth: "240px",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                fontSize: "13px",
+                                marginTop: "2px",
+                              }}
+                            >
+                              {(order.items || []).map((i) => i.name).join(", ")}
+                            </small>
+                          </td>
+                          <td>
+                            <strong style={{ color: "#e11d48", fontSize: "16.5px" }}>
                               {money(order.totalAmount)}
                             </strong>
                           </td>
                           <td>
-                            <span
-                              className="status-pill-badge"
-                              style={{ background: "#fdf2f8", color: "#be123c" }}
-                            >
-                              {order.paymentMethod === "COD"
-                                ? "💵 Thu hộ COD"
-                                : "💳 VietQR"}
-                            </span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              <span
+                                className="status-pill-badge"
+                                style={{
+                                  background: order.paymentMethod === "COD" ? "#fdf2f8" : "#eff6ff",
+                                  color: order.paymentMethod === "COD" ? "#be123c" : "#1d4ed8",
+                                  fontSize: "13px",
+                                  padding: "6px 12px",
+                                }}
+                              >
+                                {order.paymentMethod === "COD" ? "💵 Thu hộ COD" : "💳 VietQR"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleOrderPaymentStatus(order)}
+                                style={{
+                                  border: "1.5px solid",
+                                  borderRadius: "10px",
+                                  padding: "5px 10px",
+                                  fontSize: "12.5px",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  background: isPaid ? "#ecfdf5" : "#fff1f2",
+                                  borderColor: isPaid ? "#a7f3d0" : "#fecdd3",
+                                  color: isPaid ? "#047857" : "#be123c",
+                                }}
+                                title="Bấm để chuyển đổi giữa Đã thanh toán / Chưa thanh toán"
+                              >
+                                {isPaid ? "✅ Đã thanh toán" : "⏳ Chưa thanh toán"}
+                              </button>
+                            </div>
                           </td>
                           <td>
                             <select
                               className="order-status-select"
                               value={order.status}
-                              onChange={(e) =>
-                                updateOrderStatus(order._id, e.target.value)
-                              }
+                              onChange={(e) => updateOrderStatus(order._id, e.target.value)}
                             >
-                              {Object.entries(statusLabels).map(
-                                ([key, label]) => (
-                                  <option key={key} value={key}>
-                                    {statusIcons[key]} {label}
-                                  </option>
-                                ),
-                              )}
-                            </select>
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              onClick={() => showOrder(order._id)}
-                            >
-                              👁️ Xem hóa đơn
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {data.orders.length === 0 && (
-                        <tr>
-                          <td colSpan="7" style={{ textAlign: "center", padding: "30px" }}>
-                            Chưa có đơn hàng nào phát sinh.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Top 4 Bán chạy leaderboard */}
-              {data.reports.bestSelling?.length > 0 && (
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <h2>🔥 Top Sản Phẩm Len Bán Chạy Nhất</h2>
-                  </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                      gap: "16px",
-                    }}
-                  >
-                    {data.reports.bestSelling.slice(0, 4).map((item, idx) => (
-                      <div
-                        key={item._id}
-                        style={{
-                          background: "#fffafc",
-                          border: "1.5px solid #fce7f3",
-                          borderRadius: "14px",
-                          padding: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontWeight: 800,
-                              color: idx === 0 ? "#f59e0b" : "#f43f5e",
-                            }}
-                          >
-                            {idx === 0 ? "🥇 Hạng 1" : `#${idx + 1}`}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#059669",
-                            }}
-                          >
-                            Đã bán {item.quantity} cuộn
-                          </span>
-                        </div>
-                        <strong
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          {item.name}
-                        </strong>
-                        <div style={{ fontSize: "13px", color: "#e11d48", fontWeight: 700 }}>
-                          {money(item.revenue)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* TAB 2: SẢN PHẨM & KHO (PRODUCTS) */}
-          {activeTab === "products" && (
-            <>
-              {/* THỐNG KÊ LỜI / LỖ & TỒN KHO */}
-              <div className="admin-kpi-grid">
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon">🧶</div>
-                    <span className="kpi-trend">{data.products.length} mặt hàng</span>
-                  </div>
-                  <div className="kpi-title">Tổng tồn kho hàng len</div>
-                  <h3 className="kpi-val">{productInventoryStats.totalStock} cuộn/bó</h3>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon" style={{ background: "#f1f5f9", borderColor: "#cbd5e1" }}>💰</div>
-                    <span className="kpi-trend" style={{ background: "#f1f5f9", color: "#475569", borderColor: "#cbd5e1" }}>
-                      Giá nhập vốn
-                    </span>
-                  </div>
-                  <div className="kpi-title">Tổng tiền vốn tồn kho</div>
-                  <h3 className="kpi-val" style={{ color: "#475569" }}>
-                    {money(productInventoryStats.totalCostVal)}
-                  </h3>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon" style={{ background: "#fff1f5", borderColor: "#fecdd3" }}>🏷️</div>
-                    <span className="kpi-trend" style={{ background: "#fff1f5", color: "#be123c", borderColor: "#fecdd3" }}>
-                      Giá bán ra
-                    </span>
-                  </div>
-                  <div className="kpi-title">Dự kiến thu khi bán hết</div>
-                  <h3 className="kpi-val" style={{ color: "#e11d48" }}>
-                    {money(productInventoryStats.totalRetailVal)}
-                  </h3>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>💎</div>
-                    <span className="kpi-trend" style={{ background: "#ecfdf5", color: "#047857" }}>
-                      +{productInventoryStats.marginPercent}% Biên lời
-                    </span>
-                  </div>
-                  <div className="kpi-title">Lợi nhuận gộp dự kiến</div>
-                  <h3 className="kpi-val" style={{ color: "#047857" }}>
-                    {money(productInventoryStats.projectedProfit)}
-                  </h3>
-                </div>
-              </div>
-
-              {/* Form Thêm/Sửa Sản Phẩm */}
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <div>
-                    <h2>
-                      {editingProductId
-                        ? "✏️ Chỉnh Sửa Thông Tin Sản Phẩm"
-                        : "➕ Thêm Sản Phẩm Len / Dụng Cụ Mới"}
-                    </h2>
-                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                      Cập nhật giá, số lượng tồn kho và thông tin để sản phẩm xuất hiện trên trang chủ.
-                    </p>
-                  </div>
-                  {editingProductId && (
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      onClick={resetProductForm}
-                    >
-                      ✕ Hủy chỉnh sửa
-                    </button>
-                  )}
-                </div>
-
-                <form onSubmit={addProduct}>
-                  <div className="admin-product-grid-form">
-                    <div className="admin-form-group">
-                      <label>Tên sản phẩm (*)</label>
-                      <input
-                        required
-                        placeholder="VD: Len Milk Bò 50g Siêu Mềm"
-                        value={productForm.name}
-                        onChange={(e) => {
-                          const name = e.target.value;
-                          setProductForm((prev) => ({
-                            ...prev,
-                            name,
-                            slug: editingProductId ? prev.slug : slugify(name),
-                          }));
-                        }}
-                      />
-                    </div>
-
-                    <div className="admin-form-group">
-                      <label>Đường dẫn tĩnh (Slug URL) (*)</label>
-                      <input
-                        required
-                        placeholder="len-milk-bo-50g-sieu-mem"
-                        value={productForm.slug}
-                        onChange={(e) =>
-                          setProductForm({ ...productForm, slug: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div className="admin-form-group">
-                      <label>Giá bán (VNĐ) (*)</label>
-                      <input
-                        required
-                        type="number"
-                        min="0"
-                        step="1000"
-                        placeholder="18000"
-                        value={productForm.price}
-                        onChange={(e) =>
-                          setProductForm({
-                            ...productForm,
-                            price: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="admin-form-group">
-                      <label>Giá vốn / Chi phí nguyên liệu (VNĐ)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1000"
-                        placeholder="VD: 10000"
-                        value={productForm.costPrice}
-                        onChange={(e) =>
-                          setProductForm({
-                            ...productForm,
-                            costPrice: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-
-                    {(() => {
-                      const p = Number(productForm.price) || 0;
-                      const c = Number(productForm.costPrice) || 0;
-                      if (p > 0 && c > 0) {
-                        const diff = p - c;
-                        const pct = Math.round((diff / p) * 100);
-                        return (
-                          <div
-                            style={{
-                              gridColumn: "1 / -1",
-                              padding: "12px 18px",
-                              borderRadius: "12px",
-                              background: diff >= 0 ? "#ecfdf5" : "#fee2e2",
-                              border: `1.5px solid ${diff >= 0 ? "#a7f3d0" : "#fca5a5"}`,
-                              fontSize: "14px",
-                              fontWeight: 700,
-                              color: diff >= 0 ? "#047857" : "#b91c1c",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <span>
-                              {diff >= 0 ? "📈 Dự kiến lợi nhuận bán ra: " : "📉 Cảnh báo bán lỗ: "}
-                              <strong>{diff >= 0 ? `+${money(diff)}` : `-${money(Math.abs(diff))}`}</strong> ({pct}% trên giá bán)
-                            </span>
-                            <span style={{ fontSize: "12.5px", fontWeight: 600 }}>
-                              {diff >= 0 ? "✅ Giá bán có lời" : "⚠️ Giá bán thấp hơn giá vốn nhập"}
-                            </span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    <div className="admin-form-group">
-                      <label>Mô hình / Nguồn gốc sản phẩm (*)</label>
-                      <select
-                        value={productForm.productType}
-                        onChange={(e) =>
-                          setProductForm({
-                            ...productForm,
-                            productType: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="yarn_retail">
-                          🧶 Len cuộn & Phụ kiện nhập về bán
-                        </option>
-                        <option value="self_made">
-                          🌸 Tiệm tự móc (In-house thủ công)
-                        </option>
-                        <option value="outsourced">
-                          🪡 Nhờ thợ gia công móc thành phẩm
-                        </option>
-                      </select>
-                    </div>
-
-                    <div className="admin-form-group">
-                      <label>Số lượng tồn kho (Cuộn/Bộ) (*)</label>
-                      <input
-                        required
-                        type="number"
-                        min="0"
-                        placeholder="50"
-                        value={productForm.stock}
-                        onChange={(e) =>
-                          setProductForm({
-                            ...productForm,
-                            stock: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="admin-form-group">
-                      <label>Danh mục sản phẩm (*)</label>
-                      <select
-                        required
-                        value={productForm.category}
-                        onChange={(e) =>
-                          setProductForm({
-                            ...productForm,
-                            category: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="">-- Chọn danh mục --</option>
-                        {data.categories.map((c) => (
-                          <option key={c._id} value={c._id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="admin-form-group">
-                      <label>Chất liệu sợi / Nhãn hiệu</label>
-                      <input
-                        placeholder="VD: Milk Cotton, Chenille, Tự móc..."
-                        value={productForm.brand}
-                        onChange={(e) =>
-                          setProductForm({
-                            ...productForm,
-                            brand: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-
-                    {Number(productForm.price) > 0 &&
-                      Number(productForm.costPrice) > 0 && (
-                        <div
-                          className="full-width"
-                          style={{
-                            background: "#f0fdf4",
-                            border: "1px solid #bbf7d0",
-                            borderRadius: "10px",
-                            padding: "10px 14px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            color: "#166534",
-                            fontSize: "13px",
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span>
-                            💡 Ước tính Lãi gộp mỗi món:{" "}
-                            <strong style={{ color: "#15803d", fontSize: "15px" }}>
-                              {money(
-                                Number(productForm.price) -
-                                Number(productForm.costPrice),
-                              )}
-                            </strong>
-                          </span>
-                          <span>
-                            Tỷ suất sinh lời:{" "}
-                            <strong style={{ color: "#15803d" }}>
-                              {(
-                                ((Number(productForm.price) -
-                                  Number(productForm.costPrice)) /
-                                  Number(productForm.price)) *
-                                100
-                              ).toFixed(1)}
-                              %
-                            </strong>
-                          </span>
-                        </div>
-                      )}
-
-                    <div className="admin-form-group full-width">
-                      <label>Link hình ảnh sản phẩm (Cloudinary hoặc URL)</label>
-                      <div style={{ display: "flex", gap: "10px" }}>
-                        <input
-                          style={{ flex: 1 }}
-                          placeholder="https://images.unsplash.com/... hoặc link ảnh"
-                          value={productForm.images}
-                          onChange={(e) =>
-                            setProductForm({
-                              ...productForm,
-                              images: e.target.value,
-                            })
-                          }
-                        />
-                        <label
-                          className="admin-btn-outline"
-                          style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}
-                        >
-                          📁 Tải ảnh từ máy
-                          <input
-                            type="file"
-                            accept="image/*"
-                            style={{ display: "none" }}
-                            onChange={uploadProductImage}
-                          />
-                        </label>
-                      </div>
-                      {uploadMessage && (
-                        <small style={{ color: uploadingImage ? "#e11d48" : "#059669", fontWeight: 600 }}>
-                          {uploadMessage}
-                        </small>
-                      )}
-                      {productForm.images && (
-                        <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "10px", background: "#fdf2f8", padding: "8px 12px", borderRadius: "10px", border: "1px solid #fbcfe8" }}>
-                          <img
-                            src={productForm.images}
-                            alt="Xem trước ảnh sản phẩm"
-                            style={{ width: "60px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1.5px solid #fda4af" }}
-                          />
-                          <div>
-                            <span style={{ fontSize: "12px", color: "#059669", fontWeight: 700, display: "block" }}>✓ Đã chọn ảnh sản phẩm</span>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              onClick={() => setProductForm((prev) => ({ ...prev, images: "" }))}
-                              style={{ padding: "2px 8px", fontSize: "11px", color: "#e11d48", marginTop: "4px" }}
-                            >
-                              ✕ Xóa ảnh này
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                    <button type="submit" className="admin-btn-primary">
-                      {editingProductId ? "💾 Lưu Thay Đổi" : "➕ Thêm Sản Phẩm Mới"}
-                    </button>
-                    {editingProductId && (
-                      <button
-                        type="button"
-                        className="admin-btn-outline"
-                        onClick={resetProductForm}
-                      >
-                        ✕ Hủy Chỉnh Sửa
-                      </button>
-                    )}
-                  </div>
-                </form>
-              </div>
-
-              {/* Danh Sách Sản Phẩm */}
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <div>
-                    <h2>Kho Hàng & Đối Soát Lời Lỗ ({filteredProducts.length} sản phẩm)</h2>
-                    <p style={{ margin: "4px 0 0", color: "#7b4b5c", fontSize: "14.5px" }}>
-                      Đối chiếu trực quan giữa Giá Vốn Nhập Kho và Giá Bán Ra để kiểm soát biên lợi nhuận
-                    </p>
-                  </div>
-                  <div className="admin-card-actions">
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      onClick={exportProductsExcel}
-                      style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
-                      title="Xuất file Excel danh sách toàn bộ len & phụ kiện kho"
-                    >
-                      📥 Xuất Excel Kho Hàng
-                    </button>
-                    <input
-                      className="admin-search-input"
-                      placeholder="🔍 Tìm theo tên, slug..."
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                    />
-                    <select
-                      className="admin-select-input"
-                      value={productCategoryFilter}
-                      onChange={(e) => setProductCategoryFilter(e.target.value)}
-                    >
-                      <option value="all">Tất cả danh mục</option>
-                      {data.categories.map((c) => (
-                        <option key={c._id} value={c._id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* PROFIT FILTER BAR */}
-                <div className="profit-filter-bar">
-                  <span style={{ fontWeight: 800, color: "#471827", fontSize: "14.5px" }}>
-                    📊 Bộ lọc lời / lỗ:
-                  </span>
-                  <button
-                    type="button"
-                    className={`profit-filter-pill ${profitFilter === "all" ? "active" : ""}`}
-                    onClick={() => setProfitFilter("all")}
-                  >
-                    Tất cả ({data.products.length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`profit-filter-pill profit ${profitFilter === "profit" ? "active" : ""}`}
-                    onClick={() => setProfitFilter("profit")}
-                  >
-                    📈 Đang có lời ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) > Number(p.costPrice)).length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`profit-filter-pill loss ${profitFilter === "loss" ? "active" : ""}`}
-                    onClick={() => setProfitFilter("loss")}
-                  >
-                    📉 Cảnh báo lỗ ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) < Number(p.costPrice)).length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`profit-filter-pill ${profitFilter === "breakeven" ? "active" : ""}`}
-                    onClick={() => setProfitFilter("breakeven")}
-                  >
-                    ⚖️ Hòa vốn ({data.products.filter((p) => Number(p.costPrice) > 0 && Number(p.price) === Number(p.costPrice)).length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`profit-filter-pill nocost ${profitFilter === "nocost" ? "active" : ""}`}
-                    onClick={() => setProfitFilter("nocost")}
-                  >
-                    ⚠️ Chưa có giá vốn ({data.products.filter((p) => !p.costPrice || Number(p.costPrice) <= 0).length})
-                  </button>
-                </div>
-
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: "60px" }}>Ảnh</th>
-                        <th>Tên sản phẩm</th>
-                        <th>Danh mục</th>
-                        <th>Giá Bán & Giá Vốn (Nhập - Lời)</th>
-                        <th>Tồn kho</th>
-                        <th>Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredProducts.map((product) => (
-                        <tr key={product._id}>
-                          <td style={{ width: "60px" }}>
-                            <img
-                              src={product.images?.[0] || "/placeholder.jpg"}
-                              alt={product.name}
-                              style={{
-                                width: "56px",
-                                height: "56px",
-                                objectFit: "cover",
-                                borderRadius: "12px",
-                                border: "1.5px solid #fce7f3",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                              }}
-                            />
-                          </td>
-                          <td>
-                            <strong style={{ fontSize: "16px", color: "#2c0e17" }}>{product.name}</strong>
-                            <small style={{ display: "block", color: "#8d6271", marginTop: "3px", fontSize: "13px" }}>
-                              🔗 /{product.slug} · {product.brand || "Sene Handmade"}
-                            </small>
-                            <span
-                              style={{
-                                fontSize: "12px",
-                                display: "inline-block",
-                                marginTop: "4px",
-                                color: "#be123c",
-                                background: "#fff1f5",
-                                padding: "3px 10px",
-                                borderRadius: "10px",
-                                border: "1px solid #fce7f3",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {productTypeLabels[product.productType || "yarn_retail"]}
-                            </span>
-                          </td>
-                          <td>
-                            <span
-                              style={{
-                                background: "#fff1f2",
-                                color: "#be123c",
-                                padding: "5px 12px",
-                                borderRadius: "12px",
-                                fontSize: "13.5px",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {product.category?.name || "Chưa phân loại"}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="price-compare-cell">
-                              <div className="price-compare-row">
-                                <div className="price-pill-item sell" title="Giá bán ra niêm yết">
-                                  <span className="price-pill-label">Bán</span>
-                                  <span className="price-pill-val">{money(product.price)}</span>
-                                </div>
-                                <div className="price-pill-item cost" title="Giá vốn nhập kho">
-                                  <span className="price-pill-label">Vốn</span>
-                                  {product.costPrice > 0 ? (
-                                    <span className="price-pill-val">{money(product.costPrice)}</span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className="btn-add-cost-inline"
-                                      onClick={() =>
-                                        setQuickPriceModal({
-                                          open: true,
-                                          product,
-                                          price: product.price || 0,
-                                          costPrice: 0,
-                                        })
-                                      }
-                                    >
-                                      + Nhập vốn
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              {(() => {
-                                const cost = Number(product.costPrice) || 0;
-                                const price = Number(product.price) || 0;
-                                if (!cost || cost <= 0) {
-                                  return (
-                                    <span className="profit-mini-badge neutral">
-                                      ⚠️ Chưa có giá vốn
-                                    </span>
-                                  );
-                                }
-                                const profit = price - cost;
-                                const pct = price > 0 ? Math.round((profit / price) * 100) : 0;
-                                if (profit > 0) {
-                                  return (
-                                    <span className="profit-mini-badge positive">
-                                      📈 Lời +{money(profit)} ({pct}%)
-                                    </span>
-                                  );
-                                }
-                                if (profit === 0) {
-                                  return (
-                                    <span className="profit-mini-badge neutral">
-                                      ⚖️ Hòa vốn (0đ)
-                                    </span>
-                                  );
-                                }
-                                return (
-                                  <span className="profit-mini-badge negative">
-                                    📉 Lỗ -{money(Math.abs(profit))} ({pct}%)
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              {product.stock > 10 ? (
-                                <span className="status-pill-badge delivered">
-                                  Còn {product.stock} cuộn
-                                </span>
-                              ) : product.stock > 0 ? (
-                                <span className="status-pill-badge pending">
-                                  ⚠️ Sắp hết ({product.stock})
-                                </span>
-                              ) : (
-                                <span className="status-pill-badge cancelled">
-                                  ❌ Hết hàng
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                className="admin-btn-outline"
-                                style={{ padding: "3px 8px", fontSize: "12px", borderColor: "#f43f5e", color: "#f43f5e", fontWeight: 700 }}
-                                title="Nhập thêm hàng vào kho"
-                                onClick={() => setQuickStockModal({ open: true, product, addStock: 20 })}
-                              >
-                                ⚡ +20
-                              </button>
-                            </div>
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                              <button
-                                type="button"
-                                className="admin-btn-outline"
-                                style={{ borderColor: "#2563eb", color: "#2563eb", fontWeight: 700, padding: "7px 12px" }}
-                                title="Sửa nhanh giá vốn và giá bán"
-                                onClick={() =>
-                                  setQuickPriceModal({
-                                    open: true,
-                                    product,
-                                    price: product.price || 0,
-                                    costPrice: product.costPrice || 0,
-                                  })
-                                }
-                              >
-                                💰 Sửa giá
-                              </button>
-                              <button
-                                type="button"
-                                className="admin-btn-outline"
-                                style={{ borderColor: "#059669", color: "#059669", fontWeight: 700, padding: "7px 12px" }}
-                                title="Lập phiếu nhập hàng cho sản phẩm này"
-                                onClick={() => openCreateImport(product)}
-                              >
-                                📥 Nhập kho
-                              </button>
-                              <button
-                                type="button"
-                                className="admin-btn-outline"
-                                style={{ padding: "7px 12px" }}
-                                onClick={() => editProduct(product)}
-                              >
-                                ✏️ Sửa
-                              </button>
-                              <button
-                                type="button"
-                                className="admin-btn-outline"
-                                style={{ color: "#dc2626", borderColor: "#fecaca", padding: "7px 12px" }}
-                                onClick={() => deleteProduct(product._id)}
-                              >
-                                🗑️ Xóa
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredProducts.length === 0 && (
-                        <tr>
-                          <td colSpan="6" style={{ textAlign: "center", padding: "40px" }}>
-                            Không tìm thấy sản phẩm nào phù hợp với từ khóa.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* TAB: QUẢN LÝ NHẬP HÀNG & TỒN KHO (IMPORTS) */}
-          {activeTab === "imports" && (
-            <>
-              {/* KPI Thống Kê Nhập Hàng */}
-              <div className="admin-kpi-grid">
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon">📦</div>
-                    <span className="kpi-trend">Lịch sử</span>
-                  </div>
-                  <div className="kpi-title">Tổng số phiếu nhập</div>
-                  <h3 className="kpi-val">{data.imports?.length || 0} phiếu</h3>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>💰</div>
-                    <span className="kpi-trend" style={{ background: "#ecfdf5", color: "#047857" }}>Vốn nhập</span>
-                  </div>
-                  <div className="kpi-title">Tổng tiền nhập hàng</div>
-                  <h3 className="kpi-val" style={{ color: "#047857" }}>
-                    {money((data.imports || []).reduce((s, i) => s + (i.totalAmount || 0), 0))}
-                  </h3>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon" style={{ background: "#fdf2f8", borderColor: "#fbcfe8" }}>🧶</div>
-                    <span className="kpi-trend">Tồn kho đã tăng</span>
-                  </div>
-                  <div className="kpi-title">Tổng lượng len đã nhập</div>
-                  <h3 className="kpi-val" style={{ color: "#be123c" }}>
-                    {(data.imports || []).reduce(
-                      (s, i) => s + (i.items || []).reduce((sub, it) => sub + (it.quantity || 0), 0),
-                      0
-                    )} cuộn/bó
-                  </h3>
-                </div>
-
-                <div className="admin-kpi-card">
-                  <div className="kpi-top">
-                    <div className="kpi-icon" style={{ background: "#eff6ff", borderColor: "#bfdbfe" }}>🏢</div>
-                    <span className="kpi-trend" style={{ background: "#eff6ff", color: "#1d4ed8" }}>Đối tác</span>
-                  </div>
-                  <div className="kpi-title">Nhà cung cấp đối tác</div>
-                  <h3 className="kpi-val" style={{ color: "#1d4ed8" }}>{data.suppliers?.length || 0} đối tác</h3>
-                </div>
-              </div>
-
-              {/* Bảng Danh Sách Phiếu Nhập */}
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <div>
-                    <h2>📦 Lịch Sử Nhập Hàng & Tồn Kho ({filteredImports.length})</h2>
-                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                      Mỗi phiếu nhập hàng sẽ tự động tăng số lượng tồn kho của sản phẩm để phục vụ bán hàng ngay trên shop.
-                    </p>
-                  </div>
-                  <div className="admin-card-actions">
-                    <input
-                      className="admin-search-input"
-                      placeholder="🔍 Tìm theo mã PN, NCC, tên len..."
-                      value={importSearch}
-                      onChange={(e) => setImportSearch(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="admin-btn-primary"
-                      style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)", boxShadow: "0 4px 14px rgba(5, 150, 105, 0.4)" }}
-                      onClick={() => openCreateImport()}
-                    >
-                      ➕ Lập Phiếu Nhập Hàng Mới
-                    </button>
-                  </div>
-                </div>
-
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Mã Phiếu</th>
-                        <th>Nhà Cung Cấp & SĐT</th>
-                        <th>Thời Gian Nhập</th>
-                        <th>Mặt Hàng Nhập Kho</th>
-                        <th>Tổng Tiền Vốn</th>
-                        <th>Người Lập</th>
-                        <th>Trạng Thái</th>
-                        <th>Thao Tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredImports.map((imp) => (
-                        <tr key={imp._id}>
-                          <td>
-                            <strong>{imp.code}</strong>
-                          </td>
-                          <td>
-                            <strong>{imp.supplierName}</strong>
-                            {imp.supplierPhone && (
-                              <small style={{ display: "block", color: "#8d6271" }}>
-                                📱 {imp.supplierPhone}
-                              </small>
-                            )}
-                          </td>
-                          <td>
-                            {new Date(imp.createdAt).toLocaleDateString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                            })}
-                          </td>
-                          <td>
-                            <div className="import-items-list-cell">
-                              {imp.items?.slice(0, 3).map((item, idx) => (
-                                <span key={idx} className="import-item-tag">
-                                  <strong>{item.productName}</strong>
-                                  <span style={{ color: "#be123c", fontWeight: 700 }}>
-                                    x{item.quantity}
-                                  </span>
-                                  <small style={{ color: "#8d6271" }}>
-                                    ({money(item.costPrice)})
-                                  </small>
-                                </span>
+                              {Object.entries(statusLabels).map(([key, label]) => (
+                                <option key={key} value={key}>
+                                  {statusIcons[key]} {label}
+                                </option>
                               ))}
-                              {imp.items?.length > 3 && (
-                                <small style={{ color: "#8d6271" }}>
-                                  + thêm {imp.items.length - 3} mặt hàng nữa...
-                                </small>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <strong style={{ color: "#047857", fontSize: "14px" }}>
-                              {money(imp.totalAmount)}
-                            </strong>
-                          </td>
-                          <td>{imp.importedBy || "Admin Kho"}</td>
-                          <td>
-                            <span className="import-badge-pill">
-                              ✅ Đã nhập kho (+Tồn)
-                            </span>
+                            </select>
                           </td>
                           <td>
                             <div style={{ display: "flex", gap: "6px" }}>
                               <button
                                 type="button"
                                 className="admin-btn-outline"
-                                onClick={() => setSelectedImportReceipt(imp)}
-                                title="Xem và in phiếu nhập kho"
+                                onClick={() => showOrder(order)}
                               >
-                                👁️ Xem phiếu
+                                👁️ Chi tiết
                               </button>
                               <button
                                 type="button"
                                 className="admin-btn-outline"
-                                style={{ color: "#dc2626", borderColor: "#fecaca" }}
-                                onClick={() => handleDeleteImport(imp._id)}
-                                title="Xóa phiếu nhập"
+                                onClick={() => setShippingLabelOrder(order)}
+                                style={{ background: "#fff1f2", color: "#e11d48", borderColor: "#fecdd3", fontWeight: 700 }}
+                                title="In phiếu gửi hàng chuẩn bưu tá COD"
                               >
-                                🗑️
+                                🏷️ Tem
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))}
-                      {filteredImports.length === 0 && (
-                        <tr>
-                          <td colSpan="8" style={{ textAlign: "center", padding: "40px" }}>
-                            {importSearch
-                              ? "Không tìm thấy phiếu nhập nào với từ khóa này."
-                              : "Chưa có phiếu nhập hàng nào. Bấm nút '+ Lập Phiếu Nhập Hàng Mới' để nhập hàng vào kho và tăng số lượng bán."}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* TAB 3: QUẢN LÝ ĐƠN HÀNG (ORDERS) */}
-          {activeTab === "orders" && (
-            <div className="admin-card">
-              <div className="admin-card-header">
-                <h2>📦 Quản Lý {data.orders.length} Đơn Hàng</h2>
-                <div className="admin-card-actions">
-                  <button
-                    type="button"
-                    className="admin-btn-outline"
-                    onClick={exportShipperOrdersExcel}
-                    style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
-                    title="Xuất bảng kê danh sách giao hàng cho Shipper bưu tá"
-                  >
-                    📥 Xuất Bảng Kê Shipper COD
-                  </button>
-                  <input
-                    className="admin-search-input"
-                    placeholder="🔍 Tìm mã đơn, tên, SĐT..."
-                    value={orderSearch}
-                    onChange={(e) => setOrderSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Filter Tabs */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  marginBottom: "20px",
-                  borderBottom: "1.5px solid #fce7f3",
-                  paddingBottom: "12px",
-                }}
-              >
-                {[
-                  { id: "all", label: "Tất cả", count: data.orders.length },
-                  { id: "pending", label: "⏳ Chờ xác nhận", count: pendingOrders.length },
-                  { id: "confirmed", label: "🏪 Đã xác nhận", count: confirmedOrders.length },
-                  { id: "shipping", label: "🚚 Đang giao", count: shippingOrders.length },
-                  { id: "delivered", label: "✅ Đã giao", count: deliveredOrders.length },
-                  { id: "cancelled", label: "❌ Đã hủy", count: cancelledOrders.length },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setOrderFilter(tab.id)}
-                    style={{
-                      border: "0",
-                      background: orderFilter === tab.id ? "#f43f5e" : "#fff1f5",
-                      color: orderFilter === tab.id ? "#fff" : "#be123c",
-                      padding: "6px 14px",
-                      borderRadius: "16px",
-                      fontSize: "12.5px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {tab.label} ({tab.count})
-                  </button>
-                ))}
-              </div>
-
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Mã đơn</th>
-                      <th>Khách hàng & SĐT</th>
-                      <th>Ngày đặt</th>
-                      <th>Số món</th>
-                      <th>Tổng tiền</th>
-                      <th>Thanh toán</th>
-                      <th>Trạng thái đơn</th>
-                      <th>Hóa đơn</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((order) => (
-                      <tr key={order._id}>
-                        <td>
-                          <strong>#{order._id.slice(-6).toUpperCase()}</strong>
-                        </td>
-                        <td>
-                          <strong>{order.customerName}</strong>
-                          <small style={{ display: "block", color: "#8d6271" }}>
-                            📱 {order.phone}
-                          </small>
-                          <small
-                            style={{
-                              display: "block",
-                              color: "#8d6271",
-                              maxWidth: "180px",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            📍 {order.address}
-                          </small>
-                        </td>
-                        <td>
-                          {new Date(order.createdAt).toLocaleDateString("vi-VN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            day: "2-digit",
-                            month: "2-digit",
-                          })}
-                        </td>
-                        <td>{order.items?.length || 0} món</td>
-                        <td>
-                          <strong style={{ color: "#e11d48", fontSize: "14px" }}>
-                            {money(order.totalAmount)}
-                          </strong>
-                        </td>
-                        <td>
-                          <span
-                            className="status-pill-badge"
-                            style={{ background: "#fdf2f8", color: "#be123c" }}
-                          >
-                            {order.paymentMethod === "COD"
-                              ? "💵 Thu hộ COD"
-                              : "💳 VietQR"}
-                          </span>
-                        </td>
-                        <td>
-                          <select
-                            className="order-status-select"
-                            value={order.status}
-                            onChange={(e) =>
-                              updateOrderStatus(order._id, e.target.value)
-                            }
-                          >
-                            {Object.entries(statusLabels).map(([key, label]) => (
-                              <option key={key} value={key}>
-                                {statusIcons[key]} {label}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-
-                        <td>
-                          <div style={{ display: "flex", gap: "6px" }}>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              onClick={() => showOrder(order._id)}
-                            >
-                              👁️ Chi tiết
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-btn-outline"
-                              onClick={() => setShippingLabelOrder(order)}
-                              style={{ background: "#fff1f2", color: "#e11d48", borderColor: "#fecdd3", fontWeight: 700 }}
-                              title="In phiếu gửi hàng chuẩn bưu tá COD"
-                            >
-                              🏷️ In Tem
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                      );
+                    })}
                     {filteredOrders.length === 0 && (
                       <tr>
                         <td colSpan="8" style={{ textAlign: "center", padding: "40px" }}>
-                          Không có đơn hàng nào trong mục này.
+                          Không có đơn hàng nào khớp với bộ lọc hiện tại.
                         </td>
                       </tr>
                     )}
@@ -3207,12 +2875,506 @@ function AdminPage() {
             </div>
           )}
 
-          {/* TAB 4: KHÁCH HÀNG (CUSTOMERS) */}
+          {/* ========================================================
+              TAB 3: SẢN PHẨM & KHO (PRODUCTS)
+          ======================================================== */}
+          {activeTab === "products" && (
+            <>
+              {/* Product Form */}
+              <div className="admin-card" style={{ marginBottom: "24px" }}>
+                <div className="admin-card-header">
+                  <div>
+                    <h2>{editingProductId ? "✏️ Sửa Thông Tin Sản Phẩm Len" : "✨ Thêm Mới Sản Phẩm Vào Kho Len"}</h2>
+                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "14.5px" }}>
+                      Cập nhật giá bán, giá vốn nhập hàng, tồn kho và danh mục hiển thị
+                    </p>
+                  </div>
+                  {editingProductId && (
+                    <button type="button" className="admin-btn-outline" onClick={resetProductForm}>
+                      ✕ Hủy chỉnh sửa
+                    </button>
+                  )}
+                </div>
+
+                <form onSubmit={handleSaveProduct} className="admin-product-grid-form">
+                  <div className="admin-form-group">
+                    <label>Tên sản phẩm len / dụng cụ (*)</label>
+                    <input
+                      required
+                      placeholder="VD: Len Milk Cotton 50g Bò Cuộn Nhập Khẩu"
+                      value={productForm.name}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setProductForm((prev) => ({
+                          ...prev,
+                          name: val,
+                          slug: editingProductId ? prev.slug : slugify(val),
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label>Đường dẫn thân thiện (Slug)</label>
+                    <input
+                      placeholder="len-milk-cotton-50g-bo"
+                      value={productForm.slug}
+                      onChange={(e) => setProductForm({ ...productForm, slug: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label>Giá bán niêm yết (VNĐ) (*)</label>
+                    <input
+                      required
+                      type="number"
+                      min="0"
+                      step="1000"
+                      placeholder="VD: 35000"
+                      value={productForm.price}
+                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label>Giá vốn nhập hàng (VNĐ)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      placeholder="VD: 18000"
+                      value={productForm.costPrice}
+                      onChange={(e) => setProductForm({ ...productForm, costPrice: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label>Số lượng tồn kho (Cuộn/Bộ/Cành) (*)</label>
+                    <input
+                      required
+                      type="number"
+                      min="0"
+                      placeholder="VD: 100"
+                      value={productForm.stock}
+                      onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label>Nguồn gốc & Phân loại sản phẩm</label>
+                    <select
+                      value={productForm.productType}
+                      onChange={(e) => setProductForm({ ...productForm, productType: e.target.value })}
+                    >
+                      <option value="yarn_retail">🧶 Len cuộn & Phụ kiện (Nhập bán sỉ/lẻ)</option>
+                      <option value="self_made">🌸 Tiệm tự móc (Thành phẩm)</option>
+                      <option value="outsourced">🪡 Nhờ thợ móc gia công (Thành phẩm)</option>
+                    </select>
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label>Danh mục</label>
+                    <select
+                      value={productForm.category}
+                      onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                    >
+                      <option value="">-- Chọn danh mục --</option>
+                      {(data.categories || []).map((cat) => (
+                        <option key={cat._id} value={cat._id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label>Thương hiệu / Xuất xứ</label>
+                    <input
+                      placeholder="VD: Milk Bò, Tulip Japan, Sene Handmade"
+                      value={productForm.brand}
+                      onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ gridColumn: "1 / -1" }}>
+                    <label>Hình ảnh sản phẩm</label>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                      <input
+                        style={{ flex: 1 }}
+                        placeholder="Dán link ảnh https://... hoặc tải ảnh từ máy tính bên cạnh"
+                        value={productForm.images}
+                        onChange={(e) => setProductForm({ ...productForm, images: e.target.value })}
+                      />
+                      <label className="admin-btn-outline" style={{ cursor: "pointer", margin: 0 }}>
+                        📁 Chọn ảnh từ máy
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          onChange={uploadProductImage}
+                        />
+                      </label>
+                    </div>
+                    {uploadingImage && <small style={{ color: "#be123c" }}>⏳ {uploadMessage}</small>}
+                    {productForm.images && (
+                      <div style={{ marginTop: "14px" }}>
+                        <img
+                          src={productForm.images}
+                          alt="preview"
+                          style={{ width: "96px", height: "96px", borderRadius: "14px", objectFit: "cover", border: "2px solid #fbcfe8", boxShadow: "0 4px 14px rgba(244, 114, 182, 0.15)" }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="admin-form-group" style={{ gridColumn: "1 / -1" }}>
+                    <label>Mô tả chi tiết sản phẩm</label>
+                    <textarea
+                      rows="3"
+                      placeholder="Thông tin sợi, trọng lượng cuộn len, kích thước kim móc phù hợp..."
+                      value={productForm.description}
+                      onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "6px" }}>
+                    {editingProductId && (
+                      <button type="button" className="admin-btn-outline" onClick={resetProductForm}>
+                        ✕ Hủy
+                      </button>
+                    )}
+                    <button type="submit" className="admin-btn-primary">
+                      {editingProductId ? "💾 Lưu Cập Nhật Sản Phẩm" : "✨ Thêm Vào Kho Bán Hàng"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Products List & Inventory Management */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <h2>📦 Quản Lý Kho Hàng ({(filteredProducts || []).length} sản phẩm)</h2>
+                    <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "14.5px" }}>
+                      Kiểm soát tồn kho, cập nhật giá nhanh và cảnh báo biên lợi nhuận
+                    </p>
+                  </div>
+                  <div className="admin-card-actions">
+                    <button
+                      type="button"
+                      className="admin-btn-outline"
+                      onClick={exportProductsExcel}
+                      style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
+                    >
+                      📥 Xuất File Kho Excel
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn-primary"
+                      onClick={() => openCreateImport()}
+                    >
+                      📥 Lập Phiếu Nhập Hàng
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
+                  <input
+                    className="admin-search-input"
+                    placeholder="🔍 Tìm tên sản phẩm, thương hiệu..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    style={{ flex: 1, minWidth: "260px" }}
+                  />
+                  <select
+                    className="order-status-select"
+                    value={productCategoryFilter}
+                    onChange={(e) => setProductCategoryFilter(e.target.value)}
+                    style={{ minWidth: "200px" }}
+                  >
+                    <option value="all">Tất cả danh mục</option>
+                    {(data.categories || []).map((cat) => (
+                      <option key={cat._id} value={cat._id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="order-status-select"
+                    value={profitFilter}
+                    onChange={(e) => setProfitFilter(e.target.value)}
+                    style={{ minWidth: "210px" }}
+                  >
+                    <option value="all">Tất cả lợi nhuận</option>
+                    <option value="profit">📈 Đang có lãi</option>
+                    <option value="loss">📉 Cảnh báo bán lỗ</option>
+                    <option value="nocost">⚠️ Chưa nhập giá vốn</option>
+                  </select>
+                </div>
+
+                {/* Table */}
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Sản phẩm</th>
+                        <th>Danh mục & Phân loại</th>
+                        <th>Giá bán</th>
+                        <th>Giá vốn</th>
+                        <th>Lãi gộp</th>
+                        <th>Tồn kho</th>
+                        <th>Đã bán</th>
+                        <th>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProducts.map((p) => {
+                        const price = p.price || 0;
+                        const cost = p.costPrice || 0;
+                        const profit = price - cost;
+                        const margin = price > 0 && cost > 0 ? Math.round((profit / price) * 100) : 0;
+                        const isLow = (p.stock || 0) < 10;
+
+                        return (
+                          <tr key={p._id}>
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                                <img
+                                  src={p.images?.[0] || "/placeholder.jpg"}
+                                  alt=""
+                                  className="admin-product-thumb"
+                                  style={{
+                                    width: "58px",
+                                    height: "58px",
+                                    borderRadius: "12px",
+                                    objectFit: "cover",
+                                    border: isLow ? "2.5px solid #f43f5e" : "1.5px solid #fce7f3",
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={() => p.images?.[0] && setPreviewImageModal(p.images[0])}
+                                />
+                                <div>
+                                  <strong style={{ fontSize: "15.5px", color: "#2c0e17" }}>{p.name}</strong>
+                                  <small style={{ display: "block", color: "#94a3b8", fontSize: "12.5px", marginTop: "3px" }}>
+                                    Slug: {p.slug}
+                                  </small>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{ fontWeight: 700, fontSize: "15px" }}>{p.category?.name || "Len sợi"}</span>
+                              <small style={{ display: "block", color: "#8d6271", fontSize: "13px", marginTop: "3px" }}>
+                                {productTypeLabels[p.productType] || "Nhập bán"}
+                              </small>
+                            </td>
+                            <td>
+                              <strong style={{ color: "#be123c", fontSize: "16.5px" }}>{money(price)}</strong>
+                            </td>
+                            <td>{cost > 0 ? <span style={{ fontSize: "15px", fontWeight: 700 }}>{money(cost)}</span> : <em style={{ color: "#9ca3af", fontSize: "14px" }}>Chưa nhập</em>}</td>
+                            <td>
+                              {cost > 0 ? (
+                                <span style={{ color: profit >= 0 ? "#059669" : "#dc2626", fontWeight: 800, fontSize: "15px" }}>
+                                  {profit >= 0 ? `+${money(profit)}` : `-${money(Math.abs(profit))}`}
+                                  <small style={{ display: "block", fontSize: "12px", marginTop: "2px" }}>({margin}%)</small>
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td>
+                              <span
+                                className="status-pill-badge"
+                                style={{
+                                  background: isLow ? "#fee2e2" : "#ecfdf5",
+                                  color: isLow ? "#b91c1c" : "#047857",
+                                  fontWeight: 800,
+                                  fontSize: "13.5px",
+                                  padding: "7px 14px",
+                                }}
+                              >
+                                {isLow && "⚠️ "}
+                                {p.stock || 0} cuộn
+                              </span>
+                            </td>
+                            <td>
+                              <strong style={{ color: "#047857", fontSize: "16px" }}>{p.sold || 0}</strong>
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                <button
+                                  type="button"
+                                  className="admin-btn-outline"
+                                  style={{ padding: "6px 12px", fontSize: "13.5px" }}
+                                  onClick={() =>
+                                    setQuickPriceModal({
+                                      open: true,
+                                      product: p,
+                                      price: String(p.price || ""),
+                                      costPrice: String(p.costPrice || ""),
+                                    })
+                                  }
+                                  title="Cập nhật nhanh giá bán & giá vốn"
+                                >
+                                  💰 Giá
+                                </button>
+                                <button
+                                  type="button"
+                                  className="admin-btn-outline"
+                                  style={{ padding: "6px 12px", fontSize: "13.5px", color: "#047857", borderColor: "#a7f3d0" }}
+                                  onClick={() =>
+                                    setQuickStockModal({
+                                      open: true,
+                                      product: p,
+                                      addStock: 20,
+                                    })
+                                  }
+                                  title="Nhập thêm hàng nhanh"
+                                >
+                                  ⚡ +Kho
+                                </button>
+                                <button
+                                  type="button"
+                                  className="admin-btn-outline"
+                                  style={{ padding: "6px 12px", fontSize: "13.5px" }}
+                                  onClick={() => editProduct(p)}
+                                >
+                                  ✏️ Sửa
+                                </button>
+                                <button
+                                  type="button"
+                                  className="admin-btn-outline"
+                                  style={{ padding: "6px 12px", fontSize: "13.5px", color: "#dc2626", borderColor: "#fca5a5" }}
+                                  onClick={() => deleteProduct(p._id)}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filteredProducts.length === 0 && (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: "center", padding: "40px" }}>
+                            Không tìm thấy sản phẩm nào phù hợp.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ========================================================
+              TAB 4: NHẬP HÀNG & TỒN KHO (IMPORTS)
+          ======================================================== */}
+          {activeTab === "imports" && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <h2>📥 Lịch Sử Nhập Hàng & Phiếu Nhập Kho ({(data.imports || []).length})</h2>
+                  <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Theo dõi các lần nhập len, tự động cộng tồn kho và in chứng từ giao nhận
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() => openCreateImport()}
+                >
+                  ➕ Lập Phiếu Nhập Kho Mới
+                </button>
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <input
+                  className="admin-search-input"
+                  style={{ maxWidth: "400px" }}
+                  placeholder="🔍 Tìm mã phiếu nhập, nhà cung cấp..."
+                  value={importSearch}
+                  onChange={(e) => setImportSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Mã phiếu</th>
+                      <th>Nhà cung cấp & SĐT</th>
+                      <th>Ngày lập (UTC+7)</th>
+                      <th>Sản phẩm nhập</th>
+                      <th>Tổng tiền vốn</th>
+                      <th>Người lập</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredImports.map((imp) => (
+                      <tr key={imp._id}>
+                        <td>
+                          <strong>#{imp.code}</strong>
+                        </td>
+                        <td>
+                          <strong>{imp.supplierName}</strong>
+                          <small style={{ display: "block", color: "#8d6271" }}>
+                            📱 {imp.supplierPhone || "—"}
+                          </small>
+                        </td>
+                        <td>{formatVnDateTime(imp.createdAt)}</td>
+                        <td>
+                          <span style={{ fontWeight: 600 }}>{imp.items?.length || 0} mặt hàng</span>
+                          <small style={{ display: "block", color: "#64748b" }}>
+                            +{(imp.items || []).reduce((s, i) => s + (i.quantity || 0), 0)} sản phẩm
+                          </small>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#047857", fontSize: "14px" }}>
+                            {money(imp.totalAmount)}
+                          </strong>
+                        </td>
+                        <td>{imp.importedBy || "Admin"}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="admin-btn-outline"
+                            onClick={() => setSelectedImportReceipt(imp)}
+                          >
+                            👁️ Xem & In Phiếu
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredImports.length === 0 && (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: "center", padding: "40px" }}>
+                          Chưa có phiếu nhập hàng nào.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              TAB 5: KHÁCH HÀNG (CUSTOMERS) - WITH ORDER HISTORY
+          ======================================================== */}
           {activeTab === "customers" && (
             <div className="admin-card">
               <div className="admin-card-header">
-                <h2>👥 Danh Sách Khách Hàng Thành Viên ({data.customers.length})</h2>
+                <div>
+                  <h2>👥 Danh Sách Khách Hàng Thành Viên ({(data.customers || []).length})</h2>
+                  <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Xem chi tiết lịch sử mua hàng, tổng chi tiêu và hỗ trợ khôi phục mật khẩu
+                  </p>
+                </div>
               </div>
+
               <div className="admin-table-wrap">
                 <table className="admin-table">
                   <thead>
@@ -3223,11 +3385,11 @@ function AdminPage() {
                       <th>Số đơn đã mua</th>
                       <th>Tổng chi tiêu</th>
                       <th>Đơn gần nhất</th>
-                      <th>Khôi phục mật khẩu</th>
+                      <th>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.customers.map((c) => (
+                    {(data.customers || []).map((c) => (
                       <tr key={c._id}>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -3254,50 +3416,50 @@ function AdminPage() {
                         <td>
                           <span
                             className="status-pill-badge"
-                            style={{ background: "#ecfdf5", color: "#047857" }}
+                            style={{ background: "#ecfdf5", color: "#047857", fontWeight: 700 }}
                           >
-                            {c.orderCount} đơn
+                            {c.orderCount || 0} đơn
                           </span>
                         </td>
                         <td>
-                          <strong style={{ color: "#e11d48" }}>
+                          <strong style={{ color: "#e11d48", fontSize: "14px" }}>
                             {money(c.totalSpent)}
                           </strong>
                         </td>
                         <td>
-                          {c.lastOrderAt
-                            ? new Date(c.lastOrderAt).toLocaleDateString("vi-VN")
-                            : "Chưa đặt"}
+                          {c.lastOrderAt ? formatVnDateTime(c.lastOrderAt) : "Chưa đặt"}
                         </td>
                         <td>
-                          <button
-                            type="button"
-                            className="admin-btn-outline"
-                            style={{
-                              fontSize: "12px",
-                              padding: "4px 10px",
-                              color: "#be123c",
-                              borderColor: "#fecdd3",
-                              whiteSpace: "nowrap",
-                            }}
-                            onClick={() =>
-                              setResetPasswordModal({
-                                open: true,
-                                customer: c,
-                                newPassword:
-                                  "LenXinh@" +
-                                  Math.floor(1000 + Math.random() * 9000),
-                                resultMsg: "",
-                                errorMsg: "",
-                              })
-                            }
-                          >
-                            🔑 Cấp lại MK
-                          </button>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ fontSize: "12px", padding: "4px 10px", color: "#047857", borderColor: "#a7f3d0", whiteSpace: "nowrap" }}
+                              onClick={() => openCustomerHistory(c)}
+                            >
+                              👁️ Lịch sử mua
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ fontSize: "12px", padding: "4px 10px", color: "#be123c", borderColor: "#fecdd3", whiteSpace: "nowrap" }}
+                              onClick={() =>
+                                setResetPasswordModal({
+                                  open: true,
+                                  customer: c,
+                                  newPassword: "LenXinh@" + Math.floor(1000 + Math.random() * 9000),
+                                  resultMsg: "",
+                                  errorMsg: "",
+                                })
+                              }
+                            >
+                              🔑 Cấp lại MK
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
-                    {data.customers.length === 0 && (
+                    {(data.customers || []).length === 0 && (
                       <tr>
                         <td colSpan="7" style={{ textAlign: "center", padding: "40px" }}>
                           Chưa có khách hàng nào đăng ký.
@@ -3310,14 +3472,16 @@ function AdminPage() {
             </div>
           )}
 
-          {/* TAB 5: NHÀ CUNG CẤP (SUPPLIERS) */}
+          {/* ========================================================
+              TAB 6: NHÀ CUNG CẤP (SUPPLIERS)
+          ======================================================== */}
           {activeTab === "suppliers" && (
             <div className="admin-card">
               <div className="admin-card-header">
                 <div>
                   <h2>🏢 Danh Sách Nhà Cung Cấp Len & Phụ Kiện ({(data.suppliers || []).length})</h2>
-                  <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                    Quản lý nguồn nhập sỉ len sợi, kim móc, phụ kiện và lịch sử chi phí đã nhập.
+                  <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Quản lý nguồn sỉ len sợi, xưởng kim móc và công nợ mua hàng
                   </p>
                 </div>
                 <button
@@ -3344,77 +3508,82 @@ function AdminPage() {
                 </button>
               </div>
 
-              <div className="entity-grid">
-                {(data.suppliers || []).map((sup) => (
-                  <div key={sup._id} className="entity-card">
-                    <div>
-                      <div className="entity-card-top">
-                        <div>
-                          <h3 className="entity-card-title">{sup.name}</h3>
-                          <span className="entity-role-badge">⭐ {sup.rating || 5}/5 sao uy tín</span>
-                        </div>
-                      </div>
-
-                      <div className="entity-card-body">
-                        <div>📞 <strong>SĐT:</strong> {sup.phone || "(Chưa có)"}</div>
-                        <div>📍 <strong>Địa chỉ:</strong> {sup.address || "TP. Hồ Chí Minh"}</div>
-                        <div>🧶 <strong>Mặt hàng:</strong> {sup.supplyItems || "Len sợi, kim móc"}</div>
-                        <div>💰 <strong>Tổng đã nhập:</strong> <strong style={{ color: "#e11d48" }}>{money(sup.totalImported)}</strong></div>
-                        {sup.notes && (
-                          <div style={{ fontStyle: "italic", color: "#8d6271", background: "#fff5f8", padding: "6px 10px", borderRadius: "8px", marginTop: "4px" }}>
-                            📝 {sup.notes}
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Nhà cung cấp</th>
+                      <th>Số điện thoại</th>
+                      <th>Địa chỉ</th>
+                      <th>Mặt hàng chuyên sỉ</th>
+                      <th>Tổng tiền đã nhập</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.suppliers || []).map((sup) => (
+                      <tr key={sup._id}>
+                        <td>
+                          <strong>{sup.name}</strong>
+                          <div style={{ fontSize: "12px", color: "#f59e0b" }}>
+                            {"★".repeat(sup.rating || 5)}
                           </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="entity-card-footer">
-                      <button
-                        type="button"
-                        className="admin-btn-outline"
-                        style={{ fontSize: "12px", padding: "4px 10px" }}
-                        onClick={() =>
-                          setSupplierModal({
-                            open: true,
-                            isEdit: true,
-                            supplierId: sup._id,
-                            form: {
-                              name: sup.name,
-                              phone: sup.phone || "",
-                              address: sup.address || "",
-                              supplyItems: sup.supplyItems || "",
-                              rating: sup.rating || 5,
-                              totalImported: sup.totalImported || 0,
-                              notes: sup.notes || "",
-                            },
-                          })
-                        }
-                      >
-                        ✏️ Sửa
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-btn-outline"
-                        style={{ fontSize: "12px", padding: "4px 10px", color: "#dc2626", borderColor: "#fecaca" }}
-                        onClick={() => handleDeleteSupplier(sup._id)}
-                      >
-                        🗑️ Xóa
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td>📱 {sup.phone}</td>
+                        <td>{sup.address}</td>
+                        <td>
+                          <span style={{ fontSize: "12.5px", color: "#475569" }}>
+                            {sup.supplyItems}
+                          </span>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#047857" }}>{money(sup.totalImported)}</strong>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ padding: "4px 8px", fontSize: "11.5px" }}
+                              onClick={() =>
+                                setSupplierModal({
+                                  open: true,
+                                  isEdit: true,
+                                  supplierId: sup._id,
+                                  form: { ...sup },
+                                })
+                              }
+                            >
+                              ✏️ Sửa
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ padding: "4px 8px", fontSize: "11.5px", color: "#dc2626" }}
+                              onClick={() => handleDeleteSupplier(sup._id, sup.name)}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* TAB 6: THỢ MÓC & NHÂN SỰ (STAFF & ARTISANS) */}
+          {/* ========================================================
+              TAB 7: THỢ MÓC & NHÂN SỰ (STAFF)
+          ======================================================== */}
           {activeTab === "staff" && (
             <div className="admin-card">
               <div className="admin-card-header">
                 <div>
-                  <h2>🪡 Đội Ngũ Thợ Móc Thủ Công & Nhân Viên ({(data.staff || []).length})</h2>
-                  <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                    Theo dõi tiến độ gia công hoa len, thú bông, đơn giá khoán theo sản phẩm và chi phí công thợ.
+                  <h2>🪡 Thợ Móc Thủ Công & Nhân Viên ({(data.staff || []).length})</h2>
+                  <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Tính tiền công theo sản phẩm hoàn thiện (hoa len, thú bông, đóng gói)
                   </p>
                 </div>
                 <button
@@ -3439,413 +3608,402 @@ function AdminPage() {
                     })
                   }
                 >
-                  ➕ Thêm Thợ / Nhân Sự Mới
+                  ➕ Thêm Thợ / Nhân Viên Mới
                 </button>
               </div>
 
-              <div className="entity-grid">
-                {(data.staff || []).map((member) => (
-                  <div key={member._id} className="entity-card">
-                    <div>
-                      <div className="entity-card-top">
-                        <div>
-                          <h3 className="entity-card-title">{member.name}</h3>
-                          <span className="entity-role-badge">{member.role}</span>
-                        </div>
-                        <span
-                          className="status-pill-badge"
-                          style={{
-                            background: member.status === "active" ? "#ecfdf5" : "#f3f4f6",
-                            color: member.status === "active" ? "#047857" : "#6b7280",
-                            fontSize: "11px",
-                          }}
-                        >
-                          {member.status === "active" ? "✓ Đang nhận mẫu" : "Tạm ngưng"}
-                        </span>
-                      </div>
-
-                      <div className="entity-card-body">
-                        <div>📞 <strong>SĐT:</strong> {member.phone || "(Chưa có)"}</div>
-                        <div>💵 <strong>Tiền công:</strong> <strong style={{ color: "#e11d48" }}>{money(member.pieceRate)}/món</strong></div>
-                        <div>📦 <strong>Đã hoàn thành:</strong> <strong>{member.completedCount || 0} sản phẩm</strong></div>
-                        <div>💳 <strong>Tổng tiền công:</strong> <strong style={{ color: "#059669" }}>{money(member.totalPaid || ((member.completedCount || 0) * (member.pieceRate || 20000)))}</strong></div>
-                        {member.skills && (
-                          <div>✨ <strong>Tay nghề:</strong> {member.skills}</div>
-                        )}
-                        {member.notes && (
-                          <div style={{ fontStyle: "italic", color: "#8d6271", background: "#fff5f8", padding: "6px 10px", borderRadius: "8px", marginTop: "4px" }}>
-                            📝 {member.notes}
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Họ tên & SĐT</th>
+                      <th>Chức vụ / Chuyên môn</th>
+                      <th>Tiền công / SP</th>
+                      <th>Đã hoàn thành</th>
+                      <th>Đã thanh toán công</th>
+                      <th>Ghi nhận nhanh</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.staff || []).map((st) => (
+                      <tr key={st._id}>
+                        <td>
+                          <strong>{st.name}</strong>
+                          <small style={{ display: "block", color: "#8d6271" }}>
+                            📱 {st.phone}
+                          </small>
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 600 }}>{st.role}</span>
+                          <small style={{ display: "block", color: "#64748b" }}>
+                            {st.skills}
+                          </small>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#be123c" }}>{money(st.pieceRate)}/món</strong>
+                        </td>
+                        <td>
+                          <span className="status-pill-badge" style={{ background: "#ecfdf5", color: "#047857", fontWeight: 700 }}>
+                            {st.completedCount || 0} sản phẩm
+                          </span>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#047857" }}>{money(st.totalPaid)}</strong>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "4px" }}>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ padding: "3px 7px", fontSize: "11px", color: "#047857" }}
+                              onClick={() => handleRecordStaffPieces(st, 5)}
+                            >
+                              +5 món
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ padding: "3px 7px", fontSize: "11px", color: "#047857" }}
+                              onClick={() => handleRecordStaffPieces(st, 10)}
+                            >
+                              +10 món
+                            </button>
                           </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="entity-card-footer">
-                      <button
-                        type="button"
-                        className="admin-btn-outline"
-                        style={{ fontSize: "11.5px", padding: "4px 8px", borderColor: "#f43f5e", color: "#f43f5e" }}
-                        title="Ghi nhận giao thêm 5 sản phẩm móc xong"
-                        onClick={() => handleIncrementStaffCount(member, 5)}
-                      >
-                        ➕ Xong +5 món
-                      </button>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        <button
-                          type="button"
-                          className="admin-btn-outline"
-                          style={{ fontSize: "11.5px", padding: "4px 8px" }}
-                          onClick={() =>
-                            setStaffModal({
-                              open: true,
-                              isEdit: true,
-                              staffId: member._id,
-                              form: {
-                                name: member.name,
-                                phone: member.phone || "",
-                                role: member.role || "Thợ gia công hoa len",
-                                pieceRate: member.pieceRate || 20000,
-                                completedCount: member.completedCount || 0,
-                                totalPaid: member.totalPaid || 0,
-                                skills: member.skills || "",
-                                status: member.status || "active",
-                                notes: member.notes || "",
-                              },
-                            })
-                          }
-                        >
-                          ✏️ Sửa
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-btn-outline"
-                          style={{ fontSize: "11.5px", padding: "4px 8px", color: "#dc2626", borderColor: "#fecaca" }}
-                          onClick={() => handleDeleteStaff(member._id)}
-                        >
-                          🗑️ Xóa
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ padding: "3px 8px", fontSize: "11.5px" }}
+                              onClick={() =>
+                                setStaffModal({
+                                  open: true,
+                                  isEdit: true,
+                                  staffId: st._id,
+                                  form: { ...st },
+                                })
+                              }
+                            >
+                              ✏️ Sửa
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn-outline"
+                              style={{ padding: "3px 8px", fontSize: "11.5px", color: "#dc2626" }}
+                              onClick={() => handleDeleteStaff(st._id, st.name)}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* TAB 7: BÁO CÁO (REPORTS) */}
-          {activeTab === "reports" && (
-            <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <h2>🥇 Mẫu Bán Chạy Nhất</h2>
-                  </div>
-                  {data.reports.bestSelling?.map((item, idx) => (
-                    <div
-                      key={item._id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "12px 0",
-                        borderBottom: "1px solid #fdf2f8",
-                      }}
-                    >
-                      <div>
-                        <strong style={{ color: idx === 0 ? "#f59e0b" : "#f43f5e" }}>
-                          #{idx + 1} {item.name}
-                        </strong>
-                        <small style={{ display: "block", color: "#8d6271" }}>
-                          Số lượng đã bán: {item.quantity} cuộn
-                        </small>
-                      </div>
-                      <strong style={{ color: "#e11d48" }}>{money(item.revenue)}</strong>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <h2>💡 Sản Phẩm Bán Chậm (Gợi Ý Flash Sale)</h2>
-                  </div>
-                  {data.reports.slowSelling?.map((item, idx) => (
-                    <div
-                      key={item._id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "12px 0",
-                        borderBottom: "1px solid #fdf2f8",
-                      }}
-                    >
-                      <div>
-                        <strong>{item.name}</strong>
-                        <small style={{ display: "block", color: "#8d6271" }}>
-                          Mới bán: {item.quantity} sản phẩm
-                        </small>
-                      </div>
-                      <span style={{ color: "#8d6271", fontSize: "13px" }}>
-                        Tồn kho cần kích cầu
-                      </span>
-                    </div>
-                  ))}
+          {/* ========================================================
+              TAB 8: ĐƠN MÓC THEO MẪU (CUSTOM-ORDERS) - COMPLETED
+          ======================================================== */}
+          {activeTab === "custom-orders" && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <h2>🧶 Đơn Đặt Móc Theo Mẫu Riêng ({(data.customOrders || []).length})</h2>
+                  <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Khách gửi ảnh mẫu thú bông, bó hoa len; xem ảnh mẫu, chốt giá và liên hệ Zalo 1 chạm
+                  </p>
                 </div>
               </div>
 
-              {/* Doanh thu theo ngày */}
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h2>📅 Báo Cáo Doanh Thu Theo Ngày</h2>
-                </div>
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Ngày</th>
-                        <th>Số đơn hoàn tất</th>
-                        <th>Doanh thu ngày</th>
-                        <th>Kiểm tra hóa đơn</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.reports.dailyRevenue?.map((d) => (
-                        <tr key={d._id}>
-                          <td>
-                            <strong>{d._id}</strong>
-                          </td>
-                          <td>{d.orders} đơn</td>
-                          <td>
-                            <strong style={{ color: "#e11d48" }}>
-                              {money(d.revenue)}
-                            </strong>
-                          </td>
-                          <td>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Ảnh mẫu</th>
+                      <th>Khách hàng & SĐT</th>
+                      <th>Yêu cầu & Màu sắc</th>
+                      <th>Hạn nhận hàng</th>
+                      <th>Báo giá (VNĐ)</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.customOrders || []).map((co) => (
+                      <tr key={co._id}>
+                        <td>
+                          {co.sampleImage ? (
+                            <img
+                              src={co.sampleImage}
+                              alt=""
+                              style={{ width: "50px", height: "50px", borderRadius: "8px", objectFit: "cover", cursor: "pointer", border: "1.5px solid #fbcfe8" }}
+                              onClick={() => setPreviewImageModal(co.sampleImage)}
+                              title="Bấm để xem ảnh mẫu phóng to"
+                            />
+                          ) : (
+                            <span style={{ color: "#9ca3af" }}>Không có ảnh</span>
+                          )}
+                        </td>
+                        <td>
+                          <strong>{co.customerName}</strong>
+                          <small style={{ display: "block", color: "#8d6271" }}>
+                            📱 {co.phone}
+                          </small>
+                          <small style={{ display: "block", color: "#64748b", maxWidth: "160px" }}>
+                            📍 {co.address || "—"}
+                          </small>
+                        </td>
+                        <td>
+                          <div style={{ maxWidth: "200px" }}>
+                            <strong>{co.description || co.productName || "Đơn móc len riêng"}</strong>
+                            {co.colorPreference && (
+                              <small style={{ display: "block", color: "#be123c", marginTop: "2px" }}>
+                                🎨 Màu: {co.colorPreference}
+                              </small>
+                            )}
+                          </div>
+                        </td>
+                        <td>{co.expectedDate ? formatVnDateTime(co.expectedDate) : "Càng sớm càng tốt"}</td>
+                        <td>
+                          <strong style={{ color: "#e11d48", fontSize: "14px" }}>
+                            {co.quotedPrice ? money(co.quotedPrice) : "Chưa báo giá"}
+                          </strong>
+                        </td>
+                        <td>
+                          <select
+                            className="order-status-select"
+                            value={co.status || "pending"}
+                            onChange={(e) => updateCustomOrderStatus(co._id, e.target.value, co.quotedPrice, co.adminNotes)}
+                          >
+                            <option value="pending">⏳ Chờ duyệt</option>
+                            <option value="quoted">💬 Đã báo giá</option>
+                            <option value="crafting">🪡 Đang đan móc</option>
+                            <option value="completed">✅ Đã hoàn thành</option>
+                            <option value="cancelled">❌ Đã hủy</option>
+                          </select>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            {co.phone && (
+                              <a
+                                href={`https://zalo.me/${co.phone.replace(/[^0-9]/g, "")}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="admin-btn-outline"
+                                style={{ background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe", textDecoration: "none", fontSize: "12px", padding: "4px 8px" }}
+                              >
+                                💬 Zalo
+                              </a>
+                            )}
                             <button
                               type="button"
                               className="admin-btn-outline"
-                              style={{ fontSize: "12px", padding: "4px 10px" }}
-                              onClick={() => {
-                                setOrderFilter("all");
-                                setOrderSearch(d._id);
-                                setActiveTab("orders");
-                              }}
+                              style={{ color: "#dc2626", borderColor: "#fca5a5", fontSize: "12px", padding: "4px 8px" }}
+                              onClick={() => deleteCustomOrder(co._id)}
                             >
-                              👁️ Xem {d.orders} đơn ngày này →
+                              🗑️
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {(!data.reports.dailyRevenue ||
-                        data.reports.dailyRevenue.length === 0) && (
-                          <tr>
-                            <td colSpan="3" style={{ textAlign: "center", padding: "30px" }}>
-                              Chưa có phát sinh doanh thu.
-                            </td>
-                          </tr>
-                        )}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {(data.customOrders || []).length === 0 && (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: "center", padding: "40px" }}>
+                          Chưa có yêu cầu đặt móc len theo mẫu nào.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </>
+            </div>
           )}
 
-          {/* TAB 6: KHUYẾN MÃI (PROMOTIONS) */}
+          {/* ========================================================
+              TAB 9: BÁO CÁO DOANH THU (REPORTS)
+          ======================================================== */}
+          {activeTab === "reports" && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <h2>📈 Báo Cáo Doanh Thu Theo Ngày & Mặt Hàng</h2>
+                  <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Đối soát thu chi, xuất file excel và kiểm tra hiệu quả bán hàng
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="admin-btn-outline"
+                  onClick={exportFinancialReportExcel}
+                  style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0", fontWeight: 700 }}
+                >
+                  📥 Xuất Báo Cáo Doanh Thu Excel
+                </button>
+              </div>
+
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Ngày</th>
+                      <th>Số đơn phát sinh</th>
+                      <th>Doanh thu (VNĐ)</th>
+                      <th>Hiệu suất</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trendData.map((d, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <strong>{d.dayLabel}</strong>
+                          <small style={{ display: "block", color: "#94a3b8" }}>{d.date}</small>
+                        </td>
+                        <td>
+                          <span className="status-pill-badge" style={{ background: "#fdf2f8", color: "#be123c", fontWeight: 700 }}>
+                            {d.orderCount} đơn
+                          </span>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#e11d48", fontSize: "14px" }}>
+                            {money(d.revenue)}
+                          </strong>
+                        </td>
+                        <td>
+                          <span style={{ color: d.revenue > 0 ? "#059669" : "#9ca3af", fontWeight: 700 }}>
+                            {d.revenue > 0 ? "✓ Đạt doanh số" : "Chưa có phát sinh"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              TAB 10: MÃ KHUYẾN MÃI (PROMOTIONS)
+          ======================================================== */}
           {activeTab === "promotions" && (
             <>
-              <div className="admin-card">
+              <div className="admin-card" style={{ marginBottom: "24px" }}>
                 <div className="admin-card-header">
                   <h2>🎟️ Tạo Mã Giảm Giá / Voucher Mới</h2>
                 </div>
                 <form onSubmit={addPromotion}>
                   <div className="admin-product-grid-form">
                     <div className="admin-form-group">
-                      <label>Tên chương trình ưu đãi</label>
+                      <label>Tên chương trình ưu đãi (*)</label>
                       <input
                         required
                         placeholder="VD: Tri Ân Khách Mới Mua Len"
                         value={promotionForm.title}
-                        onChange={(e) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            title: e.target.value,
-                          })
-                        }
+                        onChange={(e) => setPromotionForm({ ...promotionForm, title: e.target.value })}
                       />
                     </div>
-
                     <div className="admin-form-group">
-                      <label>Mã Voucher (Viết hoa)</label>
+                      <label>Mã Voucher (Viết hoa) (*)</label>
                       <input
                         required
                         placeholder="VD: LENMOI15"
                         value={promotionForm.code}
-                        onChange={(e) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            code: e.target.value.toUpperCase(),
-                          })
-                        }
+                        onChange={(e) => setPromotionForm({ ...promotionForm, code: e.target.value.toUpperCase() })}
                       />
                     </div>
-
                     <div className="admin-form-group">
                       <label>Loại giảm giá</label>
                       <select
                         value={promotionForm.type}
-                        onChange={(e) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            type: e.target.value,
-                          })
-                        }
+                        onChange={(e) => setPromotionForm({ ...promotionForm, type: e.target.value })}
                       >
                         <option value="percent">Giảm theo phần trăm (%)</option>
                         <option value="fixed">Giảm số tiền cố định (VNĐ)</option>
                       </select>
                     </div>
-
                     <div className="admin-form-group">
-                      <label>Giá trị giảm (VD: 15 cho 15%, hoặc 30000 cho 30k)</label>
+                      <label>Giá trị giảm (*)</label>
                       <input
                         required
                         type="number"
                         min="0"
-                        placeholder="15"
+                        placeholder="15 (cho 15%) hoặc 30000 (cho 30k)"
                         value={promotionForm.value}
-                        onChange={(e) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            value: e.target.value,
-                          })
-                        }
+                        onChange={(e) => setPromotionForm({ ...promotionForm, value: e.target.value })}
                       />
                     </div>
-
                     <div className="admin-form-group">
                       <label>Thời gian bắt đầu</label>
                       <input
                         required
                         type="datetime-local"
                         value={promotionForm.startAt}
-                        onChange={(e) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            startAt: e.target.value,
-                          })
-                        }
+                        onChange={(e) => setPromotionForm({ ...promotionForm, startAt: e.target.value })}
                       />
                     </div>
-
                     <div className="admin-form-group">
                       <label>Thời gian kết thúc</label>
                       <input
                         required
                         type="datetime-local"
                         value={promotionForm.endAt}
-                        onChange={(e) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            endAt: e.target.value,
-                          })
-                        }
+                        onChange={(e) => setPromotionForm({ ...promotionForm, endAt: e.target.value })}
                       />
                     </div>
-
-                    <div className="admin-form-group full-width">
-                      <label>Mô tả ưu đãi & điều kiện áp dụng</label>
-                      <textarea
-                        placeholder="Áp dụng cho đơn hàng mua từ 150.000đ trở lên..."
+                    <div className="admin-form-group" style={{ gridColumn: "1 / -1" }}>
+                      <label>Mô tả ưu đãi</label>
+                      <input
+                        placeholder="VD: Giảm 15% tối đa 50k cho đơn từ 200k"
                         value={promotionForm.description}
-                        onChange={(e) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            description: e.target.value,
-                          })
-                        }
+                        onChange={(e) => setPromotionForm({ ...promotionForm, description: e.target.value })}
                       />
                     </div>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <button type="submit" className="admin-btn-primary">
-                      🎟️ Phát Hành Voucher Mới
-                    </button>
+                    <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+                      <button type="submit" className="admin-btn-primary">
+                        🎟️ Kích Hoạt Mã Ưu Đãi
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
 
-              {/* Danh sách Voucher đã tạo */}
+              {/* Promotions List */}
               <div className="admin-card">
                 <div className="admin-card-header">
-                  <h2>Các Mã Voucher Đang Hoạt Động</h2>
+                  <h2>🎟️ Các Mã Voucher Đang Áp Dụng ({(data.promotions || []).length})</h2>
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                    gap: "16px",
-                  }}
-                >
-                  {data.promotions.map((p) => (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
+                  {(data.promotions || []).map((p) => (
                     <div
                       key={p._id}
                       style={{
                         background: "#fffafc",
                         border: "1.5px dashed #f43f5e",
                         borderRadius: "16px",
-                        padding: "18px",
-                        position: "relative",
+                        padding: "16px",
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "10px",
-                        }}
-                      >
-                        <strong style={{ fontSize: "16px", color: "#e11d48" }}>
-                          {p.code}
-                        </strong>
-                        <span
-                          className="status-pill-badge"
-                          style={{
-                            background: p.isActive ? "#ecfdf5" : "#f3f4f6",
-                            color: p.isActive ? "#047857" : "#6b7280",
-                          }}
-                        >
-                          {p.isActive ? "✓ Đang kích hoạt" : "Tạm ngưng"}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <strong style={{ fontSize: "16px", color: "#e11d48" }}>{p.code}</strong>
+                        <span className="status-pill-badge" style={{ background: p.isActive ? "#ecfdf5" : "#f3f4f6", color: p.isActive ? "#047857" : "#6b7280" }}>
+                          {p.isActive ? "✓ Đang chạy" : "Tạm ngưng"}
                         </span>
                       </div>
-                      <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>
-                        {p.title}
-                      </div>
-                      <p style={{ margin: "0 0 10px", fontSize: "12.5px", color: "#8d6271" }}>
-                        {p.description || "Ưu đãi dành cho khách mua len"}
-                      </p>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          fontSize: "12px",
-                          paddingTop: "8px",
-                          borderTop: "1px solid #fce7f3",
-                        }}
-                      >
+                      <div style={{ fontWeight: 700, fontSize: "13.5px", marginBottom: "4px" }}>{p.title}</div>
+                      <p style={{ margin: "0 0 10px", fontSize: "12px", color: "#8d6271" }}>{p.description || "Ưu đãi khách mua hàng"}</p>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", paddingTop: "8px", borderTop: "1px solid #fce7f3" }}>
                         <span>
-                          Giảm:{" "}
-                          <strong style={{ color: "#e11d48" }}>
-                            {p.type === "percent" ? `${p.value}%` : money(p.value)}
-                          </strong>
+                          Giảm: <strong style={{ color: "#e11d48" }}>{p.type === "percent" ? `${p.value}%` : money(p.value)}</strong>
                         </span>
                         <button
                           type="button"
                           className="admin-btn-outline"
-                          style={{ padding: "4px 10px", fontSize: "11px" }}
+                          style={{ padding: "3px 8px", fontSize: "11px" }}
                           onClick={() => {
                             navigator.clipboard.writeText(p.code);
                             showToast(`✓ Đã sao chép mã: ${p.code}`);
@@ -3860,54 +4018,203 @@ function AdminPage() {
               </div>
             </>
           )}
+
+          {/* ========================================================
+              TAB 11: TÀI KHOẢN QUẢN TRỊ & PHÂN QUYỀN (ADMINS) - NEW
+          ======================================================== */}
+          {activeTab === "admins" && (
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div>
+                  <h2>👤 Quản Lý Quản Trị Viên & Nhân Viên Shop ({(data.admins || []).length})</h2>
+                  <p style={{ margin: "2px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
+                    Hệ thống quản trị đa tài khoản: Super Admin (toàn quyền), Quản trị viên (quản lý đơn & hàng), Nhân viên kho
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() =>
+                    setAdminModal({
+                      open: true,
+                      isEdit: false,
+                      targetId: null,
+                      form: { name: "", email: "", password: "", phone: "", role: "staff", isActive: true },
+                    })
+                  }
+                >
+                  ➕ Thêm Tài Khoản Quản Trị Mới
+                </button>
+              </div>
+
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Họ tên & Tài khoản</th>
+                      <th>Email đăng nhập</th>
+                      <th>Số điện thoại</th>
+                      <th>Phân quyền</th>
+                      <th>Trạng thái</th>
+                      <th>Ngày cấp</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.admins || []).map((adm) => {
+                      const isMe = String(adminUser?._id) === String(adm._id);
+                      const rColor = roleColors[adm.role] || roleColors.staff;
+                      return (
+                        <tr key={adm._id}>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <div
+                                style={{
+                                  width: "32px",
+                                  height: "32px",
+                                  borderRadius: "50%",
+                                  background: rColor.bg,
+                                  color: rColor.text,
+                                  display: "grid",
+                                  placeItems: "center",
+                                  fontWeight: 800,
+                                  fontSize: "12px",
+                                  border: `1px solid ${rColor.border}`,
+                                }}
+                              >
+                                {adm.name ? adm.name[0].toUpperCase() : "A"}
+                              </div>
+                              <div>
+                                <strong>{adm.name}</strong>
+                                {isMe && (
+                                  <span style={{ marginLeft: "6px", fontSize: "10px", background: "#f43f5e", color: "#fff", padding: "2px 6px", borderRadius: "10px", fontWeight: 800 }}>
+                                    BẠN
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td>{adm.email}</td>
+                          <td>{adm.phone || "—"}</td>
+                          <td>
+                            <span
+                              className="status-pill-badge"
+                              style={{
+                                background: rColor.bg,
+                                color: rColor.text,
+                                border: `1px solid ${rColor.border}`,
+                                fontWeight: 800,
+                              }}
+                            >
+                              {roleLabels[adm.role] || adm.role}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className="status-pill-badge"
+                              style={{
+                                background: adm.isActive !== false ? "#ecfdf5" : "#fee2e2",
+                                color: adm.isActive !== false ? "#047857" : "#b91c1c",
+                              }}
+                            >
+                              {adm.isActive !== false ? "🟢 Hoạt động" : "🔴 Đã khóa"}
+                            </span>
+                          </td>
+                          <td>{formatVnDateTime(adm.createdAt)}</td>
+                          <td>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ padding: "4px 8px", fontSize: "11.5px" }}
+                                onClick={() =>
+                                  setAdminModal({
+                                    open: true,
+                                    isEdit: true,
+                                    targetId: adm._id,
+                                    form: {
+                                      name: adm.name || "",
+                                      email: adm.email || "",
+                                      password: "",
+                                      phone: adm.phone || "",
+                                      role: adm.role || "staff",
+                                      isActive: adm.isActive !== false,
+                                    },
+                                  })
+                                }
+                              >
+                                ✏️ Sửa
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn-outline"
+                                style={{ padding: "4px 8px", fontSize: "11.5px", color: "#be123c", borderColor: "#fecdd3" }}
+                                onClick={() =>
+                                  setAdminPasswordModal({
+                                    open: true,
+                                    admin: adm,
+                                    newPassword: "",
+                                    resultMsg: "",
+                                    errorMsg: "",
+                                  })
+                                }
+                              >
+                                🔑 Đổi MK
+                              </button>
+                              {!isMe && (
+                                <button
+                                  type="button"
+                                  className="admin-btn-outline"
+                                  style={{ padding: "4px 8px", fontSize: "11.5px", color: "#dc2626", borderColor: "#fca5a5" }}
+                                  onClick={() => handleDeleteAdmin(adm._id, adm.name)}
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div> {/* end of admin-content-inner */}
       </section>
 
-      {/* MODAL XEM HÓA ĐƠN & IN PHIẾU GỬI HÀNG (INVOICE VIEWER) */}
+      {/* ========================================================
+          MODALS & POPUPS REGION
+      ======================================================== */}
+
+      {/* MODAL 1: ORDER DETAILS MODAL (HÓA ĐƠN & THEO DÕI) */}
       {selectedOrder && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() => setSelectedOrder(null)}
-        >
-          <div
-            className="admin-invoice-paper"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="admin-modal-backdrop" onClick={() => setSelectedOrder(null)}>
+          <div className="admin-invoice-paper" onClick={(e) => e.stopPropagation()}>
             <div className="invoice-brand-header">
               <div>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    color: "#f43f5e",
-                    letterSpacing: "1px",
-                  }}
-                >
-                  HÓA ĐƠN & PHIẾU ĐÓNG GÓI SENE HANDMADE
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "#f43f5e", letterSpacing: "1px" }}>
+                  CHI TIẾT ĐƠN HÀNG SENE HANDMADE
                 </span>
-                <h2>#{selectedOrder._id.slice(-6).toUpperCase()}</h2>
-                <p>
-                  Ngày đặt:{" "}
-                  {new Date(selectedOrder.createdAt).toLocaleString("vi-VN")}
-                </p>
+                <h2>{selectedOrder.trackingCode || `#${selectedOrder._id.slice(-6).toUpperCase()}`}</h2>
+                <p>Ngày đặt: {formatVnDateTime(selectedOrder.createdAt)}</p>
               </div>
-              <button
-                type="button"
-                className="admin-btn-outline"
-                onClick={() => setSelectedOrder(null)}
-              >
+              <button type="button" className="admin-btn-outline" onClick={() => setSelectedOrder(null)}>
                 ✕ Đóng
               </button>
             </div>
 
-            {/* Thông tin khách & người nhận */}
+            {/* Customer info card */}
             <div className="invoice-customer-card">
               <div>
                 <strong style={{ display: "block", color: "#be123c", marginBottom: "4px" }}>
                   👤 NGƯỜI NHẬN HÀNG:
                 </strong>
-                <div>{selectedOrder.customerName}</div>
-                <div>📱 {selectedOrder.phone}</div>
+                <div><strong>{selectedOrder.customerName}</strong></div>
+                <div>📱 Số điện thoại: {selectedOrder.phone}</div>
+                {selectedOrder.user?.email && <div>✉️ Email: {selectedOrder.user.email}</div>}
               </div>
               <div>
                 <strong style={{ display: "block", color: "#be123c", marginBottom: "4px" }}>
@@ -3915,12 +4222,7 @@ function AdminPage() {
                 </strong>
                 <div>{selectedOrder.address}</div>
                 <div style={{ marginTop: "4px" }}>
-                  Thanh toán:{" "}
-                  <strong>
-                    {selectedOrder.paymentMethod === "COD"
-                      ? "Thu hộ COD"
-                      : "VietQR Chuyển khoản"}
-                  </strong>
+                  Hình thức: <strong>{selectedOrder.paymentMethod === "COD" ? "Thu hộ COD" : "Chuyển khoản VietQR"}</strong>
                 </div>
               </div>
             </div>
@@ -3937,11 +4239,11 @@ function AdminPage() {
                   color: "#b45309",
                 }}
               >
-                🎁 <strong>Ghi chú từ khách:</strong> {selectedOrder.note}
+                🎁 <strong>Ghi chú của khách:</strong> {selectedOrder.note}
               </div>
             )}
 
-            {/* Bảng sản phẩm trong kiện */}
+            {/* Items Table */}
             <table className="invoice-items-table">
               <thead>
                 <tr>
@@ -3960,12 +4262,7 @@ function AdminPage() {
                           <img
                             src={item.image}
                             alt=""
-                            style={{
-                              width: "36px",
-                              height: "36px",
-                              borderRadius: "6px",
-                              objectFit: "cover",
-                            }}
+                            style={{ width: "36px", height: "36px", borderRadius: "6px", objectFit: "cover" }}
                           />
                         )}
                         <strong>{item.name}</strong>
@@ -3973,61 +4270,75 @@ function AdminPage() {
                     </td>
                     <td style={{ textAlign: "center" }}>x{item.quantity}</td>
                     <td style={{ textAlign: "right" }}>{money(item.price)}</td>
-                    <td style={{ textAlign: "right", fontWeight: 700 }}>
-                      {money(item.price * item.quantity)}
-                    </td>
+                    <td style={{ textAlign: "right", fontWeight: 700 }}>{money(item.price * item.quantity)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            {/* Tóm tắt thanh toán */}
+            {/* Total Financial Summary */}
             <div className="invoice-total-summary">
               <div>
                 Tạm tính: <strong>{money(selectedOrder.subtotalAmount || selectedOrder.totalAmount)}</strong>
               </div>
               {selectedOrder.discountAmount > 0 && (
                 <div style={{ color: "#059669" }}>
-                  Mã giảm giá ({selectedOrder.promotionCode}): -{money(selectedOrder.discountAmount)}
+                  Giảm giá voucher ({selectedOrder.promotionCode}): -{money(selectedOrder.discountAmount)}
                 </div>
               )}
+              {selectedOrder.shippingFee > 0 && (
+                <div>Phí vận chuyển: +{money(selectedOrder.shippingFee)}</div>
+              )}
               <div style={{ fontSize: "16px", marginTop: "4px" }}>
-                Tổng thu từ khách:{" "}
+                Tổng thu thực tế:{" "}
                 <strong style={{ color: "#e11d48", fontSize: "22px" }}>
                   {money(selectedOrder.totalAmount)}
                 </strong>
               </div>
             </div>
 
-            {/* Trạng thái đơn hàng trong modal */}
+            {/* Payment & Status Control Panel */}
             <div
               style={{
                 background: "#fff1f5",
                 border: "1px solid #fce7f3",
                 borderRadius: "12px",
-                padding: "12px 16px",
+                padding: "14px 18px",
                 marginTop: "16px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
                 flexWrap: "wrap",
-                gap: "10px",
+                gap: "14px",
               }}
             >
-              <div style={{ fontSize: "13px" }}>
-                <strong>Cập nhật trạng thái đơn:</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700 }}>Thanh toán:</span>
+                <button
+                  type="button"
+                  onClick={() => toggleOrderPaymentStatus(selectedOrder)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 800,
+                    background: selectedOrder.paymentStatus === "paid" ? "#ecfdf5" : "#fee2e2",
+                    borderColor: selectedOrder.paymentStatus === "paid" ? "#a7f3d0" : "#fca5a5",
+                    color: selectedOrder.paymentStatus === "paid" ? "#047857" : "#b91c1c",
+                  }}
+                >
+                  {selectedOrder.paymentStatus === "paid" ? "✅ ĐÃ THANH TOÁN" : "⏳ CHƯA THANH TOÁN (Click để đổi)"}
+                </button>
               </div>
-              <div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700 }}>Trạng thái đơn:</span>
                 <select
                   className="order-status-select"
                   value={selectedOrder.status}
-                  onChange={(e) => {
-                    const newStatus = e.target.value;
-                    updateOrderStatus(selectedOrder._id, newStatus);
-                    setSelectedOrder((prev) =>
-                      prev ? { ...prev, status: newStatus } : null
-                    );
-                  }}
+                  onChange={(e) => updateOrderStatus(selectedOrder._id, e.target.value)}
                   style={{ padding: "6px 12px", fontSize: "13px" }}
                 >
                   {Object.entries(statusLabels).map(([key, label]) => (
@@ -4039,20 +4350,40 @@ function AdminPage() {
               </div>
             </div>
 
+            {/* Tracking Logs / Timeline */}
+            {selectedOrder.trackingLogs && selectedOrder.trackingLogs.length > 0 && (
+              <div style={{ marginTop: "16px", padding: "12px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                <strong style={{ fontSize: "12.5px", color: "#475569", display: "block", marginBottom: "8px" }}>
+                  📜 Lịch Sử Xử Lý Đơn Hàng:
+                </strong>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px" }}>
+                  {selectedOrder.trackingLogs.map((log, lIdx) => (
+                    <div key={lIdx} style={{ display: "flex", gap: "10px" }}>
+                      <span style={{ color: "#94a3b8", minWidth: "120px" }}>{formatVnDateTime(log.timestamp)}</span>
+                      <span>
+                        Chuyển sang: <strong style={{ color: "#be123c" }}>{statusLabels[log.status] || log.status}</strong>
+                        {log.note && <em> ({log.note})</em>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Actions Footer */}
             <div className="invoice-actions-footer">
               <button
                 type="button"
                 className="admin-btn-outline"
-                onClick={() => window.print()}
+                onClick={() => setShippingLabelOrder(selectedOrder)}
+                style={{ background: "#fff1f2", color: "#e11d48", borderColor: "#fecdd3" }}
               >
-                🖨️ In Hóa Đơn / Phiếu Gửi Hàng
+                🏷️ In Tem Gửi Hàng Bưu Tá
               </button>
-              <button
-                type="button"
-                className="admin-btn-primary"
-                onClick={() => setSelectedOrder(null)}
-              >
+              <button type="button" className="admin-btn-outline" onClick={() => window.print()}>
+                🖨️ In Hóa Đơn & Đóng Gói
+              </button>
+              <button type="button" className="admin-btn-primary" onClick={() => setSelectedOrder(null)}>
                 Xong
               </button>
             </div>
@@ -4060,151 +4391,541 @@ function AdminPage() {
         </div>
       )}
 
-      {/* MODAL XEM & IN PHIẾU NHẬP KHO */}
-      {selectedImportReceipt && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() => setSelectedImportReceipt(null)}
-        >
+      {/* MODAL 2: IN TEM PHIẾU GỬI HÀNG (SHIPPING LABEL) */}
+      {shippingLabelOrder && (
+        <div className="admin-modal-backdrop" onClick={() => setShippingLabelOrder(null)}>
           <div
-            className="admin-import-paper"
+            className="shipping-label-paper"
+            style={{ maxWidth: "560px", background: "#fff", padding: "24px", borderRadius: "14px", border: "2px dashed #e11d48" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="invoice-brand-header">
+            <div style={{ borderBottom: "2px solid #000", paddingBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    color: "#059669",
-                    letterSpacing: "1px",
-                  }}
-                >
-                  PHIẾU NHẬP KHO SENE HANDMADE
+                <h3 style={{ margin: 0, fontSize: "18px", color: "#e11d48", fontWeight: 900 }}>🌸 SENE HANDMADE</h3>
+                <small style={{ color: "#475569" }}>Hotline: 0908 123 456 • Website: senehandmade.vn</small>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <strong style={{ fontSize: "15px" }}>{shippingLabelOrder.trackingCode || `#${shippingLabelOrder._id.slice(-6).toUpperCase()}`}</strong>
+                <small style={{ display: "block", color: "#64748b" }}>{formatVnDateTime(shippingLabelOrder.createdAt)}</small>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", padding: "14px 0", borderBottom: "1.5px solid #e2e8f0" }}>
+              <div>
+                <small style={{ fontWeight: 800, color: "#64748b" }}>NGƯỜI GỬI:</small>
+                <div style={{ fontWeight: 700, fontSize: "14px" }}>Tiệm Len Sene Handmade</div>
+                <div style={{ fontSize: "12px", color: "#334155" }}>TP. Hồ Chí Minh</div>
+                <div style={{ fontSize: "12px", color: "#334155" }}>SĐT: 0908 123 456</div>
+              </div>
+              <div>
+                <small style={{ fontWeight: 800, color: "#e11d48" }}>NGƯỜI NHẬN:</small>
+                <div style={{ fontWeight: 800, fontSize: "15px", color: "#0f172a" }}>{shippingLabelOrder.customerName}</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>📱 {shippingLabelOrder.phone}</div>
+                <div style={{ fontSize: "12.5px", color: "#334155", marginTop: "2px" }}>📍 {shippingLabelOrder.address}</div>
+              </div>
+            </div>
+
+            {/* Package contents & COD amount */}
+            <div style={{ padding: "12px 0", borderBottom: "2px solid #000" }}>
+              <div style={{ fontSize: "12.5px", marginBottom: "8px" }}>
+                <strong>Nội dung hàng: </strong>
+                {(shippingLabelOrder.items || []).map((i) => `${i.name} (x${i.quantity})`).join(", ")}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "10px 14px", borderRadius: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700 }}>
+                  Tiền thu hộ COD:
                 </span>
-                <h2>#{selectedImportReceipt.code}</h2>
-                <p>
-                  Thời gian lập phiếu:{" "}
-                  {new Date(selectedImportReceipt.createdAt).toLocaleString("vi-VN")}
-                </p>
+                <strong style={{ fontSize: "20px", color: shippingLabelOrder.paymentMethod === "COD" && shippingLabelOrder.paymentStatus !== "paid" ? "#e11d48" : "#047857" }}>
+                  {shippingLabelOrder.paymentMethod === "COD" && shippingLabelOrder.paymentStatus !== "paid"
+                    ? money(shippingLabelOrder.totalAmount)
+                    : "0 VNĐ (ĐÃ THANH TOÁN)"}
+                </strong>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px" }}>
+              <button type="button" className="admin-btn-primary" onClick={() => window.print()}>
+                🖨️ In Tem Này
+              </button>
+              <button type="button" className="admin-btn-outline" onClick={() => setShippingLabelOrder(null)}>
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: CUSTOMER PURCHASE HISTORY MODAL */}
+      {customerHistoryModal.open && (
+        <div className="admin-modal-backdrop" onClick={() => setCustomerHistoryModal({ open: false, customer: null, orders: [], loading: false })}>
+          <div className="admin-dialog-card" style={{ maxWidth: "760px", width: "95%" }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-dialog-header">
+              <div>
+                <h3>🛍️ Lịch Sử Mua Hàng Của {customerHistoryModal.customer?.name}</h3>
+                <small style={{ color: "#8d6271" }}>
+                  📱 {customerHistoryModal.customer?.phone || "Chưa có SĐT"} • ✉️ {customerHistoryModal.customer?.email}
+                </small>
               </div>
               <button
                 type="button"
                 className="admin-btn-outline"
-                onClick={() => setSelectedImportReceipt(null)}
+                style={{ padding: "3px 8px" }}
+                onClick={() => setCustomerHistoryModal({ open: false, customer: null, orders: [], loading: false })}
               >
+                ✕
+              </button>
+            </div>
+
+            <div className="admin-dialog-body" style={{ maxHeight: "65vh", overflowY: "auto" }}>
+              {/* Customer Stats Cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                <div style={{ background: "#fff1f5", padding: "12px", borderRadius: "10px", border: "1px solid #fce7f3" }}>
+                  <small style={{ color: "#8d6271", fontWeight: 700 }}>TỔNG ĐƠN ĐÃ ĐẶT</small>
+                  <div style={{ fontSize: "18px", fontWeight: 900, color: "#be123c", marginTop: "4px" }}>
+                    {customerHistoryModal.orders.length} đơn hàng
+                  </div>
+                </div>
+                <div style={{ background: "#ecfdf5", padding: "12px", borderRadius: "10px", border: "1px solid #a7f3d0" }}>
+                  <small style={{ color: "#047857", fontWeight: 700 }}>TỔNG CHI TIÊU</small>
+                  <div style={{ fontSize: "18px", fontWeight: 900, color: "#047857", marginTop: "4px" }}>
+                    {money(customerHistoryModal.orders.reduce((s, o) => s + (o.status !== "cancelled" ? o.totalAmount : 0), 0))}
+                  </div>
+                </div>
+              </div>
+
+              {customerHistoryModal.loading ? (
+                <div style={{ textAlign: "center", padding: "30px" }}>⏳ Đang tải lịch sử đơn hàng...</div>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Mã đơn</th>
+                      <th>Ngày đặt</th>
+                      <th>Sản phẩm</th>
+                      <th>Tổng tiền</th>
+                      <th>Trạng thái</th>
+                      <th>Chi tiết</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerHistoryModal.orders.map((ord) => (
+                      <tr key={ord._id}>
+                        <td>
+                          <strong>{ord.trackingCode || `#${ord._id.slice(-6).toUpperCase()}`}</strong>
+                        </td>
+                        <td>{formatVnDateTime(ord.createdAt)}</td>
+                        <td>
+                          <span style={{ fontSize: "12px" }}>
+                            {(ord.items || []).map((i) => `${i.name} (x${i.quantity})`).join(", ")}
+                          </span>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#e11d48" }}>{money(ord.totalAmount)}</strong>
+                        </td>
+                        <td>
+                          <span
+                            className="status-pill-badge"
+                            style={{
+                              background: ord.status === "delivered" ? "#ecfdf5" : ord.status === "pending" ? "#fff1f2" : "#fdf2f8",
+                              color: ord.status === "delivered" ? "#047857" : ord.status === "pending" ? "#e11d48" : "#be123c",
+                            }}
+                          >
+                            {statusLabels[ord.status] || ord.status}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="admin-btn-outline"
+                            style={{ padding: "3px 8px", fontSize: "11px" }}
+                            onClick={() => {
+                              setCustomerHistoryModal((prev) => ({ ...prev, open: false }));
+                              showOrder(ord);
+                            }}
+                          >
+                            👁️ Xem
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {customerHistoryModal.orders.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: "center", padding: "30px" }}>
+                          Khách hàng này chưa có đơn hàng nào được ghi nhận.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: ADMIN ACCOUNTS FORM (TẠO / SỬA TÀI KHOẢN) */}
+      {adminModal.open && (
+        <div className="admin-modal-backdrop" onClick={() => setAdminModal((prev) => ({ ...prev, open: false }))}>
+          <div className="admin-dialog-card" style={{ maxWidth: "480px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-dialog-header">
+              <h3>{adminModal.isEdit ? "✏️ Cập Nhật Tài Khoản Quản Trị" : "👤 Thêm Quản Trị Viên / Nhân Viên"}</h3>
+              <button
+                type="button"
+                className="admin-btn-outline"
+                style={{ padding: "2px 8px" }}
+                onClick={() => setAdminModal((prev) => ({ ...prev, open: false }))}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAdmin}>
+              <div className="admin-dialog-body">
+                <div className="admin-form-group">
+                  <label>Họ và tên (*)</label>
+                  <input
+                    required
+                    placeholder="VD: Nguyễn Văn Tài"
+                    value={adminModal.form.name}
+                    onChange={(e) => setAdminModal((prev) => ({ ...prev, form: { ...prev.form, name: e.target.value } }))}
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label>Email đăng nhập (*)</label>
+                  <input
+                    required
+                    type="email"
+                    placeholder="admin@senehandmade.vn"
+                    disabled={adminModal.isEdit}
+                    value={adminModal.form.email}
+                    onChange={(e) => setAdminModal((prev) => ({ ...prev, form: { ...prev.form, email: e.target.value } }))}
+                  />
+                </div>
+
+                {!adminModal.isEdit && (
+                  <div className="admin-form-group">
+                    <label>Mật khẩu khởi tạo (*)</label>
+                    <input
+                      required
+                      type="password"
+                      placeholder="Ít nhất 6 ký tự"
+                      value={adminModal.form.password}
+                      onChange={(e) => setAdminModal((prev) => ({ ...prev, form: { ...prev.form, password: e.target.value } }))}
+                    />
+                  </div>
+                )}
+
+                <div className="admin-form-group">
+                  <label>Số điện thoại</label>
+                  <input
+                    placeholder="0908 xxx xxx"
+                    value={adminModal.form.phone}
+                    onChange={(e) => setAdminModal((prev) => ({ ...prev, form: { ...prev.form, phone: e.target.value } }))}
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label>Phân quyền vai trò (*)</label>
+                  <select
+                    value={adminModal.form.role}
+                    onChange={(e) => setAdminModal((prev) => ({ ...prev, form: { ...prev.form, role: e.target.value } }))}
+                  >
+                    <option value="staff">🪡 Nhân viên (Xem đơn, kho hàng)</option>
+                    <option value="admin">🛡️ Quản trị viên (Toàn quyền quản lý)</option>
+                    <option value="superadmin">👑 Super Admin (Toàn quyền hệ thống & phân quyền)</option>
+                  </select>
+                </div>
+
+                {adminModal.isEdit && (
+                  <div className="admin-form-group">
+                    <label>Trạng thái tài khoản</label>
+                    <select
+                      value={adminModal.form.isActive ? "true" : "false"}
+                      onChange={(e) => setAdminModal((prev) => ({ ...prev, form: { ...prev.form, isActive: e.target.value === "true" } }))}
+                    >
+                      <option value="true">🟢 Đang hoạt động</option>
+                      <option value="false">🔴 Đã khóa (Không cho đăng nhập)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="admin-dialog-footer">
+                <button type="button" className="admin-btn-outline" onClick={() => setAdminModal((prev) => ({ ...prev, open: false }))}>
+                  Hủy
+                </button>
+                <button type="submit" className="admin-btn-primary">
+                  💾 {adminModal.isEdit ? "Lưu Cập Nhật" : "Tạo Tài Khoản"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: CHANGE ADMIN PASSWORD */}
+      {adminPasswordModal.open && (
+        <div className="admin-modal-backdrop" onClick={() => setAdminPasswordModal({ open: false, admin: null, newPassword: "", resultMsg: "", errorMsg: "" })}>
+          <div className="admin-dialog-card" style={{ maxWidth: "420px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-dialog-header">
+              <h3>🔑 Đổi Mật Khẩu Cho {adminPasswordModal.admin?.name}</h3>
+              <button
+                type="button"
+                className="admin-btn-outline"
+                style={{ padding: "2px 8px" }}
+                onClick={() => setAdminPasswordModal({ open: false, admin: null, newPassword: "", resultMsg: "", errorMsg: "" })}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleChangeAdminPassword}>
+              <div className="admin-dialog-body">
+                {adminPasswordModal.resultMsg && <div style={{ color: "#047857", fontWeight: 700, marginBottom: "10px" }}>{adminPasswordModal.resultMsg}</div>}
+                {adminPasswordModal.errorMsg && <div style={{ color: "#b91c1c", fontWeight: 700, marginBottom: "10px" }}>{adminPasswordModal.errorMsg}</div>}
+
+                <div className="admin-form-group">
+                  <label>Mật khẩu mới (*)</label>
+                  <input
+                    required
+                    type="password"
+                    placeholder="Tối thiểu 6 ký tự"
+                    value={adminPasswordModal.newPassword}
+                    onChange={(e) => setAdminPasswordModal((prev) => ({ ...prev, newPassword: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="admin-dialog-footer">
+                <button type="button" className="admin-btn-outline" onClick={() => setAdminPasswordModal({ open: false, admin: null, newPassword: "", resultMsg: "", errorMsg: "" })}>
+                  Đóng
+                </button>
+                <button type="submit" className="admin-btn-primary">
+                  Lưu Mật Khẩu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: QUICK ADD STOCK */}
+      {quickStockModal.open && (
+        <div className="admin-modal-backdrop" onClick={() => setQuickStockModal({ open: false, product: null, addStock: 20 })}>
+          <div className="admin-dialog-card" style={{ maxWidth: "420px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-dialog-header">
+              <h3>⚡ Nhập Nhanh Tồn Kho Bán Hàng</h3>
+              <button type="button" className="admin-btn-outline" style={{ padding: "2px 8px" }} onClick={() => setQuickStockModal({ open: false, product: null, addStock: 20 })}>
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickAddStock}>
+              <div className="admin-dialog-body">
+                <div style={{ background: "#fff1f5", padding: "12px", borderRadius: "10px", marginBottom: "14px" }}>
+                  <strong>{quickStockModal.product?.name}</strong>
+                  <div style={{ fontSize: "12.5px", color: "#8d6271", marginTop: "4px" }}>
+                    Tồn kho hiện tại: <strong style={{ color: "#e11d48" }}>{quickStockModal.product?.stock || 0} cuộn</strong>
+                  </div>
+                </div>
+
+                <div className="admin-form-group">
+                  <label>Số lượng cuộn/bó cần cộng thêm vào kho (*)</label>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    value={quickStockModal.addStock}
+                    onChange={(e) => setQuickStockModal({ ...quickStockModal, addStock: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="admin-dialog-footer">
+                <button type="button" className="admin-btn-outline" onClick={() => setQuickStockModal({ open: false, product: null, addStock: 20 })}>
+                  Hủy
+                </button>
+                <button type="submit" className="admin-btn-primary">
+                  ⚡ Cộng Tồn Kho Ngay
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: QUICK PRICE */}
+      {quickPriceModal.open && (
+        <div className="admin-modal-backdrop" onClick={() => setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" })}>
+          <div className="admin-dialog-card" style={{ maxWidth: "440px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-dialog-header">
+              <h3>💰 Cập Nhật Nhanh Giá Bán & Giá Vốn</h3>
+              <button type="button" className="admin-btn-outline" style={{ padding: "2px 8px" }} onClick={() => setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" })}>
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickPrice}>
+              <div className="admin-dialog-body">
+                <div style={{ background: "#fff1f5", padding: "12px", borderRadius: "10px", marginBottom: "14px" }}>
+                  <strong>{quickPriceModal.product?.name}</strong>
+                  <div style={{ fontSize: "12.5px", color: "#8d6271", marginTop: "4px" }}>
+                    Tồn kho hiện tại: {quickPriceModal.product?.stock || 0} cuộn
+                  </div>
+                </div>
+
+                <div className="admin-form-group">
+                  <label>Giá bán niêm yết (VNĐ) (*)</label>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={quickPriceModal.price}
+                    onChange={(e) => setQuickPriceModal({ ...quickPriceModal, price: e.target.value })}
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label>Giá vốn nhập sỉ (VNĐ)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={quickPriceModal.costPrice}
+                    onChange={(e) => setQuickPriceModal({ ...quickPriceModal, costPrice: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="admin-dialog-footer">
+                <button type="button" className="admin-btn-outline" onClick={() => setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" })}>
+                  Hủy
+                </button>
+                <button type="submit" className="admin-btn-primary">
+                  💾 Lưu Giá
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: RESET CUSTOMER PASSWORD */}
+      {resetPasswordModal.open && (
+        <div className="admin-modal-backdrop" onClick={() => setResetPasswordModal({ open: false, customer: null, newPassword: "", resultMsg: "", errorMsg: "" })}>
+          <div className="admin-dialog-card" style={{ maxWidth: "420px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-dialog-header">
+              <h3>🔑 Cấp Lại Mật Khẩu Khách Hàng</h3>
+              <button type="button" className="admin-btn-outline" style={{ padding: "2px 8px" }} onClick={() => setResetPasswordModal({ open: false, customer: null, newPassword: "", resultMsg: "", errorMsg: "" })}>
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword}>
+              <div className="admin-dialog-body">
+                {resetPasswordModal.resultMsg && <div style={{ color: "#047857", fontWeight: 700, marginBottom: "10px" }}>{resetPasswordModal.resultMsg}</div>}
+                {resetPasswordModal.errorMsg && <div style={{ color: "#b91c1c", fontWeight: 700, marginBottom: "10px" }}>{resetPasswordModal.errorMsg}</div>}
+
+                <div style={{ marginBottom: "12px", fontSize: "13px" }}>
+                  Khách hàng: <strong>{resetPasswordModal.customer?.name}</strong> ({resetPasswordModal.customer?.email})
+                </div>
+
+                <div className="admin-form-group">
+                  <label>Mật khẩu mới cấp cho khách (*)</label>
+                  <input
+                    required
+                    value={resetPasswordModal.newPassword}
+                    onChange={(e) => setResetPasswordModal({ ...resetPasswordModal, newPassword: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="admin-dialog-footer">
+                <button type="button" className="admin-btn-outline" onClick={() => setResetPasswordModal({ open: false, customer: null, newPassword: "", resultMsg: "", errorMsg: "" })}>
+                  Đóng
+                </button>
+                <button type="submit" className="admin-btn-primary">
+                  Cập Nhật Mật Khẩu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 9: VIEW & PRINT IMPORT RECEIPT */}
+      {selectedImportReceipt && (
+        <div className="admin-modal-backdrop" onClick={() => setSelectedImportReceipt(null)}>
+          <div className="admin-import-paper" onClick={(e) => e.stopPropagation()}>
+            <div className="invoice-brand-header">
+              <div>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "#059669", letterSpacing: "1px" }}>
+                  PHIẾU NHẬP KHO SENE HANDMADE
+                </span>
+                <h2>#{selectedImportReceipt.code}</h2>
+                <p>Thời gian lập: {formatVnDateTime(selectedImportReceipt.createdAt)}</p>
+              </div>
+              <button type="button" className="admin-btn-outline" onClick={() => setSelectedImportReceipt(null)}>
                 ✕ Đóng
               </button>
             </div>
 
-            {/* Thông tin NCC & Người nhập */}
             <div className="invoice-customer-card" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}>
               <div>
                 <strong style={{ display: "block", color: "#047857", marginBottom: "4px" }}>
                   🏢 ĐƠN VỊ CUNG CẤP:
                 </strong>
                 <div><strong>{selectedImportReceipt.supplierName}</strong></div>
-                {selectedImportReceipt.supplierPhone && (
-                  <div>📱 SĐT: {selectedImportReceipt.supplierPhone}</div>
-                )}
-                {selectedImportReceipt.supplier?.address && (
-                  <div>📍 Địa chỉ: {selectedImportReceipt.supplier.address}</div>
-                )}
+                {selectedImportReceipt.supplierPhone && <div>📱 SĐT: {selectedImportReceipt.supplierPhone}</div>}
               </div>
               <div>
                 <strong style={{ display: "block", color: "#047857", marginBottom: "4px" }}>
                   📦 THÔNG TIN NHẬP KHO:
                 </strong>
-                <div>Người lập phiếu: <strong>{selectedImportReceipt.importedBy || "Admin Kho Len"}</strong></div>
-                <div>Trạng thái: <strong style={{ color: "#047857" }}>Đã nhập vào kho hàng bán</strong></div>
-                {selectedImportReceipt.notes && (
-                  <div style={{ marginTop: "4px", color: "#4b5563" }}>
-                    Ghi chú: <em>{selectedImportReceipt.notes}</em>
-                  </div>
-                )}
+                <div>Người lập: <strong>{selectedImportReceipt.importedBy || "Admin Kho"}</strong></div>
+                <div>Trạng thái: <strong style={{ color: "#047857" }}>Đã cộng vào kho bán hàng</strong></div>
               </div>
             </div>
 
-            {/* Bảng chi tiết mặt hàng */}
             <table className="invoice-items-table">
               <thead>
                 <tr>
                   <th style={{ width: "40px" }}>STT</th>
-                  <th>Tên Sản Phẩm Len / Dụng Cụ</th>
-                  <th style={{ textAlign: "center" }}>Số Lượng Nhập</th>
-                  <th style={{ textAlign: "right" }}>Giá Vốn Đơn Vị</th>
-                  <th style={{ textAlign: "right" }}>Thành Tiền</th>
+                  <th>Mặt hàng len / phụ kiện</th>
+                  <th style={{ textAlign: "center" }}>Số lượng</th>
+                  <th style={{ textAlign: "right" }}>Giá vốn</th>
+                  <th style={{ textAlign: "right" }}>Thành tiền</th>
                 </tr>
               </thead>
               <tbody>
-                {selectedImportReceipt.items?.map((item, idx) => (
+                {selectedImportReceipt.items?.map((it, idx) => (
                   <tr key={idx}>
                     <td>{idx + 1}</td>
-                    <td>
-                      <strong>{item.productName}</strong>
-                    </td>
-                    <td style={{ textAlign: "center", fontWeight: 700, color: "#be123c" }}>
-                      +{item.quantity} cuộn/bó
-                    </td>
-                    <td style={{ textAlign: "right" }}>{money(item.costPrice)}</td>
-                    <td style={{ textAlign: "right", fontWeight: 700, color: "#047857" }}>
-                      {money(item.total || item.quantity * item.costPrice)}
-                    </td>
+                    <td><strong>{it.productName}</strong></td>
+                    <td style={{ textAlign: "center", fontWeight: 700, color: "#be123c" }}>+{it.quantity}</td>
+                    <td style={{ textAlign: "right" }}>{money(it.costPrice)}</td>
+                    <td style={{ textAlign: "right", fontWeight: 700, color: "#047857" }}>{money(it.total || it.quantity * it.costPrice)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            {/* Tổng cộng */}
             <div className="invoice-total-summary">
-              <div style={{ fontSize: "14px" }}>
-                Tổng số lượng nhập:{" "}
-                <strong>
-                  {selectedImportReceipt.items?.reduce((s, i) => s + (i.quantity || 0), 0)} sản phẩm
-                </strong>
+              <div>
+                Tổng sản phẩm nhập: <strong>{(selectedImportReceipt.items || []).reduce((s, i) => s + (i.quantity || 0), 0)} món</strong>
               </div>
               <div style={{ fontSize: "16px", marginTop: "4px" }}>
-                Tổng tiền thanh toán cho NCC:{" "}
-                <strong style={{ color: "#047857", fontSize: "22px" }}>
-                  {money(selectedImportReceipt.totalAmount)}
-                </strong>
+                Tổng tiền thanh toán NCC: <strong style={{ color: "#047857", fontSize: "22px" }}>{money(selectedImportReceipt.totalAmount)}</strong>
               </div>
             </div>
 
-            {/* Chữ ký 3 bên */}
-            <div className="import-sig-grid">
-              <div className="import-sig-col">
-                <strong>Người Giao Hàng</strong>
-                <small>(Ký và ghi rõ họ tên)</small>
-                <div className="import-sig-space" />
-              </div>
-              <div className="import-sig-col">
-                <strong>Thủ Kho Sene Handmade</strong>
-                <small>(Ký và ghi rõ họ tên)</small>
-                <div className="import-sig-space" />
-              </div>
-              <div className="import-sig-col">
-                <strong>Chủ Tiệm / Quản Lý</strong>
-                <small>(Ký duyệt)</small>
-                <div className="import-sig-space" />
-              </div>
-            </div>
-
-            {/* Footer */}
             <div className="invoice-actions-footer">
-              <button
-                type="button"
-                className="admin-btn-outline"
-                onClick={() => window.print()}
-              >
+              <button type="button" className="admin-btn-outline" onClick={() => window.print()}>
                 🖨️ In Phiếu Nhập Kho
               </button>
-              <button
-                type="button"
-                className="admin-btn-primary"
-                style={{ background: "#059669" }}
-                onClick={() => setSelectedImportReceipt(null)}
-              >
+              <button type="button" className="admin-btn-primary" style={{ background: "#059669" }} onClick={() => setSelectedImportReceipt(null)}>
                 Xong
               </button>
             </div>
@@ -4212,48 +4933,29 @@ function AdminPage() {
         </div>
       )}
 
-      {/* MODAL LẬP PHIẾU NHẬP HÀNG MỚI */}
+      {/* MODAL 10: CREATE IMPORT RECEIPT */}
       {importModal.open && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() => setImportModal((prev) => ({ ...prev, open: false }))}
-        >
-          <div
-            className="admin-dialog-card"
-            style={{ maxWidth: "860px", width: "95%" }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="admin-modal-backdrop" onClick={() => setImportModal((prev) => ({ ...prev, open: false }))}>
+          <div className="admin-dialog-card" style={{ maxWidth: "860px", width: "95%" }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-dialog-header">
               <div>
                 <h3>📥 Lập Phiếu Nhập Hàng & Tự Động Tăng Tồn Kho</h3>
-                <p style={{ margin: "4px 0 0", color: "#8d6271", fontSize: "12.5px" }}>
-                  Khi hoàn tất, tồn kho sản phẩm sẽ được tự động cộng dồn ngay và hiển thị sẵn sàng bán trên trang chủ.
-                </p>
+                <small style={{ color: "#8d6271" }}>Khi hoàn tất, tồn kho sản phẩm sẽ được tự động cộng dồn ngay lập tức.</small>
               </div>
-              <button
-                type="button"
-                className="admin-btn-outline"
-                style={{ padding: "4px 10px", fontSize: "13px" }}
-                onClick={() => setImportModal((prev) => ({ ...prev, open: false }))}
-              >
+              <button type="button" className="admin-btn-outline" style={{ padding: "3px 8px" }} onClick={() => setImportModal((prev) => ({ ...prev, open: false }))}>
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleCreateImport}>
-              <div className="admin-dialog-body" style={{ maxHeight: "70vh", overflowY: "auto", padding: "16px 20px" }}>
+              <div className="admin-dialog-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "16px" }}>
                   <div className="admin-form-group">
                     <label>Mã phiếu nhập (*)</label>
                     <input
                       required
                       value={importModal.form.code}
-                      onChange={(e) =>
-                        setImportModal((prev) => ({
-                          ...prev,
-                          form: { ...prev.form, code: e.target.value },
-                        }))
-                      }
+                      onChange={(e) => setImportModal((prev) => ({ ...prev, form: { ...prev.form, code: e.target.value } }))}
                     />
                   </div>
                   <div className="admin-form-group">
@@ -4262,21 +4964,21 @@ function AdminPage() {
                       value={importModal.form.supplierId}
                       onChange={(e) => {
                         const supId = e.target.value;
-                        const foundSup = (data.suppliers || []).find((s) => s._id === supId);
+                        const found = (data.suppliers || []).find((s) => s._id === supId);
                         setImportModal((prev) => ({
                           ...prev,
                           form: {
                             ...prev.form,
                             supplierId: supId,
-                            supplierName: foundSup ? foundSup.name : prev.form.supplierName,
-                            supplierPhone: foundSup ? foundSup.phone : prev.form.supplierPhone,
+                            supplierName: found ? found.name : prev.form.supplierName,
+                            supplierPhone: found ? found.phone : prev.form.supplierPhone,
                           },
                         }));
                       }}
                     >
                       {(data.suppliers || []).map((s) => (
                         <option key={s._id} value={s._id}>
-                          {s.name} ({s.phone || "Chưa có SĐT"})
+                          {s.name} ({s.phone})
                         </option>
                       ))}
                       <option value="">-- Nhà cung cấp khác (Nhập tay) --</option>
@@ -4284,251 +4986,127 @@ function AdminPage() {
                   </div>
                 </div>
 
-                {(!importModal.form.supplierId || importModal.form.supplierId === "") && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "16px" }}>
-                    <div className="admin-form-group">
-                      <label>Tên nhà cung cấp mới (*)</label>
-                      <input
-                        required
-                        placeholder="Nhập tên đại lý / nhà xưởng..."
-                        value={importModal.form.supplierName}
-                        onChange={(e) =>
-                          setImportModal((prev) => ({
-                            ...prev,
-                            form: { ...prev.form, supplierName: e.target.value },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="admin-form-group">
-                      <label>Số điện thoại liên hệ</label>
-                      <input
-                        placeholder="VD: 0912 345 678"
-                        value={importModal.form.supplierPhone}
-                        onChange={(e) =>
-                          setImportModal((prev) => ({
-                            ...prev,
-                            form: { ...prev.form, supplierPhone: e.target.value },
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
+                <div className="admin-form-group" style={{ marginBottom: "16px" }}>
+                  <label>Ghi chú nhập hàng</label>
+                  <input
+                    placeholder="VD: Nhập thêm đợt hàng len Milk cotton phục vụ lễ 20/10"
+                    value={importModal.form.notes}
+                    onChange={(e) => setImportModal((prev) => ({ ...prev, form: { ...prev.form, notes: e.target.value } }))}
+                  />
+                </div>
 
-                {/* Bảng Danh Sách Sản Phẩm Nhập */}
-                <div style={{ marginBottom: "16px" }}>
+                {/* Items in Receipt */}
+                <div style={{ marginBottom: "14px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <label style={{ fontWeight: 700, color: "#3f1a26", fontSize: "13.5px" }}>
-                      Danh Sách Mặt Hàng Nhập Kho (*)
-                    </label>
+                    <strong style={{ fontSize: "14px" }}>Danh sách sản phẩm nhập vào kho:</strong>
                     <button
                       type="button"
                       className="admin-btn-outline"
-                      style={{ fontSize: "12px", padding: "4px 10px", borderColor: "#059669", color: "#059669" }}
-                      onClick={addImportItemRow}
+                      style={{ fontSize: "12px", padding: "3px 8px" }}
+                      onClick={() => {
+                        setImportModal((prev) => ({
+                          ...prev,
+                          form: {
+                            ...prev.form,
+                            items: [
+                              ...prev.form.items,
+                              { productId: "", productName: "", quantity: 20, costPrice: 15000 },
+                            ],
+                          },
+                        }));
+                      }}
                     >
-                      ➕ Thêm dòng mặt hàng
+                      ➕ Thêm sản phẩm
                     </button>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {importModal.form.items.map((row, idx) => {
-                      const matchedProd = (data.products || []).find((p) => p._id === row.productId);
-                      const currentStock = matchedProd ? matchedProd.stock : 0;
-                      const newStock = currentStock + (Number(row.quantity) || 0);
+                  {importModal.form.items.map((it, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "2fr 1fr 1fr auto",
+                        gap: "10px",
+                        alignItems: "center",
+                        background: "#fffafc",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        marginBottom: "8px",
+                        border: "1px solid #fce7f3",
+                      }}
+                    >
+                      <select
+                        value={it.productId}
+                        onChange={(e) => {
+                          const pId = e.target.value;
+                          const pr = (data.products || []).find((p) => p._id === pId);
+                          const newItems = [...importModal.form.items];
+                          newItems[idx] = {
+                            ...newItems[idx],
+                            productId: pId,
+                            productName: pr ? pr.name : "",
+                            costPrice: pr?.costPrice || Math.round((pr?.price || 20000) * 0.6),
+                          };
+                          setImportModal((prev) => ({ ...prev, form: { ...prev.form, items: newItems } }));
+                        }}
+                      >
+                        <option value="">-- Chọn sản phẩm có sẵn --</option>
+                        {(data.products || []).map((p) => (
+                          <option key={p._id} value={p._id}>
+                            {p.name} (Tồn hiện tại: {p.stock || 0})
+                          </option>
+                        ))}
+                      </select>
 
-                      return (
-                        <div
-                          key={idx}
-                          style={{
-                            background: "#fffafc",
-                            border: "1px solid #fce7f3",
-                            borderRadius: "12px",
-                            padding: "12px 14px",
-                            display: "grid",
-                            gridTemplateColumns: "2.2fr 1fr 1.2fr 1.2fr 36px",
-                            gap: "10px",
-                            alignItems: "center",
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Số lượng"
+                        value={it.quantity}
+                        onChange={(e) => {
+                          const newItems = [...importModal.form.items];
+                          newItems[idx].quantity = Number(e.target.value);
+                          setImportModal((prev) => ({ ...prev, form: { ...prev.form, items: newItems } }));
+                        }}
+                      />
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        placeholder="Giá vốn"
+                        value={it.costPrice}
+                        onChange={(e) => {
+                          const newItems = [...importModal.form.items];
+                          newItems[idx].costPrice = Number(e.target.value);
+                          setImportModal((prev) => ({ ...prev, form: { ...prev.form, items: newItems } }));
+                        }}
+                      />
+
+                      {importModal.form.items.length > 1 && (
+                        <button
+                          type="button"
+                          className="admin-btn-outline"
+                          style={{ color: "#dc2626", borderColor: "#fca5a5", padding: "4px 8px" }}
+                          onClick={() => {
+                            const newItems = importModal.form.items.filter((_, i) => i !== idx);
+                            setImportModal((prev) => ({ ...prev, form: { ...prev.form, items: newItems } }));
                           }}
                         >
-                          <div>
-                            <label style={{ fontSize: "11px", color: "#8d6271", display: "block", marginBottom: "4px" }}>
-                              Sản phẩm len / Phụ kiện
-                            </label>
-                            <select
-                              value={row.productId || (row.productName ? "NEW_CUSTOM" : "")}
-                              onChange={(e) => handleImportItemChange(idx, "productId", e.target.value)}
-                              style={{ width: "100%", padding: "7px 10px", fontSize: "12.5px" }}
-                            >
-                              {(data.products || []).map((p) => (
-                                <option key={p._id} value={p._id}>
-                                  {p.name} (Hiện có: {p.stock} cuộn)
-                                </option>
-                              ))}
-                              <option value="NEW_CUSTOM">➕ [Nhập tên sản phẩm mới]</option>
-                            </select>
-                            {(!row.productId || row.productId === "NEW_CUSTOM") && (
-                              <input
-                                placeholder="Nhập tên sản phẩm len..."
-                                value={row.productName}
-                                onChange={(e) => handleImportItemChange(idx, "productName", e.target.value)}
-                                style={{ marginTop: "6px", width: "100%", padding: "6px 10px", fontSize: "12px" }}
-                              />
-                            )}
-                            {matchedProd && (
-                              <small style={{ color: "#059669", display: "block", marginTop: "4px" }}>
-                                📊 Tồn hiện tại: <strong>{currentStock}</strong> ➜ Sau nhập: <strong>{newStock} cuộn</strong>
-                              </small>
-                            )}
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: "11px", color: "#8d6271", display: "block", marginBottom: "4px" }}>
-                              SL nhập (*)
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={row.quantity}
-                              onChange={(e) => handleImportItemChange(idx, "quantity", e.target.value)}
-                              style={{ width: "100%", padding: "7px 10px", fontSize: "13px", fontWeight: 700 }}
-                            />
-                          </div>
-
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                              <label style={{ fontSize: "11px", color: "#8d6271" }}>
-                                Giá vốn/cuộn (VND)
-                              </label>
-                              {matchedProd && (
-                                <span style={{ fontSize: "10.5px", color: "#e11d48", fontWeight: 700 }} title="Giá bán niêm yết hiện tại">
-                                  Bán: {money(matchedProd.price)}
-                                </span>
-                              )}
-                            </div>
-                            <input
-                              type="number"
-                              min="0"
-                              step="500"
-                              value={row.costPrice}
-                              onChange={(e) => handleImportItemChange(idx, "costPrice", e.target.value)}
-                              style={{ width: "100%", padding: "7px 10px", fontSize: "13px" }}
-                            />
-                            {matchedProd && Number(row.costPrice) > 0 && (
-                              <small
-                                style={{
-                                  display: "block",
-                                  marginTop: "3px",
-                                  fontSize: "11px",
-                                  fontWeight: 700,
-                                  color: Number(matchedProd.price) >= Number(row.costPrice) ? "#059669" : "#dc2626",
-                                }}
-                              >
-                                {Number(matchedProd.price) >= Number(row.costPrice)
-                                  ? `+${money(Number(matchedProd.price) - Number(row.costPrice))} lãi`
-                                  : `Lỗ -${money(Number(row.costPrice) - Number(matchedProd.price))}`}
-                              </small>
-                            )}
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: "11px", color: "#8d6271", display: "block", marginBottom: "4px" }}>
-                              Thành tiền
-                            </label>
-                            <strong style={{ display: "block", color: "#047857", fontSize: "13.5px", marginTop: "6px" }}>
-                              {money(Number(row.quantity || 0) * Number(row.costPrice || 0))}
-                            </strong>
-                          </div>
-
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => removeImportItemRow(idx)}
-                              style={{
-                                background: "#fee2e2",
-                                border: "1px solid #fca5a5",
-                                color: "#b91c1c",
-                                width: "32px",
-                                height: "32px",
-                                borderRadius: "8px",
-                                cursor: "pointer",
-                                display: "grid",
-                                placeItems: "center",
-                              }}
-                              title="Xóa dòng này"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Tổng cộng & Ghi chú */}
-                <div
-                  style={{
-                    background: "#ecfdf5",
-                    border: "1.5px solid #a7f3d0",
-                    borderRadius: "14px",
-                    padding: "14px 18px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <div>
-                    <span style={{ color: "#065f46", fontSize: "13px" }}>Tổng mặt hàng nhập: </span>
-                    <strong style={{ color: "#065f46" }}>
-                      {importModal.form.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)} cuộn/bó len
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={{ color: "#065f46", fontSize: "13px" }}>Tổng thanh toán cho NCC: </span>
-                    <strong style={{ color: "#047857", fontSize: "20px" }}>
-                      {money(
-                        importModal.form.items.reduce(
-                          (s, i) => s + Number(i.quantity || 0) * Number(i.costPrice || 0),
-                          0
-                        )
+                          ✕
+                        </button>
                       )}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="admin-form-group">
-                  <label>Ghi chú đợt nhập hàng</label>
-                  <textarea
-                    rows={2}
-                    placeholder="VD: Nhập thêm len Milk Bò màu pastel phục vụ mùa đan len, hàng chuẩn loại 1..."
-                    value={importModal.form.notes}
-                    onChange={(e) =>
-                      setImportModal((prev) => ({
-                        ...prev,
-                        form: { ...prev.form, notes: e.target.value },
-                      }))
-                    }
-                  />
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div className="admin-dialog-footer">
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={() => setImportModal((prev) => ({ ...prev, open: false }))}
-                >
-                  Hủy bỏ
+                <button type="button" className="admin-btn-outline" onClick={() => setImportModal((prev) => ({ ...prev, open: false }))}>
+                  Hủy
                 </button>
-                <button
-                  type="submit"
-                  className="admin-btn-primary"
-                  style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)" }}
-                >
-                  💾 Xác Nhận Nhập Hàng & Tự Động Tăng Tồn Kho Bán
+                <button type="submit" className="admin-btn-primary">
+                  📥 Hoàn Tất Nhập Kho & Tăng Tồn Hàng
                 </button>
               </div>
             </form>
@@ -4536,213 +5114,13 @@ function AdminPage() {
         </div>
       )}
 
-      {/* MODAL 1: CẤP LẠI MẬT KHẨU CHO KHÁCH HÀNG */}
-      {resetPasswordModal.open && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() =>
-            setResetPasswordModal({
-              open: false,
-              customer: null,
-              newPassword: "",
-              resultMsg: "",
-              errorMsg: "",
-            })
-          }
-        >
-          <div
-            className="admin-dialog-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="admin-dialog-header">
-              <h3>🔑 Cấp Lại Mật Khẩu Khách Hàng</h3>
-              <button
-                type="button"
-                className="admin-btn-outline"
-                style={{ padding: "2px 8px", fontSize: "12px" }}
-                onClick={() =>
-                  setResetPasswordModal({
-                    open: false,
-                    customer: null,
-                    newPassword: "",
-                    resultMsg: "",
-                    errorMsg: "",
-                  })
-                }
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="admin-dialog-body">
-              <div
-                style={{
-                  background: "#fff1f5",
-                  border: "1px solid #fce7f3",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontSize: "13px",
-                }}
-              >
-                <div>
-                  👤 <strong>Khách hàng:</strong> {resetPasswordModal.customer?.name}
-                </div>
-                <div>
-                  📧 <strong>Email đăng nhập:</strong> {resetPasswordModal.customer?.email}
-                </div>
-                {resetPasswordModal.customer?.phone && (
-                  <div>
-                    📱 <strong>Số điện thoại:</strong> {resetPasswordModal.customer?.phone}
-                  </div>
-                )}
-              </div>
-
-              {resetPasswordModal.resultMsg ? (
-                <div
-                  style={{
-                    background: "#ecfdf5",
-                    border: "1.5px solid #a7f3d0",
-                    borderRadius: "12px",
-                    padding: "16px",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ color: "#047857", fontWeight: 800, fontSize: "14px", marginBottom: "8px" }}>
-                    {resetPasswordModal.resultMsg}
-                  </div>
-                  <p style={{ margin: "0 0 12px", fontSize: "12.5px", color: "#065f46" }}>
-                    Hãy gửi mật khẩu này cho khách hàng qua Zalo hoặc SMS để khách đăng nhập lại tài khoản!
-                  </p>
-                  <button
-                    type="button"
-                    className="admin-btn-primary"
-                    onClick={() => {
-                      navigator.clipboard.writeText(resetPasswordModal.newPassword);
-                      showToast(`✓ Đã sao chép mật khẩu: ${resetPasswordModal.newPassword}`);
-                    }}
-                  >
-                    📋 Sao chép mật khẩu gửi khách
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleResetPassword}>
-                  <div className="admin-form-group">
-                    <label>Mật khẩu mới muốn đặt (*)</label>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <input
-                        required
-                        placeholder="VD: LenXinh@2026"
-                        value={resetPasswordModal.newPassword}
-                        onChange={(e) =>
-                          setResetPasswordModal({
-                            ...resetPasswordModal,
-                            newPassword: e.target.value,
-                          })
-                        }
-                      />
-                      <button
-                        type="button"
-                        className="admin-btn-outline"
-                        style={{ whiteSpace: "nowrap", fontSize: "12px" }}
-                        onClick={() =>
-                          setResetPasswordModal({
-                            ...resetPasswordModal,
-                            newPassword:
-                              "LenXinh@" +
-                              Math.floor(1000 + Math.random() * 9000),
-                          })
-                        }
-                      >
-                        🎲 Đổi mã khác
-                      </button>
-                    </div>
-                  </div>
-
-                  {resetPasswordModal.errorMsg && (
-                    <small style={{ color: "#dc2626", fontWeight: 700 }}>
-                      {resetPasswordModal.errorMsg}
-                    </small>
-                  )}
-
-                  <div className="admin-dialog-footer">
-                    <button
-                      type="button"
-                      className="admin-btn-outline"
-                      onClick={() =>
-                        setResetPasswordModal({
-                          open: false,
-                          customer: null,
-                          newPassword: "",
-                          resultMsg: "",
-                          errorMsg: "",
-                        })
-                      }
-                    >
-                      Hủy bỏ
-                    </button>
-                    <button type="submit" className="admin-btn-primary">
-                      💾 Xác Nhận Cấp Lại Mật Khẩu
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: THÊM / SỬA NHÀ CUNG CẤP */}
+      {/* MODAL 11: SUPPLIER MODAL */}
       {supplierModal.open && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() =>
-            setSupplierModal({
-              open: false,
-              isEdit: false,
-              supplierId: null,
-              form: {
-                name: "",
-                phone: "",
-                address: "",
-                supplyItems: "",
-                rating: 5,
-                totalImported: 0,
-                notes: "",
-              },
-            })
-          }
-        >
-          <div
-            className="admin-dialog-card"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="admin-modal-backdrop" onClick={() => setSupplierModal((prev) => ({ ...prev, open: false }))}>
+          <div className="admin-dialog-card" style={{ maxWidth: "500px" }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-dialog-header">
-              <h3>
-                {supplierModal.isEdit
-                  ? "✏️ Chỉnh Sửa Nhà Cung Cấp"
-                  : "➕ Thêm Nhà Cung Cấp Mới"}
-              </h3>
-              <button
-                type="button"
-                className="admin-btn-outline"
-                style={{ padding: "2px 8px", fontSize: "12px" }}
-                onClick={() =>
-                  setSupplierModal({
-                    open: false,
-                    isEdit: false,
-                    supplierId: null,
-                    form: {
-                      name: "",
-                      phone: "",
-                      address: "",
-                      supplyItems: "",
-                      rating: 5,
-                      totalImported: 0,
-                      notes: "",
-                    },
-                  })
-                }
-              >
+              <h3>{supplierModal.isEdit ? "✏️ Sửa Nhà Cung Cấp" : "🏢 Thêm Nhà Cung Cấp Mới"}</h3>
+              <button type="button" className="admin-btn-outline" style={{ padding: "2px 8px" }} onClick={() => setSupplierModal((prev) => ({ ...prev, open: false }))}>
                 ✕
               </button>
             </div>
@@ -4750,146 +5128,44 @@ function AdminPage() {
             <form onSubmit={handleSaveSupplier}>
               <div className="admin-dialog-body">
                 <div className="admin-form-group">
-                  <label>Tên nhà cung cấp / Tổng kho (*)</label>
+                  <label>Tên nhà cung cấp (*)</label>
                   <input
                     required
-                    placeholder="VD: Tổng Kho Len Sợi Miền Nam"
                     value={supplierModal.form.name}
-                    onChange={(e) =>
-                      setSupplierModal({
-                        ...supplierModal,
-                        form: { ...supplierModal.form, name: e.target.value },
-                      })
-                    }
+                    onChange={(e) => setSupplierModal((prev) => ({ ...prev, form: { ...prev.form, name: e.target.value } }))}
                   />
                 </div>
-
                 <div className="admin-form-group">
-                  <label>Số điện thoại liên hệ (*)</label>
+                  <label>Số điện thoại (*)</label>
                   <input
                     required
-                    placeholder="VD: 0908 123 456"
                     value={supplierModal.form.phone}
-                    onChange={(e) =>
-                      setSupplierModal({
-                        ...supplierModal,
-                        form: { ...supplierModal.form, phone: e.target.value },
-                      })
-                    }
+                    onChange={(e) => setSupplierModal((prev) => ({ ...prev, form: { ...prev.form, phone: e.target.value } }))}
                   />
                 </div>
-
                 <div className="admin-form-group">
-                  <label>Địa chỉ kho hàng</label>
+                  <label>Địa chỉ</label>
                   <input
-                    placeholder="VD: Tân Bình, TP. Hồ Chí Minh"
                     value={supplierModal.form.address}
-                    onChange={(e) =>
-                      setSupplierModal({
-                        ...supplierModal,
-                        form: { ...supplierModal.form, address: e.target.value },
-                      })
-                    }
+                    onChange={(e) => setSupplierModal((prev) => ({ ...prev, form: { ...prev.form, address: e.target.value } }))}
                   />
                 </div>
-
                 <div className="admin-form-group">
-                  <label>Mặt hàng cung cấp chính</label>
+                  <label>Mặt hàng cung cấp</label>
                   <input
-                    placeholder="VD: Len Milk Bò, Kim SKC, Bông gòn bi..."
+                    placeholder="VD: Len milk cotton, kim móc, bông gòn"
                     value={supplierModal.form.supplyItems}
-                    onChange={(e) =>
-                      setSupplierModal({
-                        ...supplierModal,
-                        form: {
-                          ...supplierModal.form,
-                          supplyItems: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <div className="admin-form-group">
-                    <label>Đánh giá uy tín (1-5 sao)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="5"
-                      value={supplierModal.form.rating}
-                      onChange={(e) =>
-                        setSupplierModal({
-                          ...supplierModal,
-                          form: {
-                            ...supplierModal.form,
-                            rating: Number(e.target.value),
-                          },
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Tổng tiền đã nhập (VNĐ)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100000"
-                      value={supplierModal.form.totalImported}
-                      onChange={(e) =>
-                        setSupplierModal({
-                          ...supplierModal,
-                          form: {
-                            ...supplierModal.form,
-                            totalImported: Number(e.target.value),
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="admin-form-group">
-                  <label>Ghi chú (Chính sách sỉ, thời gian giao hàng...)</label>
-                  <textarea
-                    placeholder="Giao hàng hỏa tốc trong ngày, giá sỉ tốt từ 50 cuộn..."
-                    value={supplierModal.form.notes}
-                    onChange={(e) =>
-                      setSupplierModal({
-                        ...supplierModal,
-                        form: { ...supplierModal.form, notes: e.target.value },
-                      })
-                    }
+                    onChange={(e) => setSupplierModal((prev) => ({ ...prev, form: { ...prev.form, supplyItems: e.target.value } }))}
                   />
                 </div>
               </div>
 
               <div className="admin-dialog-footer">
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={() =>
-                    setSupplierModal({
-                      open: false,
-                      isEdit: false,
-                      supplierId: null,
-                      form: {
-                        name: "",
-                        phone: "",
-                        address: "",
-                        supplyItems: "",
-                        rating: 5,
-                        totalImported: 0,
-                        notes: "",
-                      },
-                    })
-                  }
-                >
+                <button type="button" className="admin-btn-outline" onClick={() => setSupplierModal((prev) => ({ ...prev, open: false }))}>
                   Hủy
                 </button>
                 <button type="submit" className="admin-btn-primary">
-                  {supplierModal.isEdit ? "💾 Cập Nhật" : "➕ Thêm Nhà Cung Cấp"}
+                  💾 Lưu Nhà Cung Cấp
                 </button>
               </div>
             </form>
@@ -4897,62 +5173,13 @@ function AdminPage() {
         </div>
       )}
 
-      {/* MODAL 3: THÊM / SỬA THỢ MÓC & NHÂN SỰ */}
+      {/* MODAL 12: STAFF MODAL */}
       {staffModal.open && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() =>
-            setStaffModal({
-              open: false,
-              isEdit: false,
-              staffId: null,
-              form: {
-                name: "",
-                phone: "",
-                role: "Thợ gia công hoa len",
-                pieceRate: 20000,
-                completedCount: 0,
-                totalPaid: 0,
-                skills: "",
-                status: "active",
-                notes: "",
-              },
-            })
-          }
-        >
-          <div
-            className="admin-dialog-card"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="admin-modal-backdrop" onClick={() => setStaffModal((prev) => ({ ...prev, open: false }))}>
+          <div className="admin-dialog-card" style={{ maxWidth: "500px" }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-dialog-header">
-              <h3>
-                {staffModal.isEdit
-                  ? "✏️ Cập Nhật Thợ Móc / Nhân Sự"
-                  : "➕ Thêm Thợ Móc / Nhân Sự Mới"}
-              </h3>
-              <button
-                type="button"
-                className="admin-btn-outline"
-                style={{ padding: "2px 8px", fontSize: "12px" }}
-                onClick={() =>
-                  setStaffModal({
-                    open: false,
-                    isEdit: false,
-                    staffId: null,
-                    form: {
-                      name: "",
-                      phone: "",
-                      role: "Thợ gia công hoa len",
-                      pieceRate: 20000,
-                      completedCount: 0,
-                      totalPaid: 0,
-                      skills: "",
-                      status: "active",
-                      notes: "",
-                    },
-                  })
-                }
-              >
+              <h3>{staffModal.isEdit ? "✏️ Sửa Hồ Sơ Thợ / Nhân Viên" : "🪡 Thêm Thợ Thủ Công Mới"}</h3>
+              <button type="button" className="admin-btn-outline" style={{ padding: "2px 8px" }} onClick={() => setStaffModal((prev) => ({ ...prev, open: false }))}>
                 ✕
               </button>
             </div>
@@ -4960,594 +5187,55 @@ function AdminPage() {
             <form onSubmit={handleSaveStaff}>
               <div className="admin-dialog-body">
                 <div className="admin-form-group">
-                  <label>Họ tên thợ / nhân sự (*)</label>
+                  <label>Họ tên (*)</label>
                   <input
                     required
-                    placeholder="VD: Chị Mai (Thợ Móc Hoa)"
                     value={staffModal.form.name}
-                    onChange={(e) =>
-                      setStaffModal({
-                        ...staffModal,
-                        form: { ...staffModal.form, name: e.target.value },
-                      })
-                    }
+                    onChange={(e) => setStaffModal((prev) => ({ ...prev, form: { ...prev.form, name: e.target.value } }))}
                   />
                 </div>
-
                 <div className="admin-form-group">
-                  <label>Số điện thoại liên hệ (*)</label>
+                  <label>Số điện thoại (*)</label>
                   <input
                     required
-                    placeholder="VD: 0987 111 222"
                     value={staffModal.form.phone}
-                    onChange={(e) =>
-                      setStaffModal({
-                        ...staffModal,
-                        form: { ...staffModal.form, phone: e.target.value },
-                      })
-                    }
+                    onChange={(e) => setStaffModal((prev) => ({ ...prev, form: { ...prev.form, phone: e.target.value } }))}
                   />
                 </div>
-
                 <div className="admin-form-group">
-                  <label>Vai trò / Nhiệm vụ (*)</label>
-                  <select
-                    value={staffModal.form.role}
-                    onChange={(e) =>
-                      setStaffModal({
-                        ...staffModal,
-                        form: { ...staffModal.form, role: e.target.value },
-                      })
-                    }
-                  >
-                    <option value="Thợ gia công hoa len">
-                      🌸 Thợ gia công hoa len (Tulip, Hướng dương...)
-                    </option>
-                    <option value="Thợ móc thú bông len">
-                      🧸 Thợ móc thú bông Amigurumi (Thỏ, Gấu...)
-                    </option>
-                    <option value="Thợ móc túi & phụ kiện">
-                      👜 Thợ móc túi xách, nón len & kẹp tóc
-                    </option>
-                    <option value="Đóng gói & Phụ kiện">
-                      📦 Nhân viên đóng gói & kiểm hàng
-                    </option>
-                  </select>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <div className="admin-form-group">
-                    <label>Tiền công khoán (VNĐ/sản phẩm) (*)</label>
-                    <input
-                      required
-                      type="number"
-                      min="1000"
-                      step="5000"
-                      placeholder="20000"
-                      value={staffModal.form.pieceRate}
-                      onChange={(e) =>
-                        setStaffModal({
-                          ...staffModal,
-                          form: {
-                            ...staffModal.form,
-                            pieceRate: Number(e.target.value),
-                          },
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="admin-form-group">
-                    <label>Số lượng đã hoàn thành</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={staffModal.form.completedCount}
-                      onChange={(e) =>
-                        setStaffModal({
-                          ...staffModal,
-                          form: {
-                            ...staffModal.form,
-                            completedCount: Number(e.target.value),
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="admin-form-group">
-                  <label>Kỹ năng nổi bật / Thế mạnh tay nghề</label>
+                  <label>Chức vụ / Chuyên môn</label>
                   <input
-                    placeholder="VD: Móc mũi hạt gạo đều, khâu ráp thú có hồn..."
-                    value={staffModal.form.skills}
-                    onChange={(e) =>
-                      setStaffModal({
-                        ...staffModal,
-                        form: { ...staffModal.form, skills: e.target.value },
-                      })
-                    }
+                    value={staffModal.form.role}
+                    onChange={(e) => setStaffModal((prev) => ({ ...prev, form: { ...prev.form, role: e.target.value } }))}
                   />
                 </div>
-
                 <div className="admin-form-group">
-                  <label>Trạng thái</label>
-                  <select
-                    value={staffModal.form.status}
-                    onChange={(e) =>
-                      setStaffModal({
-                        ...staffModal,
-                        form: { ...staffModal.form, status: e.target.value },
-                      })
-                    }
-                  >
-                    <option value="active">✓ Đang nhận mẫu / Hoạt động</option>
-                    <option value="inactive">Tạm ngưng nhận hàng</option>
-                  </select>
-                </div>
-
-                <div className="admin-form-group">
-                  <label>Ghi chú</label>
-                  <textarea
-                    placeholder="Mũi móc đều đẹp, đúng hẹn trước các dịp lễ..."
-                    value={staffModal.form.notes}
-                    onChange={(e) =>
-                      setStaffModal({
-                        ...staffModal,
-                        form: { ...staffModal.form, notes: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="admin-dialog-footer">
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={() =>
-                    setStaffModal({
-                      open: false,
-                      isEdit: false,
-                      staffId: null,
-                      form: {
-                        name: "",
-                        phone: "",
-                        role: "Thợ gia công hoa len",
-                        pieceRate: 20000,
-                        completedCount: 0,
-                        totalPaid: 0,
-                        skills: "",
-                        status: "active",
-                        notes: "",
-                      },
-                    })
-                  }
-                >
-                  Hủy
-                </button>
-                <button type="submit" className="admin-btn-primary">
-                  {staffModal.isEdit ? "💾 Cập Nhật" : "➕ Thêm Nhân Sự"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: NHẬP THÊM HÀNG VÀO KHO NHANH */}
-      {quickStockModal.open && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() =>
-            setQuickStockModal({ open: false, product: null, addStock: 20 })
-          }
-        >
-          <div
-            className="admin-dialog-card"
-            style={{ maxWidth: "420px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="admin-dialog-header">
-              <h3>⚡ Nhập Thêm Hàng Vào Kho</h3>
-              <button
-                type="button"
-                className="admin-btn-outline"
-                style={{ padding: "2px 8px", fontSize: "12px" }}
-                onClick={() =>
-                  setQuickStockModal({ open: false, product: null, addStock: 20 })
-                }
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleQuickAddStock}>
-              <div className="admin-dialog-body">
-                <div
-                  style={{
-                    background: "#fff1f5",
-                    border: "1px solid #fce7f3",
-                    borderRadius: "12px",
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                  }}
-                >
-                  <img
-                    src={quickStockModal.product?.images?.[0] || "/placeholder.jpg"}
-                    alt=""
-                    style={{
-                      width: "48px",
-                      height: "48px",
-                      borderRadius: "8px",
-                      objectFit: "cover",
-                      border: "1px solid #fecdd3",
-                    }}
-                  />
-                  <div>
-                    <strong>{quickStockModal.product?.name}</strong>
-                    <div style={{ fontSize: "12px", color: "#8d6271", marginTop: "2px" }}>
-                      Tồn kho hiện tại:{" "}
-                      <strong style={{ color: "#e11d48" }}>
-                        {quickStockModal.product?.stock || 0} cuộn
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="admin-form-group">
-                  <label>Số lượng muốn nhập thêm (*)</label>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <input
-                      required
-                      type="number"
-                      min="1"
-                      value={quickStockModal.addStock}
-                      onChange={(e) =>
-                        setQuickStockModal({
-                          ...quickStockModal,
-                          addStock: e.target.value,
-                        })
-                      }
-                    />
-                    {[20, 50, 100].map((qty) => (
-                      <button
-                        key={qty}
-                        type="button"
-                        className="admin-btn-outline"
-                        style={{ fontSize: "12px" }}
-                        onClick={() =>
-                          setQuickStockModal({
-                            ...quickStockModal,
-                            addStock: qty,
-                          })
-                        }
-                      >
-                        +{qty}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ fontSize: "12px", color: "#059669", fontWeight: 600 }}>
-                  ✓ Sau khi nhập, tổng tồn kho sẽ là:{" "}
-                  <strong>
-                    {(quickStockModal.product?.stock || 0) +
-                      Number(quickStockModal.addStock || 0)}{" "}
-                    cuộn
-                  </strong>
-                </div>
-              </div>
-
-              <div className="admin-dialog-footer">
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={() =>
-                    setQuickStockModal({ open: false, product: null, addStock: 20 })
-                  }
-                >
-                  Hủy
-                </button>
-                <button type="submit" className="admin-btn-primary">
-                  ⚡ Xác Nhận Nhập Kho
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-
-
-      {/* MODAL 6: IN TEM GỬI HÀNG / PHIẾU ĐÓNG GÓI CHO SHIPPER */}
-      {shippingLabelOrder && (
-        <div
-          className="shipping-label-backdrop"
-          onClick={() => setShippingLabelOrder(null)}
-        >
-          <div
-            className="shipping-label-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="shipping-label-actions-top">
-              <h3>🏷️ Mẫu Tem Gửi Hàng / Phiếu Vận Chuyển A6</h3>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  type="button"
-                  className="admin-btn-primary"
-                  onClick={() => window.print()}
-                  style={{ background: "#e11d48", padding: "7px 18px", fontSize: "13px" }}
-                >
-                  🖨️ Bấm Để In Tem (Print)
-                </button>
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={() => setShippingLabelOrder(null)}
-                >
-                  ✕ Đóng
-                </button>
-              </div>
-            </div>
-
-            {/* VÙNG IN TEM CHUẨN KÍCH THƯỚC */}
-            <div id="shipping-label-printable" className="shipping-label-sheet">
-              <div className="label-header">
-                <div className="label-shop-info">
-                  <h2>🌸 TIỆM LEN SENE HANDMADE</h2>
-                  <p>Tiệm Len Sợi Thủ Công · Hoa Len Vĩnh Cửu · Quà Tặng Độc Bản</p>
-                  <p>Hotline hỗ trợ: <strong>0942.901.124</strong> | Web: sene-handmade.vercel.app</p>
-                </div>
-                <div className="label-barcode-box">
-                  <div className="label-barcode-mock">||||| | |||| || |||</div>
-                  <div className="label-code-val">#{shippingLabelOrder._id.slice(-8).toUpperCase()}</div>
-                </div>
-              </div>
-
-              <div className="label-party-grid">
-                <div className="label-box">
-                  <div className="label-box-title">Người Gửi (From):</div>
-                  <div><strong>Tiệm Len Sene Handmade</strong></div>
-                  <div>SĐT: 0942.901.124</div>
-                  <div>Địa chỉ: Cần Thơ / TP. Hồ Chí Minh</div>
-                </div>
-
-                <div className="label-box label-box-receiver">
-                  <div className="label-box-title">Người Nhận (To):</div>
-                  <div className="label-receiver-name">{shippingLabelOrder.customerName}</div>
-                  <div className="label-receiver-phone">📞 {shippingLabelOrder.phone}</div>
-                  <div style={{ marginTop: "4px" }}>📍 {shippingLabelOrder.address}</div>
-                </div>
-              </div>
-
-              <table className="label-items-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "35px" }}>STT</th>
-                    <th>Tên Sản Phẩm Len / Phụ Kiện</th>
-                    <th style={{ width: "50px", textAlign: "center" }}>SL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(shippingLabelOrder.items || []).map((item, i) => (
-                    <tr key={i}>
-                      <td style={{ textAlign: "center" }}>{i + 1}</td>
-                      <td><strong>{item.name}</strong></td>
-                      <td style={{ textAlign: "center" }}><strong>x{item.quantity}</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="label-cod-highlight">
-                <div className="label-cod-title">
-                  {shippingLabelOrder.paymentMethod === "COD" ? "TIỀN THU HỘ (COD):" : "THANH TOÁN TRƯỚC:"}
-                </div>
-                <div
-                  className="label-cod-amount"
-                  style={{ color: shippingLabelOrder.paymentMethod === "COD" ? "#e11d48" : "#059669" }}
-                >
-                  {shippingLabelOrder.paymentMethod === "COD"
-                    ? money(shippingLabelOrder.totalAmount)
-                    : "0 VNĐ (ĐÃ THANH TOÁN)"}
-                </div>
-              </div>
-
-              <div className="label-footer-note">
-                <p>⚠️ <strong>LỜI DẶN SHIPPER:</strong> Cho khách đồng kiểm hàng trước khi nhận, không thử hàng.</p>
-                <p>Mọi thắc mắc về đơn hàng vui lòng gọi ngay hotline shop: <strong>0942.901.124</strong>. Cảm ơn anh shipper!</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 7: PHÓNG TO ẢNH MẪU KHÁCH GỬI */}
-      {previewImageModal && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() => setPreviewImageModal(null)}
-          style={{ zIndex: 999999 }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "16px",
-              borderRadius: "16px",
-              maxWidth: "90vw",
-              maxHeight: "90vh",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={previewImageModal}
-              alt="Mẫu khách gửi"
-              style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: "10px" }}
-            />
-            <button
-              type="button"
-              className="admin-btn-primary"
-              onClick={() => setPreviewImageModal(null)}
-              style={{ marginTop: "12px" }}
-            >
-              ✕ Đóng lại
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 5: SỬA NHANH GIÁ BÁN & GIÁ VỐN */}
-      {quickPriceModal.open && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() =>
-            setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" })
-          }
-        >
-          <div
-            className="admin-dialog-card"
-            style={{ maxWidth: "440px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="admin-dialog-header">
-              <h3>💰 Cập Nhật Giá Bán & Giá Vốn</h3>
-              <button
-                type="button"
-                className="admin-btn-outline"
-                style={{ padding: "2px 8px", fontSize: "12px" }}
-                onClick={() =>
-                  setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" })
-                }
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveQuickPrice}>
-              <div className="admin-dialog-body">
-                <div
-                  style={{
-                    background: "#fff1f5",
-                    border: "1px solid #fce7f3",
-                    borderRadius: "12px",
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                  }}
-                >
-                  <img
-                    src={quickPriceModal.product?.images?.[0] || "/placeholder.jpg"}
-                    alt=""
-                    style={{
-                      width: "48px",
-                      height: "48px",
-                      borderRadius: "8px",
-                      objectFit: "cover",
-                      border: "1px solid #fecdd3",
-                    }}
-                  />
-                  <div>
-                    <strong>{quickPriceModal.product?.name}</strong>
-                    <div style={{ fontSize: "12px", color: "#8d6271", marginTop: "2px" }}>
-                      Tồn kho hiện tại:{" "}
-                      <strong style={{ color: "#e11d48" }}>
-                        {quickPriceModal.product?.stock || 0} cuộn
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="admin-form-group">
-                  <label>Giá bán ra niêm yết (VNĐ) (*)</label>
+                  <label>Tiền công / sản phẩm hoàn thiện (VNĐ) (*)</label>
                   <input
                     required
                     type="number"
                     min="0"
                     step="1000"
-                    placeholder="VD: 45000"
-                    value={quickPriceModal.price}
-                    onChange={(e) =>
-                      setQuickPriceModal({
-                        ...quickPriceModal,
-                        price: e.target.value,
-                      })
-                    }
+                    value={staffModal.form.pieceRate}
+                    onChange={(e) => setStaffModal((prev) => ({ ...prev, form: { ...prev.form, pieceRate: Number(e.target.value) } }))}
                   />
                 </div>
-
                 <div className="admin-form-group">
-                  <label>Giá vốn nhập hàng (VNĐ)</label>
+                  <label>Kỹ năng đan móc</label>
                   <input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    placeholder="VD: 28000"
-                    value={quickPriceModal.costPrice}
-                    onChange={(e) =>
-                      setQuickPriceModal({
-                        ...quickPriceModal,
-                        costPrice: e.target.value,
-                      })
-                    }
+                    placeholder="VD: Hoa tulip, hoa hồng, móc thú bông"
+                    value={staffModal.form.skills}
+                    onChange={(e) => setStaffModal((prev) => ({ ...prev, form: { ...prev.form, skills: e.target.value } }))}
                   />
-                  <small style={{ color: "#64748b", fontSize: "12px", marginTop: "2px" }}>
-                    Dùng để tính lợi nhuận gộp và đối soát lãi tự động
-                  </small>
                 </div>
-
-                {/* Real-time Profit Preview */}
-                {(() => {
-                  const p = Number(quickPriceModal.price) || 0;
-                  const c = Number(quickPriceModal.costPrice) || 0;
-                  if (p > 0 && c > 0) {
-                    const diff = p - c;
-                    const pct = Math.round((diff / p) * 100);
-                    return (
-                      <div
-                        style={{
-                          padding: "10px 14px",
-                          borderRadius: "10px",
-                          background: diff >= 0 ? "#ecfdf5" : "#fee2e2",
-                          border: `1.5px solid ${diff >= 0 ? "#a7f3d0" : "#fca5a5"}`,
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: diff >= 0 ? "#047857" : "#b91c1c",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <span>
-                          {diff >= 0 ? "📈 Lãi dự kiến: " : "📉 Cảnh báo bán lỗ: "}
-                          <strong>{diff >= 0 ? `+${money(diff)}` : `-${money(Math.abs(diff))}`}</strong>
-                        </span>
-                        <span>{pct}% biên lời</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
               </div>
 
               <div className="admin-dialog-footer">
-                <button
-                  type="button"
-                  className="admin-btn-outline"
-                  onClick={() =>
-                    setQuickPriceModal({ open: false, product: null, price: "", costPrice: "" })
-                  }
-                >
+                <button type="button" className="admin-btn-outline" onClick={() => setStaffModal((prev) => ({ ...prev, open: false }))}>
                   Hủy
                 </button>
                 <button type="submit" className="admin-btn-primary">
-                  💾 Lưu Thay Đổi Giá
+                  💾 Lưu Hồ Sơ
                 </button>
               </div>
             </form>
@@ -5555,6 +5243,19 @@ function AdminPage() {
         </div>
       )}
 
+      {/* MODAL 13: PREVIEW IMAGE MODAL */}
+      {previewImageModal && (
+        <div className="admin-modal-backdrop" onClick={() => setPreviewImageModal(null)}>
+          <div style={{ maxWidth: "600px", padding: "12px", background: "#fff", borderRadius: "12px", textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+            <img src={previewImageModal} alt="Preview" style={{ maxWidth: "100%", maxHeight: "75vh", borderRadius: "8px", objectFit: "contain" }} />
+            <div style={{ marginTop: "12px" }}>
+              <button type="button" className="admin-btn-primary" onClick={() => setPreviewImageModal(null)}>
+                ✕ Đóng lại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -210,48 +210,189 @@ router.post("/upload", upload.single("image"), async (req, res) => {
   }
 });
 
+// Vietnam UTC+7 date parser and bound calculator
+function getVnTodayDateString() {
+  const vnNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  return vnNow.toISOString().slice(0, 10);
+}
+
+function parseVnDate(dateStr, isEndOfDay = false) {
+  if (!dateStr) return null;
+  const parts = String(dateStr).slice(0, 10).split("-");
+  if (parts.length !== 3) return new Date(dateStr);
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  if (isEndOfDay) {
+    return new Date(Date.UTC(y, m, d, 16, 59, 59, 999));
+  } else {
+    return new Date(Date.UTC(y, m, d - 1, 17, 0, 0, 0));
+  }
+}
+
+function getDateRangeForPreset(preset) {
+  const vnNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const y = vnNow.getUTCFullYear();
+  const m = vnNow.getUTCMonth();
+  const d = vnNow.getUTCDate();
+
+  const toYmd = (date) => date.toISOString().slice(0, 10);
+  const norm = (preset || "").toLowerCase();
+
+  if (norm === "today") {
+    const todayStr = toYmd(vnNow);
+    return {
+      startDate: parseVnDate(todayStr, false),
+      endDate: parseVnDate(todayStr, true),
+    };
+  }
+  if (norm === "yesterday") {
+    const yest = new Date(Date.UTC(y, m, d - 1));
+    const yestStr = toYmd(yest);
+    return {
+      startDate: parseVnDate(yestStr, false),
+      endDate: parseVnDate(yestStr, true),
+    };
+  }
+  if (norm === "7days") {
+    const sevenAgo = new Date(Date.UTC(y, m, d - 6));
+    return {
+      startDate: parseVnDate(toYmd(sevenAgo), false),
+      endDate: parseVnDate(toYmd(vnNow), true),
+    };
+  }
+  if (norm === "30days") {
+    const thirtyAgo = new Date(Date.UTC(y, m, d - 29));
+    return {
+      startDate: parseVnDate(toYmd(thirtyAgo), false),
+      endDate: parseVnDate(toYmd(vnNow), true),
+    };
+  }
+  if (norm === "thismonth") {
+    const startMonth = new Date(Date.UTC(y, m, 1));
+    return {
+      startDate: parseVnDate(toYmd(startMonth), false),
+      endDate: parseVnDate(toYmd(vnNow), true),
+    };
+  }
+  if (norm === "lastmonth") {
+    const startLastMonth = new Date(Date.UTC(y, m - 1, 1));
+    const endLastMonth = new Date(Date.UTC(y, m, 0));
+    return {
+      startDate: parseVnDate(toYmd(startLastMonth), false),
+      endDate: parseVnDate(toYmd(endLastMonth), true),
+    };
+  }
+  return null;
+}
+
 // DASHBOARD
 router.get("/dashboard", async (req, res) => {
-  const [
-    totalProducts,
-    totalOrders,
-    totalCustomers,
-    revenueResult,
-    totalSuppliers,
-    totalStaff,
-    lowStockCount,
-    totalImports,
-    totalTasks,
-    activeTasksCount,
-  ] = await Promise.all([
-    Product.countDocuments({ isActive: true }),
-    Order.countDocuments(),
-    User.countDocuments({ role: "user" }),
-    Order.aggregate([
-      { $match: { status: "delivered" } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-    ]),
-    Supplier.countDocuments({ isActive: true }).catch(() => 0),
-    Staff.countDocuments({ status: "active" }).catch(() => 0),
-    Product.countDocuments({ isActive: true, stock: { $lt: 10 } }),
-    ImportReceipt.countDocuments().catch(() => 0),
-    ArtisanTask.countDocuments().catch(() => 0),
-    ArtisanTask.countDocuments({
-      status: { $in: ["assigned", "in_progress", "submitted"] },
-    }).catch(() => 0),
-  ]);
-  res.json({
-    totalProducts,
-    totalOrders,
-    totalCustomers,
-    revenue: revenueResult[0]?.total || 0,
-    totalSuppliers,
-    totalStaff,
-    lowStockCount,
-    totalImports,
-    totalTasks,
-    activeTasksCount,
-  });
+  try {
+    const vnTodayStr = getVnTodayDateString();
+    const startOfToday = parseVnDate(vnTodayStr, false);
+    const endOfToday = parseVnDate(vnTodayStr, true);
+
+    const [
+      totalProducts,
+      totalOrders,
+      totalCustomers,
+      pendingOrdersCount,
+      todayOrdersCount,
+      todayRevenueResult,
+      totalRevenueResult,
+      totalStockResult,
+      lowStockCount,
+      recentOrders,
+      topSelling,
+      lowStockProducts,
+    ] = await Promise.all([
+      Product.countDocuments({ isActive: true }),
+      Order.countDocuments(),
+      User.countDocuments({ role: "user" }),
+      Order.countDocuments({ status: "pending" }),
+      Order.countDocuments({ createdAt: { $gte: startOfToday, $lte: endOfToday } }),
+      Order.aggregate([
+        {
+          $match: {
+            status: { $ne: "cancelled" },
+            createdAt: { $gte: startOfToday, $lte: endOfToday },
+          },
+        },
+        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      ]),
+      Order.aggregate([
+        { $match: { status: { $ne: "cancelled" } } },
+        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      ]),
+      Product.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: null, totalStock: { $sum: "$stock" } } },
+      ]),
+      Product.countDocuments({ isActive: true, stock: { $lt: 10 } }),
+      Order.find().sort({ createdAt: -1 }).limit(6),
+      Order.aggregate([
+        { $match: { status: { $ne: "cancelled" } } },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.product",
+            name: { $first: "$items.name" },
+            image: { $first: "$items.image" },
+            price: { $first: "$items.price" },
+            quantity: { $sum: "$items.quantity" },
+            revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+          },
+        },
+        { $sort: { quantity: -1 } },
+        { $limit: 6 },
+      ]),
+      Product.find({ isActive: true, stock: { $lt: 10 } }).limit(6),
+    ]);
+
+    // Calculate last 7 days daily stats in UTC+7
+    const last7DaysStats = [];
+    for (let i = 6; i >= 0; i--) {
+      const dDate = new Date(Date.now() + 7 * 3600000 - i * 86400000);
+      const dStr = dDate.toISOString().slice(0, 10);
+      const sDate = parseVnDate(dStr, false);
+      const eDate = parseVnDate(dStr, true);
+
+      const [dCount, dRev] = await Promise.all([
+        Order.countDocuments({ createdAt: { $gte: sDate, $lte: eDate } }),
+        Order.aggregate([
+          { $match: { status: { $ne: "cancelled" }, createdAt: { $gte: sDate, $lte: eDate } } },
+          { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+        ]),
+      ]);
+
+      const parts = dStr.split("-");
+      last7DaysStats.push({
+        date: dStr,
+        dayLabel: `${parts[2]}/${parts[1]}`,
+        orderCount: dCount,
+        revenue: dRev[0]?.total || 0,
+      });
+    }
+
+    res.json({
+      totalProducts,
+      totalOrders,
+      totalCustomers,
+      pendingOrdersCount,
+      todayOrdersCount,
+      todayRevenue: todayRevenueResult[0]?.total || 0,
+      revenue: totalRevenueResult[0]?.total || 0,
+      totalStock: totalStockResult[0]?.totalStock || 0,
+      lowStockCount,
+      recentOrders,
+      topSelling,
+      lowStockProducts,
+      dailyStats: last7DaysStats,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải thông tin tổng quan", error: error.message });
+  }
 });
 
 // PRODUCTS
@@ -314,31 +455,268 @@ router.delete("/categories/:id", async (req, res) => {
 });
 
 // ORDERS
-router.get("/orders", async (req, res) =>
-  res.json(
-    await Order.find().populate("user", "name email").sort({ createdAt: -1 }),
-  ),
-);
-router.get("/orders/:id", async (req, res) =>
-  res.json(await Order.findById(req.params.id).populate("user", "name email")),
-);
+router.get("/orders", async (req, res) => {
+  try {
+    const {
+      search,
+      status,
+      paymentStatus,
+      paymentMethod,
+      startDate,
+      endDate,
+      preset,
+    } = req.query;
+
+    const query = {};
+
+    if (status && status !== "all") {
+      query.status = status;
+    }
+    if (paymentStatus && paymentStatus !== "all") {
+      query.paymentStatus = paymentStatus;
+    }
+    if (paymentMethod && paymentMethod !== "all") {
+      query.paymentMethod = paymentMethod;
+    }
+
+    // Timezone UTC+7 Filter
+    let dateRange = null;
+    if (preset && preset !== "all") {
+      dateRange = getDateRangeForPreset(preset);
+    } else if (startDate || endDate) {
+      dateRange = {
+        startDate: startDate ? parseVnDate(startDate, false) : undefined,
+        endDate: endDate ? parseVnDate(endDate, true) : undefined,
+      };
+    }
+
+    if (dateRange) {
+      query.createdAt = {};
+      if (dateRange.startDate) query.createdAt.$gte = dateRange.startDate;
+      if (dateRange.endDate) query.createdAt.$lte = dateRange.endDate;
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      const searchRegex = new RegExp(q, "i");
+      const orList = [
+        { customerName: searchRegex },
+        { phone: searchRegex },
+        { trackingCode: searchRegex },
+      ];
+      if (mongoose.isValidObjectId(q)) {
+        orList.push({ _id: q });
+      } else {
+        orList.push({ trackingCode: { $regex: new RegExp(q.replace(/^#/, ""), "i") } });
+      }
+      query.$or = orList;
+    }
+
+    const orders = await Order.find(query)
+      .populate("user", "name email")
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải danh sách đơn hàng", error: error.message });
+  }
+});
+
+router.get("/orders/:id", async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).populate("user", "name email");
+    if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải chi tiết đơn hàng", error: error.message });
+  }
+});
+
 router.put("/orders/:id/status", async (req, res) => {
-  const allowed = [
-    "pending",
-    "confirmed",
-    "shipping",
-    "delivered",
-    "cancelled",
-  ];
-  if (!allowed.includes(req.body.status))
-    return res.status(400).json({ message: "Trạng thái không hợp lệ" });
-  res.json(
-    await Order.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { returnDocument: "after" },
-    ),
-  );
+  try {
+    const { status, paymentStatus, cancelledReason, note } = req.body;
+    const allowedStatus = [
+      "pending",
+      "confirmed",
+      "shipping",
+      "delivered",
+      "cancelled",
+    ];
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+
+    const now = new Date();
+    if (!order.shippingLogs) order.shippingLogs = [];
+
+    if (status) {
+      if (!allowedStatus.includes(status)) {
+        return res.status(400).json({ message: "Trạng thái đơn hàng không hợp lệ" });
+      }
+      order.status = status;
+
+      if (status === "confirmed") {
+        order.shippingLogs.push({
+          time: now,
+          title: "Shop đã duyệt & Đang đóng gói",
+          desc: "Đơn hàng len handmade đã được xác nhận và tiến hành đóng gói xuất kho.",
+          location: "Kho Tổng Cần Thơ (124 Đ. 30/4, Ninh Kiều)",
+          icon: "🏪",
+        });
+      } else if (status === "shipping") {
+        order.shippingLogs.push({
+          time: now,
+          title: "Bưu tá Shopee Xpress đang giao",
+          desc: `Bưu tá ${order.shipper?.name || "Nguyễn Văn Hùng"} (${order.shipper?.phone || "0918.234.567"}) đang di chuyển giao kiện hàng.`,
+          location: "Tuyến phát Cần Thơ",
+          icon: "🚚",
+        });
+      } else if (status === "delivered") {
+        order.paymentStatus = "paid";
+        if (!order.paidAt) order.paidAt = now;
+        order.shippingLogs.push({
+          time: now,
+          title: "Giao hàng thành công",
+          desc: "Kiện hàng đã được giao tận tay khách hàng hoàn tất.",
+          location: order.address || "Địa chỉ nhận hàng",
+          icon: "🎉",
+        });
+      } else if (status === "cancelled") {
+        order.shippingLogs.push({
+          time: now,
+          title: "Đơn hàng đã hủy",
+          desc: cancelledReason ? `Lý do: ${cancelledReason}` : "Đơn hàng đã được hủy trên hệ thống quản trị.",
+          location: "Sene Handmade Studio",
+          icon: "❌",
+        });
+      }
+    }
+
+    if (paymentStatus && ["paid", "unpaid"].includes(paymentStatus)) {
+      order.paymentStatus = paymentStatus;
+      if (paymentStatus === "paid" && !order.paidAt) {
+        order.paidAt = now;
+      }
+    }
+
+    if (note !== undefined) {
+      order.note = note;
+    }
+
+    await order.save();
+    res.json({ message: "Cập nhật đơn hàng thành công", order });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi cập nhật trạng thái đơn hàng", error: error.message });
+  }
+});
+
+// ADMIN & STAFF ACCOUNTS MANAGEMENT
+router.get("/admins", async (req, res) => {
+  try {
+    const admins = await User.find({ role: { $in: ["admin", "superadmin", "staff"] } })
+      .select("-password")
+      .sort({ createdAt: -1 });
+    res.json(admins);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải tài khoản quản trị", error: error.message });
+  }
+});
+
+router.post("/admins", async (req, res) => {
+  try {
+    const { name, email, password, role = "admin", phone } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu" });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Mật khẩu phải từ 6 ký tự trở lên" });
+    }
+    const existing = await User.findOne({ email: email.toLowerCase().trim() });
+    if (existing) {
+      return res.status(400).json({ message: "Email này đã tồn tại trên hệ thống" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newAdmin = await User.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      role: ["superadmin", "admin", "staff"].includes(role) ? role : "admin",
+      phone: phone?.trim(),
+      isActive: true,
+    });
+    res.status(201).json({
+      message: "Tạo tài khoản quản trị thành công",
+      user: {
+        _id: newAdmin._id,
+        name: newAdmin.name,
+        email: newAdmin.email,
+        role: newAdmin.role,
+        phone: newAdmin.phone,
+        isActive: newAdmin.isActive,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tạo tài khoản", error: error.message });
+  }
+});
+
+router.put("/admins/:id", async (req, res) => {
+  try {
+    const { name, role, phone, password, isActive } = req.body;
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) return res.status(404).json({ message: "Không tìm thấy tài khoản" });
+
+    if (name) targetUser.name = name.trim();
+    if (phone !== undefined) targetUser.phone = phone.trim();
+    if (role && ["superadmin", "admin", "staff"].includes(role)) targetUser.role = role;
+    if (isActive !== undefined) targetUser.isActive = Boolean(isActive);
+    if (password && password.trim().length >= 6) {
+      targetUser.password = await bcrypt.hash(password.trim(), 10);
+    }
+
+    await targetUser.save();
+    res.json({
+      message: "Cập nhật tài khoản thành công",
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        role: targetUser.role,
+        phone: targetUser.phone,
+        isActive: targetUser.isActive,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi cập nhật tài khoản", error: error.message });
+  }
+});
+
+router.delete("/admins/:id", async (req, res) => {
+  try {
+    if (String(req.user._id) === String(req.params.id)) {
+      return res.status(400).json({ message: "Bạn không thể tự xóa tài khoản của chính mình" });
+    }
+    const deleted = await User.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Không tìm thấy tài khoản để xóa" });
+    res.json({ message: "Đã xóa tài khoản quản trị viên" });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi xóa tài khoản", error: error.message });
+  }
+});
+
+// CUSTOMER ORDERS HISTORY
+router.get("/customers/:id/orders", async (req, res) => {
+  try {
+    const customer = await User.findById(req.params.id);
+    const query = [{ user: req.params.id }];
+    if (customer && customer.phone) {
+      query.push({ phone: customer.phone });
+    }
+    const orders = await Order.find({ $or: query }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải lịch sử đơn hàng của khách", error: error.message });
+  }
 });
 
 // CUSTOMERS

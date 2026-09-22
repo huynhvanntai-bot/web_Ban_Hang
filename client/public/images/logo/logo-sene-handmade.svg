@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
+  <defs>
+    <linearGradient id="senePink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff758c"/>
+      <stop offset="100%" stop-color="#ff7eb3"/>
+    </linearGradient>
+    <linearGradient id="seneYarn" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8b500"/>
+      <stop offset="100%" stop-color="#fce043"/>
+    </linearGradient>
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#ff758c" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  
+  <!-- Yarn Icon / Ball -->
+  <g transform="translate(15, 12)" filter="url(#softGlow)">
+    <circle cx="28" cy="28" r="26" fill="url(#senePink)"/>
+    <path d="M12 28 C12 18, 38 14, 44 26 C48 34, 30 46, 18 38 C14 34, 40 22, 42 34" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>
+    <path d="M18 16 C26 22, 34 36, 26 44" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="46" cy="18" r="4" fill="url(#seneYarn)"/>
+    <!-- Cute Knitting Needle -->
+    <line x1="6" y1="50" x2="50" y2="6" stroke="#fce043" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="6" cy="50" r="3.5" fill="#f8b500"/>
+  </g>
+
+  <!-- Typography -->
+  <text x="82" y="44" font-family="'Nunito', 'Segoe UI', sans-serif" font-size="30" font-weight="900" fill="#2d3748" letter-spacing="1">
+    SENE <tspan fill="#ff758c">HANDMADE</tspan>
+  </text>
+  <text x="84" y="62" font-family="'Nunito', 'Segoe UI', sans-serif" font-size="12" font-weight="700" fill="#8d99ae" letter-spacing="2">
+    TIỆM LEN SỢI &amp; SẢN PHẨM DIY
+  </text>
+</svg>

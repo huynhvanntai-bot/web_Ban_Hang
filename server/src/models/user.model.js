@@ -11,7 +11,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     password: { type: String, required: true, minlength: 6 },
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    role: {
+      type: String,
+      enum: ["user", "admin", "superadmin", "staff"],
+      default: "user",
+    },
+    isActive: { type: Boolean, default: true },
     phone: { type: String, trim: true },
     address: { type: String, trim: true },
   },
