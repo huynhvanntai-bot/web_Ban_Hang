@@ -413,6 +413,10 @@
   text-decoration: line-through;
 }
 
+.card-quick-cart-btn {
+  display: none;
+}
+
 .card-actions-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -452,6 +456,14 @@
 .card-btn-addcart:hover {
   background: #fce7f3;
   border-color: #f472b6;
+}
+
+.btn-full-text {
+  display: inline;
+}
+
+.btn-short-text {
+  display: none;
 }
 
 /* 3. CATEGORY VIEW PAGE */
@@ -1971,121 +1983,217 @@
     color: #15803d !important;
   }
 
-  /* 2. PRODUCT CARDS & 2-COLUMN GRID ON MOBILE */
+  /* 2. PRODUCT CARDS & 2-COLUMN GRID ON MOBILE (CHỐNG TRÀN VỪA KHÍT 100% MỌI ĐIỆN THOẠI) */
+  .mobile-products-grid,
   .category-products-grid,
   .ecommerce-products-grid,
   .products-grid,
   .related-grid,
-  .product-grid {
+  .product-grid,
+  .flash-sale-grid,
+  .flash-sales-grid {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 10px !important;
-    padding: 0 10px !important;
+    gap: 8px !important;
+    padding: 0 8px !important;
     box-sizing: border-box !important;
     width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
   }
 
   .standard-product-card {
-    border-radius: 14px !important;
-    box-shadow: 0 2px 8px rgba(74, 29, 46, 0.07) !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(74, 29, 46, 0.06) !important;
     background: #ffffff !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
     border: 1px solid #fce7f3 !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  }
+
+  .standard-product-card:active {
+    transform: scale(0.985) !important;
   }
 
   .card-media-wrapper {
+    width: 100% !important;
     aspect-ratio: 1 / 1 !important;
+    position: relative !important;
+    overflow: hidden !important;
+    background: #fff5f8 !important;
   }
 
   .card-badges {
     top: 6px !important;
     left: 6px !important;
     gap: 3px !important;
+    z-index: 2 !important;
   }
 
   .card-badge {
-    font-size: 9.5px !important;
-    padding: 2px 6px !important;
-    border-radius: 6px !important;
+    font-size: 9px !important;
+    padding: 2px 5px !important;
+    border-radius: 4px !important;
+    line-height: 1.2 !important;
   }
 
   .card-wish-btn {
     top: 6px !important;
     right: 6px !important;
-    width: 28px !important;
-    height: 28px !important;
-    font-size: 14px !important;
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 13px !important;
+    z-index: 2 !important;
   }
 
   .card-content {
-    padding: 8px !important;
+    padding: 7px 7px 9px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   .card-top-row {
-    margin-bottom: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
+    margin-bottom: 2px !important;
+    min-width: 0 !important;
   }
 
   .card-cat-name {
     font-size: 9px !important;
+    font-weight: 700 !important;
+    color: #9d6981 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-width: 0 !important;
+    flex: 1 !important;
   }
 
   .card-swatch-dot {
-    width: 8px !important;
-    height: 8px !important;
+    width: 7px !important;
+    height: 7px !important;
   }
 
   .card-title {
     font-size: 12px !important;
-    line-height: 1.35 !important;
-    height: 33px !important;
-    margin-bottom: 4px !important;
+    line-height: 1.32 !important;
+    height: 32px !important;
+    margin: 0 0 3px 0 !important;
+    font-weight: 700 !important;
+    color: #2d1822 !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
+    word-break: break-word !important;
+  }
+
+  .card-title a {
+    color: #2d1822 !important;
+    text-decoration: none !important;
   }
 
   .card-rating-row {
-    font-size: 10px !important;
-    margin-bottom: 6px !important;
+    display: flex !important;
+    align-items: center !important;
     gap: 3px !important;
+    font-size: 9.5px !important;
+    margin-bottom: 4px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-width: 0 !important;
+  }
+
+  .stars {
+    font-size: 9px !important;
+    letter-spacing: -0.5px !important;
+  }
+
+  .card-sold-count {
+    color: #835269 !important;
+    font-size: 9px !important;
   }
 
   .card-price-row {
-    margin-bottom: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
+    margin-top: auto !important;
+    margin-bottom: 0 !important;
+    padding-top: 3px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .price-box {
-    gap: 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
   }
 
   .current-price {
-    font-size: 14px !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    color: #e11d48 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
   }
 
   .old-price {
-    font-size: 10.5px !important;
+    font-size: 9px !important;
+    color: #9ca3af !important;
+    text-decoration: line-through !important;
+    white-space: nowrap !important;
+    line-height: 1.1 !important;
   }
 
+  .card-quick-cart-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    background: #fdf2f8 !important;
+    border: 1.5px solid #fbcfe8 !important;
+    color: #db2777 !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
+    box-shadow: 0 1px 4px rgba(219, 39, 119, 0.12) !important;
+    transition: transform 0.15s ease, background 0.15s ease !important;
+  }
+
+  .card-quick-cart-btn:active {
+    transform: scale(0.88) !important;
+    background: #db2777 !important;
+    color: #ffffff !important;
+  }
+
+  /* ẨN HÀNG 2 NÚT TO ĐÙNG TRÊN MOBILE ĐỂ CARD NHỎ XINH CHUẨN SHOPEE */
   .card-actions-row {
-    display: grid !important;
-    grid-template-columns: 1fr auto !important;
-    gap: 5px !important;
-    margin-top: auto !important;
-  }
-
-  .card-btn-buynow {
-    padding: 6px 8px !important;
-    font-size: 11.5px !important;
-    border-radius: 8px !important;
-  }
-
-  .card-btn-addcart {
-    padding: 6px 10px !important;
-    font-size: 11.5px !important;
-    border-radius: 8px !important;
+    display: none !important;
   }
 
   /* 3. CATEGORY VIEW MOBILE LAYOUT */
@@ -2376,70 +2484,91 @@
     border-radius: 12px !important;
   }
 
-  /* MOBILE STICKY BUY BAR (FIXED ABOVE BOTTOM NAV) */
+  /* MOBILE STICKY BUY BAR (SHOPEE STYLE - BOTTOM 0) */
   .mobile-sticky-buy-bar {
     position: fixed !important;
-    bottom: 60px !important;
+    bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    z-index: 2400 !important;
+    z-index: 3000 !important;
     background: #ffffff !important;
-    border-top: 1px solid #fce7f3 !important;
-    padding: 8px 14px !important;
+    border-top: 1.5px solid #fce7f3 !important;
+    padding: 6px 10px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
+    gap: 8px !important;
     box-shadow: 0 -4px 16px rgba(74, 29, 46, 0.08) !important;
     box-sizing: border-box !important;
+    height: 56px !important;
   }
 
-  .sticky-price-box {
+  .sticky-home-btn,
+  .sticky-chat-btn {
     display: flex !important;
     flex-direction: column !important;
-  }
-
-  .sticky-price-label {
-    font-size: 10px !important;
-    color: #9d6981 !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-  }
-
-  .sticky-price-val {
-    font-size: 17px !important;
-    font-weight: 900 !important;
-    color: #db2777 !important;
-  }
-
-  .sticky-actions-box {
-    display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
+    justify-content: center !important;
+    background: none !important;
+    border: none !important;
+    padding: 2px 4px !important;
+    color: #4b5563 !important;
+    font-size: 16px !important;
+    cursor: pointer !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .sticky-home-btn small,
+  .sticky-chat-btn small {
+    font-size: 9px !important;
+    margin-top: 2px !important;
+    color: #6b7280 !important;
+    font-weight: 600 !important;
   }
 
   .sticky-add-cart-btn {
+    flex: 1 !important;
     background: #fff0f5 !important;
     border: 1.5px solid #fbcfe8 !important;
     color: #db2777 !important;
-    font-size: 12.5px !important;
+    font-size: 12px !important;
     font-weight: 800 !important;
-    padding: 8px 12px !important;
-    border-radius: 10px !important;
+    height: 40px !important;
+    padding: 0 8px !important;
+    border-radius: 8px !important;
     cursor: pointer !important;
     white-space: nowrap !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background 0.15s ease !important;
+  }
+
+  .sticky-add-cart-btn:active {
+    background: #fce7f3 !important;
   }
 
   .sticky-buy-now-btn {
-    background: linear-gradient(135deg, #f472b6, #db2777) !important;
+    flex: 1.3 !important;
+    background: linear-gradient(135deg, #e11d48 0%, #db2777 100%) !important;
     border: none !important;
     color: #ffffff !important;
     font-size: 13px !important;
     font-weight: 800 !important;
-    padding: 8px 16px !important;
-    border-radius: 10px !important;
+    height: 40px !important;
+    padding: 0 10px !important;
+    border-radius: 8px !important;
     cursor: pointer !important;
     white-space: nowrap !important;
-    box-shadow: 0 3px 10px rgba(219, 39, 119, 0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.25) !important;
+  }
+
+  .sticky-buy-now-btn:active {
+    opacity: 0.9 !important;
   }
 
   /* 5. FOOTER & MISC ON MOBILE */
@@ -2632,41 +2761,47 @@
     background: #faf7f8 !important;
   }
 
-  /* Quick Shortcuts (2 rows / 5 cols) */
+  /* Quick Shortcuts (2 rows / 5 cols - Tỷ lệ vàng Shopee) */
   .mobile-quick-shortcuts {
-    padding: 12px 6px 8px !important;
+    padding: 10px 4px 6px !important;
     background: #ffffff !important;
     margin-bottom: 8px !important;
     border-bottom: 1px solid #fce7f3 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .mobile-shortcuts-grid {
     display: grid !important;
     grid-template-columns: repeat(5, 1fr) !important;
-    gap: 10px 4px !important;
+    gap: 8px 2px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .mobile-shortcut-btn {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 4px !important;
     background: none !important;
     border: none !important;
-    padding: 0 !important;
+    padding: 2px 0 !important;
     cursor: pointer !important;
     text-align: center !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .mobile-shortcut-icon-wrap {
-    width: 44px !important;
-    height: 44px !important;
+    width: 40px !important;
+    height: 40px !important;
     border-radius: 50% !important;
     background: linear-gradient(135deg, #fdf2f8 0%, #ffe4e6 100%) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    box-shadow: 0 2px 6px rgba(244, 114, 182, 0.15) !important;
+    box-shadow: 0 2px 6px rgba(244, 114, 182, 0.12) !important;
     border: 1px solid #fbcfe8 !important;
     transition: transform 0.15s ease !important;
   }
@@ -2676,16 +2811,17 @@
   }
 
   .mobile-shortcut-icon {
-    font-size: 20px !important;
+    font-size: 18px !important;
     line-height: 1 !important;
   }
 
   .mobile-shortcut-label {
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     font-weight: 600 !important;
-    color: #4b5563 !important;
+    color: #374151 !important;
     line-height: 1.2 !important;
     white-space: nowrap !important;
+    letter-spacing: -0.2px !important;
   }
 
   /* Compact Banner Carousel */

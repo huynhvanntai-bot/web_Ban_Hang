@@ -5995,67 +5995,69 @@ function App() {
         </button>
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className="mobile-bottom-nav" aria-label="Thanh điều hướng di động">
-        <button
-          type="button"
-          className="mobile-nav-item"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        >
-          <span className="mobile-nav-icon">🏠</span>
-          <span className="mobile-nav-label">Trang chủ</span>
-        </button>
+      {/* MOBILE BOTTOM NAVIGATION BAR (Only on Home & Category pages, hide on Product detail) */}
+      {currentRoute.type !== "product" && (
+        <nav className="mobile-bottom-nav" aria-label="Thanh điều hướng di động">
+          <button
+            type="button"
+            className="mobile-nav-item"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          >
+            <span className="mobile-nav-icon">🏠</span>
+            <span className="mobile-nav-label">Trang chủ</span>
+          </button>
 
-        <button
-          type="button"
-          className="mobile-nav-item"
-          onClick={() => {
-            const searchInput = document.querySelector("#site-search-input");
-            if (searchInput) {
-              searchInput.focus();
-              searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-          }}
-        >
-          <span className="mobile-nav-icon">🔍</span>
-          <span className="mobile-nav-label">Tìm kiếm</span>
-        </button>
+          <button
+            type="button"
+            className="mobile-nav-item"
+            onClick={() => {
+              const searchInput = document.querySelector("#site-search-input");
+              if (searchInput) {
+                searchInput.focus();
+                searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
+              }
+            }}
+          >
+            <span className="mobile-nav-icon">🔍</span>
+            <span className="mobile-nav-label">Tìm kiếm</span>
+          </button>
 
-        <button
-          type="button"
-          className="mobile-nav-item mobile-nav-highlight"
-          onClick={() => {
-            setCustomOrderSuccess(null);
-            setCustomOrderModalOpen(true);
-          }}
-        >
-          <span className="mobile-nav-icon">🧶</span>
-          <span className="mobile-nav-label">Đặt móc</span>
-        </button>
+          <button
+            type="button"
+            className="mobile-nav-item mobile-nav-highlight"
+            onClick={() => {
+              setCustomOrderSuccess(null);
+              setCustomOrderModalOpen(true);
+            }}
+          >
+            <span className="mobile-nav-icon">🧶</span>
+            <span className="mobile-nav-label">Đặt móc</span>
+          </button>
 
-        <button
-          type="button"
-          className="mobile-nav-item"
-          onClick={() => setCartOpen(true)}
-        >
-          <span className="mobile-nav-icon-wrap">
-            <span className="mobile-nav-icon">🛒</span>
-            {cartCount > 0 && <span className="mobile-nav-badge">{cartCount}</span>}
-          </span>
-          <span className="mobile-nav-label">Giỏ hàng</span>
-        </button>
+          <button
+            type="button"
+            className="mobile-nav-item"
+            onClick={() => setCartOpen(true)}
+          >
+            <span className="mobile-nav-icon-wrap">
+              <span className="mobile-nav-icon">🛒</span>
+              {cartCount > 0 && <span className="mobile-nav-badge">{cartCount}</span>}
+            </span>
+            <span className="mobile-nav-label">Giỏ hàng</span>
+          </button>
 
-        <a
-          href="#account"
-          className="mobile-nav-item"
-          onClick={() => {
-            document.querySelector("#account")?.scrollIntoView({ behavior: "smooth" });
-          }}
-        >
-          <span className="mobile-nav-icon">👤</span>
-          <span className="mobile-nav-label">{currentUser ? "Tôi" : "Tài khoản"}</span>
-        </a>
-      </nav>
+          <a
+            href="#account"
+            className="mobile-nav-item"
+            onClick={() => {
+              document.querySelector("#account")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            <span className="mobile-nav-icon">👤</span>
+            <span className="mobile-nav-label">{currentUser ? "Tôi" : "Tài khoản"}</span>
+          </a>
+        </nav>
+      )}
 
       {/* MODAL: ĐẶT MÓC LEN THEO YÊU CẦU (CUSTOM CROCHET ORDER) */}
       {customOrderModalOpen && (

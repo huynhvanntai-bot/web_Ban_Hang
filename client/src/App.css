@@ -9298,7 +9298,19 @@ html, body {
   display: none !important;
 }
 .desktop-only {
-  display: inline-flex !important;
+  display: block !important;
+}
+
+.desktop-home-sections {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.mobile-home-sections {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 .admin-mobile-backdrop {
@@ -9323,7 +9335,7 @@ html, body {
     display: none !important;
   }
   .mobile-only {
-    display: inline-flex !important;
+    display: block !important;
   }
 
   /* --- 1. ADMIN SHELL & SIDEBAR --- */
@@ -17929,10 +17941,10 @@ html, body {
 
 /* Mobile (<= 768px) - TOÀN DIỆN RESPONSIVE MOBILE CHUYÊN NGHIỆP */
 @media (max-width: 768px) {
-  /* CHỐNG TRÀN TOÀN TRANG */
+  /* CHỐNG TRÀN TOÀN TRANG TRÊN MỌI THIẾT BỊ DI ĐỘNG */
   html, body, #root, .storefront {
     overflow-x: hidden !important;
-    max-width: 100vw !important;
+    max-width: 100% !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
@@ -18049,6 +18061,17 @@ html, body {
     padding: 0 8px !important;
     box-sizing: border-box !important;
     width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .mobile-products-grid > *,
+  .product-grid > *,
+  .products-grid > *,
+  .flash-sale-grid > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .section-heading {

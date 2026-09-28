@@ -25,7 +25,15 @@ export default function ProductCard({
   const hoverImg = product.images?.[1] || null;
 
   return (
-    <article className="standard-product-card" id={`product-${product.slug || product._id}`}>
+    <article
+      className="standard-product-card"
+      id={`product-${product.slug || product._id}`}
+      onClick={(e) => {
+        if (e.target.closest("button") || e.target.closest("a")) return;
+        onOpenDetail(product);
+      }}
+      style={{ cursor: "pointer" }}
+    >
       {/* CARD MEDIA */}
       <div className="card-media-wrapper">
         <a
@@ -101,20 +109,20 @@ export default function ProductCard({
       <div className="card-content">
         {/* CATEGORY & SWATCHES */}
         <div className="card-top-row">
-          <span className="card-cat-name">
+          <span className="card-cat-name" title={product.category?.name || "Handmade Sene"}>
             {product.category?.name || "Handmade Sene"}
           </span>
           {product.colors && product.colors.length > 0 && (
             <div className="card-color-swatches" title={`${product.colors.length} mã màu`}>
-              {product.colors.slice(0, 4).map((c, i) => (
+              {product.colors.slice(0, 3).map((c, i) => (
                 <span
                   key={i}
                   className="card-swatch-dot"
                   style={{ backgroundColor: c.hex || "#ffc0cb" }}
                 />
               ))}
-              {product.colors.length > 4 && (
-                <small className="card-swatch-more">+{product.colors.length - 4}</small>
+              {product.colors.length > 3 && (
+                <small className="card-swatch-more">+{product.colors.length - 3}</small>
               )}
             </div>
           )}
@@ -143,7 +151,7 @@ export default function ProductCard({
           </span>
         </div>
 
-        {/* PRICE ROW */}
+        {/* PRICE ROW & QUICK CART (SHOPEE STYLE) */}
         <div className="card-price-row">
           <div className="price-box">
             <span className="current-price">{formatPrice(currentPrice)}</span>
@@ -151,14 +159,29 @@ export default function ProductCard({
               <span className="old-price">{formatPrice(oldPrice)}</span>
             )}
           </div>
+          <button
+            type="button"
+            className="card-quick-cart-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product, 1);
+            }}
+            title="Thêm vào giỏ"
+            aria-label={`Thêm ${product.name} vào giỏ`}
+          >
+            🛒
+          </button>
         </div>
 
-        {/* ACTIONS */}
+        {/* ACTIONS (DESKTOP ONLY) */}
         <div className="card-actions-row">
           <button
             type="button"
             className="card-btn-buynow"
-            onClick={() => onBuyNow(product, 1)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onBuyNow(product, 1);
+            }}
             title="Mua ngay hỏa tốc"
           >
             ⚡ Mua ngay
@@ -166,7 +189,10 @@ export default function ProductCard({
           <button
             type="button"
             className="card-btn-addcart"
-            onClick={() => onAddToCart(product, 1)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product, 1);
+            }}
             title="Thêm vào giỏ hàng"
             aria-label={`Thêm ${product.name} vào giỏ`}
           >

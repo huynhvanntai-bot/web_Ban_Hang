@@ -597,30 +597,50 @@ export default function ProductDetailView({
         </section>
       )}
 
-      {/* MOBILE STICKY PURCHASE BAR (<= 768px) - FIXED ABOVE BOTTOM NAV */}
+      {/* MOBILE STICKY PURCHASE BAR (<= 768px) - SHOPEE STYLE BOTTOM 0 */}
       <div className="mobile-sticky-buy-bar mobile-only">
-        <div className="sticky-price-box">
-          <small className="sticky-price-label">Giá ưu đãi</small>
-          <strong className="sticky-price-val">{formatPrice(currentPrice)}</strong>
-        </div>
-        <div className="sticky-actions-box">
-          <button
-            type="button"
-            className="sticky-add-cart-btn"
-            onClick={() => onAddToCart(product, quantity)}
-            aria-label="Thêm vào giỏ"
-            title="Thêm vào giỏ"
-          >
-            🛒 +Giỏ
-          </button>
-          <button
-            type="button"
-            className="sticky-buy-now-btn"
-            onClick={() => onBuyNow(product, quantity)}
-          >
-            ⚡ Mua ngay
-          </button>
-        </div>
+        <button
+          type="button"
+          className="sticky-home-btn"
+          onClick={() => {
+            if (typeof onNavigateHome === "function") {
+              onNavigateHome();
+            } else {
+              window.location.href = "/";
+            }
+          }}
+          title="Trang chủ"
+          aria-label="Trang chủ"
+        >
+          <span>🏠</span>
+          <small>Trang chủ</small>
+        </button>
+        <button
+          type="button"
+          className="sticky-chat-btn"
+          onClick={() => window.open("https://zalo.me/0942901124", "_blank")}
+          title="Chat Zalo"
+          aria-label="Chat Zalo"
+        >
+          <span>💬</span>
+          <small>Tư vấn</small>
+        </button>
+        <button
+          type="button"
+          className="sticky-add-cart-btn"
+          onClick={() => onAddToCart(product, quantity)}
+          aria-label="Thêm vào giỏ"
+          title="Thêm vào giỏ"
+        >
+          🛒 + Giỏ
+        </button>
+        <button
+          type="button"
+          className="sticky-buy-now-btn"
+          onClick={() => onBuyNow(product, quantity)}
+        >
+          ⚡ Mua ngay
+        </button>
       </div>
     </div>
   );

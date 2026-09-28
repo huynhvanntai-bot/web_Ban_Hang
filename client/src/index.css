@@ -13,10 +13,14 @@
 }
 html {
   min-width: 320px;
+  max-width: 100%;
+  overflow-x: hidden;
   background: #fff5f8;
 }
 body {
   min-width: 320px;
+  max-width: 100%;
+  overflow-x: hidden;
   min-height: 100vh;
   margin: 0;
   background: #fff5f8;
